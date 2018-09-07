@@ -5,97 +5,91 @@
 #include <ctype.h>
 #include "flux.h"
 
-#define INDEX_HOLE_MARK         0
-#define ID_ADDRESS_MARK         0xe
-#define INDEX_ADDRESS_MARK      0xc
-#define DATA_ADDRESS_MARK       0xb
-#define DELETED_ADDRESS_MARK    0x8
+enum {
+    INDEX_HOLE_MARK,
+    INDEX_ADDRESS_MARK,
+    ID_ADDRESS_MARK,
+    DATA_ADDRESS_MARK,
+    DELETED_ADDRESS_MARK
+};
 
-// byte lengths
-#define NOMINAL_LEADIN          46
-#define GAP_LEN                 28
-#define ID_LEN                  7
-#define DATA_LEN                131
-#define SECTOR_LEN              (GAP_LEN + ID_LEN + GAP_LEN + DATA_LEN)
-#define JITTER_ALLOWANCE        28
-#define USCLOCK                 24      // 1 uS clock 
+
+
+#define JITTER_ALLOWANCE        10
+
 
 #define BYTES_PER_LINE  16      // for display of data dumps
 
+struct {
+    char    *name;              // format name
+    int     (*getBit)();        // get next bit routine
+    word    indexAM;            // index address marker -- markers are stored with marker sig in high byte, marker in low
+    word    idAM;               // id address marker
+    word    dataAM;             // data address marker
+    word    deletedAM;          // deleted data address marker
+    short   fixedSector;        // min size of sector excluding data
+    short   gap4;               // min gap4 size
+    byte    imdMode;            // mode byte for IMD image
+    double  byteClock;          // 1 byte in samples
+    unsigned short crcInit;
+} *curFmt, formats[] = {
+    {"FM",     getFMBit, 0x28fc, 0x38fe, 0x38fb, 0x38f8, 60, 170, 0, 32 * SCK / 1000000.0, 0xffff},
+    {"MFM",        NULL, 0x200d, 0x200a, 0x200b, 0x2005, 60, 240, 3, 16 * SCK / 1000000.0, 0},
+    {"M2FM", getM2FMBit, 0x300c, 0x300e, 0x300b, 0x3008, 60, 240, 3, 16 * SCK / 1000000.0, 0},
+    {"Unknown"}
+};
+
+struct {
+    long slotByteNumber;
+    byte slot;
+    int interMarkerByteCnt;
+    int interSectorByteCnt;
+
+} slotInfo;
+
 imd_t curTrack;
 
-int byte2Time(int cnt) {  // return estimated time of cnt bytes
-    return (cnt * x8ByteTime() + 4) / 8;
+int time2Byte(long time) {
+    return (int)(time / curFmt->byteClock + 0.5);
 }
 
 
 int getSlot(int marker) {
-    static long indexTime, lastSectorTime, lastSlot;
-    long time = when(0);
-    int initialSlot = lastSlot;
-
+    int t = time2Byte(when(0));
+    int slotInc;
+ 
     switch (marker) {
     case INDEX_HOLE_MARK:
-        indexTime = lastSectorTime = lastSlot = 0;
-        return 0;
-    case INDEX_ADDRESS_MARK:
-        indexTime = time;
-        return 0;
-    case ID_ADDRESS_MARK:
-        if (indexTime == 0)
-            indexTime = NOMINAL_LEADIN * x8ByteTime() / 8;     // we didn't have an index marker assume one
-        if (lastSectorTime == 0) {                         // first id block seen
-            if (time - indexTime < byte2Time(GAP_LEN + JITTER_ALLOWANCE)) {
-                lastSectorTime = time;
-                return lastSlot = 0;
-            }
-            else {
-                lastSectorTime = byte2Time(GAP_LEN + 1) + indexTime;        // estimated time after id marker
-                lastSlot = 0;
-            }
-        }
-        while (time - lastSectorTime > byte2Time(SECTOR_LEN - JITTER_ALLOWANCE)) {
-            lastSectorTime += byte2Time(SECTOR_LEN);
-            lastSlot++;
-        }
-        lastSectorTime = time;
+        slotInfo.slotByteNumber = 0;           // reset for new track copy
+        slotInfo.slot = 0;
         break;
     case DELETED_ADDRESS_MARK:
     case DATA_ADDRESS_MARK:
-        if (indexTime == 0)
-            indexTime = NOMINAL_LEADIN * x8ByteTime() / 8;      // we didn't have an index marker assume one
-        if (lastSectorTime == 0) {                          // we didn't have a sector id marker
-            if (time - indexTime < byte2Time(GAP_LEN + ID_LEN + GAP_LEN + JITTER_ALLOWANCE)) {
-                lastSlot = 0;
-                lastSectorTime = time - byte2Time(GAP_LEN + ID_LEN);    // set an effective time;
-                return lastSlot;
-            }
-            else {
-                lastSectorTime = byte2Time(GAP_LEN + 1) + indexTime;        // estimated time after id marker
-                lastSlot = 0;
-            }
+        if (t - slotInfo.slotByteNumber < 128)  // less than a sector away
+            return slotInfo.slot;
+        t -= slotInfo.interMarkerByteCnt;
+    case ID_ADDRESS_MARK:
+        if (slotInfo.slotByteNumber == 0) {
+            slotInfo.slotByteNumber = t;              // back up to slot 0 if first sector missing
+            while (slotInfo.slotByteNumber > slotInfo.interSectorByteCnt)
+                slotInfo.slotByteNumber -= slotInfo.interSectorByteCnt;
+            slotInfo.slot = 0;
         }
-        while (time - lastSectorTime > byte2Time(ID_LEN + GAP_LEN + JITTER_ALLOWANCE)) {
-            lastSectorTime += byte2Time(SECTOR_LEN);
-            lastSlot++;
-        }
-        lastSectorTime = time - byte2Time(GAP_LEN + ID_LEN);
-        break;
-    default:
-        error("Coding error marker %d parameter error in getSlot\n", marker);
-
+        for (slotInc = 0; t - slotInfo.slotByteNumber > slotInfo.interSectorByteCnt - JITTER_ALLOWANCE; slotInc++)
+            slotInfo.slotByteNumber += slotInfo.interSectorByteCnt;
+        if (slotInc > 3)
+            logger(ALWAYS, "More than 3 consecutive sectors missing\n");
+        slotInfo.slot += slotInc;
+        if (slotInc != 0)
+            slotInfo.slotByteNumber = t;          // reset base point
     }
-    if (lastSlot - initialSlot > 3)
-        logger(MINIMAL, "Warning more than 3 sectors missing\n");
-
-    return lastSlot;
+    return slotInfo.slot;
 }
-
 
 
 bool crcCheck(byte * buf, unsigned length) {
     byte x;
-    unsigned short crc = 0;
+    unsigned short crc = curFmt->crcInit;
     if (length < 2)
         return false;
     while (length-- > 2) {
@@ -107,57 +101,44 @@ bool crcCheck(byte * buf, unsigned length) {
     return crc == (buf[0] * 256 + buf[1]);      // check with recorded crc
 }
 
-enum {
-    BAD_DATA = 256,
-};
-
 // read data into buffer and check crc  ok
 // returns bytes read + marker if CRC error or bad flux transition
-int getData(int marker, byte *buf, bool cbit) {
-    int val = 0;
-    int bitCnt = cbit ? 1 : 0;
+int getData(int marker, byte *buf) {
     int toRead;
     int byteCnt = 0;
+    int val;
 
     switch (marker) {
     case ID_ADDRESS_MARK:
+        marker = curFmt->idAM & 0xff;      // replace with real marker to make crc work
         toRead = 7;
         break;
     case DATA_ADDRESS_MARK:
-    case DELETED_ADDRESS_MARK:
-        toRead = 131;
+        marker = curFmt->dataAM & 0xff;
+        toRead = 3 + curTrack.size;
         break;
-    case INDEX_ADDRESS_MARK:
-        return 0;
+    case DELETED_ADDRESS_MARK:
+        marker = curFmt->deletedAM & 0xff;
+        toRead = 3 + curTrack.size;
+        break;
     default:
         return 0;
     }
 
-    buf[byteCnt++] = marker;        // record the marker
+    for (buf[byteCnt++] = marker; byteCnt < toRead; buf[byteCnt++] = val) {
+        val = 0;
+        for (int bitCnt = 0; bitCnt < 8; bitCnt++)
+            switch (curFmt->getBit()) {
+            case BIT0: val <<= 1; break;
+            case BIT1: val = (val << 1) + 1; break;
+            default:
+                bitLog(BITFLUSH);
+                return -byteCnt;
+            }
+    }
+    bitLog(BITFLUSH);
 
-    do {
-        switch (nextBitsM2FM()) {
-        case BIT0: val <<= 1; bitCnt++; break;
-        case BIT1: val = (val << 1) + 1; bitCnt++; break;
-        case BIT00: val <<= 2; bitCnt += 2; break;
-        case BIT01: val = (val << 2) + 1; bitCnt += 2; break;
-
-        case BIT0M:         // marker bit illegal in data
-        case BIT1S:         // had to resync in data which shouldn't happen
-        case BITEND:        // ran out of flux data
-        case BITBAD:        // corrupt flux data
-            bitLog(BITFLUSH);   // flush every thing
-            return byteCnt + BAD_DATA;
-        }
-        if (bitCnt >= 8) {
-            buf[byteCnt++] = bitCnt == 8 ? val : val >> 1;
-            bitCnt -= 8;
-        }
-
-    } while (byteCnt < toRead);
-    bitLog(bitCnt ? BITFLUSH_1 : BITFLUSH);
-
-    return crcCheck(buf, byteCnt) ? byteCnt : byteCnt + BAD_DATA;    // flag if crc error
+    return crcCheck(buf, byteCnt) ? byteCnt : -byteCnt;    // flag if crc error
 }
 
 
@@ -192,73 +173,70 @@ void dumpBuf(byte *buf, int length) {
 
 
 int getMarker() {
-    int bits;
+    byte marker = 0;   // marker sig bits
+    byte am = 0;       // marker value
+    int bit;
 
-    while ((bits = nextBitsM2FM()) != BITEND) {          // read this track
-    /* look for the marker start signature 00MM1 where M is special marker specific 0 */
-        if (bits == BIT00 && nextBitsM2FM() == BIT0M && nextBitsM2FM() == BIT0M && nextBitsM2FM() == BIT1)
-            switch (nextBitsM2FM()) {
-            case BIT1:                              // 00MM11                     
-                if ((bits = nextBitsM2FM()) == BIT00) { // 00MM1100 - index address mark
-                    bitLog(BITFLUSH);
-                    return INDEX_ADDRESS_MARK;
-                }
-                else if (bits == BIT1 && nextBitsM2FM() == BIT00) {
-                    bitLog(BITFLUSH_1);
-                    return ID_ADDRESS_MARK;         // 00MM1110 (0) id address mark + preread of next 0 bit
-                }
-                break;
-            case BIT01:
-                if (nextBitsM2FM() == BIT1) {             // 00MM1011 - data address mark
-                    bitLog(BITFLUSH);
-                    return DATA_ADDRESS_MARK;
-                }
-                break;
-            case BIT00:                             // 00MM1000 (0) deleted address mark
-                if (nextBitsM2FM() == BIT00) {
-                    bitLog(BITFLUSH);
-                    return DELETED_ADDRESS_MARK;
-                }
-            }
+    while ((bit = curFmt->getBit()) != BITEND) {        // interleave marker & data bits
+       marker <<= 1;
+       am <<= 1;
+
+        switch (bit) {
+        case BIT1M: marker++;
+        case BIT1:  am++; break;
+        case BIT0M: marker++;
+        case BIT0:  break;
+        case BIT1S: marker = 0; am = 1;  break;
+        default:    marker = 0; am = 0;  break;         // bad so reset
+        }
+
+        word am16 = (marker << 8) + am;
+        if (am16 == curFmt->idAM)
+            am = ID_ADDRESS_MARK;
+        else if (am16 == curFmt->dataAM)
+            am = DATA_ADDRESS_MARK;
+        else if (am16 == curFmt->indexAM)
+            am = INDEX_ADDRESS_MARK;
+        else if (am16 == curFmt->deletedAM)
+            am = DELETED_ADDRESS_MARK;
+        else
+            continue;
+
+        bitLog(BITFLUSH);           // make sure we start a new bit stream if logging
+        return am;
     }
+    bitLog(BITFLUSH);
     return INDEX_HOLE_MARK;
 }
 
 
-
 void flux2track() {
-    byte dataBuf[131];
-    int track = -1, sector;
-    int blk = 1;
-    int slot;
-    int i;
-    int marker;
-    int missingIdCnt, missingSecCnt;
-    byte secToSlot[MAXSECTORS + 1];
-    int len;
+    byte secToSlot[MAXSECTORS + 1];     // used to check for same sector at different locations
 
-    
-    if (guessFormat() != M2FM)
+    if (!analyseFormat())
         return;
+    /*
+        here track, head and size have been determined
+        and curFmt points to the disk format slotInfo info
+    */
+    memset(secToSlot, curTrack.spt, sizeof(secToSlot));
 
-    memset(secToSlot, MAXSECTORS, sizeof(secToSlot));
-    memset(&curTrack, 0, sizeof(curTrack));
 
-    while (1) {
+    for (int blk = 1; seekBlock(blk); blk++) {
+        int marker, sector, slot, len;
+
+        byte dataBuf[3 + MAXSECTORSIZE];        // includes AM and CRC
+
         if (seekBlock(blk) == 0) {
-            if (track == -1) {
-                logger(ALWAYS, "No Id markers\n");
-                return;
-            }
-            addIMD(track, &curTrack);
+            addIMD(&curTrack);
             return;
         }
-        logger(MINIMAL, "Processing block %d\n", blk);
+        logger(VERBOSE, "Processing block %d\n", blk);
         slot = getSlot(INDEX_HOLE_MARK);                    // initialise the pyhsical sector logic
 
         while ((marker = getMarker()) != INDEX_HOLE_MARK) {          // read this track
-            if ((slot = getSlot(marker)) >= MAXSECTORS) {
-                logger(ALWAYS, "Physical sector (%d) >= %d\n", slot, MAXSECTORS);
+            if ((slot = getSlot(marker)) >= curTrack.spt) {
+                logger(ALWAYS, "Physical sector (%d) >= %d\n", slot, curTrack.spt);
                 continue;
             }
 
@@ -267,20 +245,20 @@ void flux2track() {
                 logger(VERBOSE, "Block %d - Index Address Mark\n", blk);
                 break;
             case ID_ADDRESS_MARK:
-                if ((len = getData(marker, dataBuf, true)) & BAD_DATA) {
+                if ((len = getData(marker, dataBuf)) < 0) {
                     logger(curTrack.smap[slot] ? VERBOSE : MINIMAL, "Block %d - Id corrupt for physical sector %d\n", blk, slot);
-                    dumpBuf(dataBuf + 1, (len & 0xff) - 1);
+                    dumpBuf(dataBuf + 1, -len - 1);
                 }
                 else {
                     logger(VERBOSE, "Block %d - Sector Id - Track = %d, Sector = %d at physical sector %d\n", blk, dataBuf[1], dataBuf[3], slot);
                     dumpBuf(dataBuf + 1, len - 1);
-                    if (track != -1 && track != dataBuf[1]) {
-                        logger(ALWAYS, "Block %d - Multiple track Ids %d and %d - skipping track", track, dataBuf[1]);
+                    if (curTrack.cyl != dataBuf[1] || curTrack.head != dataBuf[2]) {
+                        logger(ALWAYS, "Block %d - Different Cyl/Head %d/%d and %d/%d- skipping track",
+                            curTrack.cyl, curTrack.head, dataBuf[1], dataBuf[2]);
                         return;
                     }
-                    track = dataBuf[1];
                     sector = dataBuf[3];
-                    if (sector == 0 || sector > MAXSECTORS) {
+                    if (sector == 0 || sector > curTrack.spt) {
                         logger(ALWAYS, "Block %d - Ignoring invalid sector number %d at physical sector %d\n", blk, sector, slot);
                         continue;
                     }
@@ -291,7 +269,7 @@ void flux2track() {
                         continue;
                     }
 
-                    if (secToSlot[sector] != slot && secToSlot[sector] != MAXSECTORS) {   // physical is 0 to DDSECTORS - 1
+                    if (secToSlot[sector] != slot && secToSlot[sector] != curTrack.spt) {   // physical is 0 to spt - 1
                         logger(ALWAYS, "Block %d - Sector %d already allocated to pyhsical sector %d ignoring allocation to physical sector %d\n",
                             blk, curTrack.smap[slot], slot, sector);
                         continue;
@@ -304,13 +282,13 @@ void flux2track() {
             case DELETED_ADDRESS_MARK:
                 logger(ALWAYS, "Block %d - Deleted Data Marker seen at pyhsical sector %d\n", blk, slot);
             case DATA_ADDRESS_MARK:
-                if ((len = getData(marker, dataBuf, marker == DELETED_ADDRESS_MARK)) & BAD_DATA) {
+                if ((len = getData(marker, dataBuf)) < 0) {
                     logger(curTrack.smap[slot] ? VERBOSE : MINIMAL, "Block %d - Data corrupt for physical sector %d\n", blk, slot);
-                    dumpBuf(dataBuf + 1, (len & 0xff) - 1);
+                    dumpBuf(dataBuf + 1, -len - 1);
                 }
                 else {
                     if (curTrack.smap[slot])
-                        logger(VERBOSE, "Block %d - Data for sector %d at physical sector\n", blk, curTrack.smap[slot], slot);
+                        logger(VERBOSE, "Block %d - Data for sector %d at physical sector %d\n", blk, curTrack.smap[slot], slot);
                     else
                         logger(VERBOSE, "Block %d - Data for physical sector %d\n", blk, slot);
 
@@ -318,10 +296,10 @@ void flux2track() {
 
                     if (marker == DATA_ADDRESS_MARK) {
                         if (!curTrack.hasData[slot]) {
-                            memcpy(curTrack.track + slot * SECTORSIZE, dataBuf + 1, 128);
+                            memcpy(curTrack.track + slot * curTrack.size, dataBuf + 1, curTrack.size);
                             curTrack.hasData[slot] = true;
                         }
-                        else if (memcmp(curTrack.track + slot * SECTORSIZE, dataBuf + 1, 128) != 0)
+                        else if (memcmp(curTrack.track + slot * curTrack.size, dataBuf + 1, curTrack.size) != 0)
                             logger(ALWAYS, "Block %d - Pyhsical sector %d has different valid sector data\n", blk, slot);
                     }
                 }
@@ -329,8 +307,11 @@ void flux2track() {
             }
 
         }
-        missingIdCnt = missingSecCnt = 0;
-        for (i = 0; i < MAXSECTORS; i++) {
+
+
+        int missingIdCnt = 0, missingSecCnt = 0;
+
+        for (int i = 0; i < curTrack.spt; i++) {
             if (!curTrack.smap[i])
                 missingIdCnt++;
             if (!curTrack.hasData[i])
@@ -338,10 +319,10 @@ void flux2track() {
         }
         ;
         if (missingIdCnt == 0 && missingSecCnt == 0) {
-            addIMD(track, &curTrack);
+            addIMD(&curTrack);
             return;
         }
-        logger(MINIMAL, "Missing %d ids and %d sectors after block %d\n", missingIdCnt, missingSecCnt, blk++);
+        logger(MINIMAL, "Missing %d ids and %d sectors trying block %d\n", missingIdCnt, missingSecCnt, blk + 1);
     }
 }
 
@@ -359,21 +340,13 @@ int bitLog(int bits) {
             printf("%.*s\n", bitCnt, bitBuf);
             bitCnt = 0;
         }
-        else if (bitCnt > 0 && (bitCnt == BITS_PER_LINE + 1 || bits == BITFLUSH_1)) {
-            char tmp = bitBuf[bitCnt - 1];      // last char
-            printf("%.*s\n", bitCnt - 1, bitBuf);
-            bitCnt = 1;
-            bitBuf[0] = tmp;
-        }
-        switch (bits) {
-        case BIT00: bitBuf[bitCnt++] = '0';
-        case BIT0:  bitBuf[bitCnt++] = '0'; break;
-        case BIT0M: bitBuf[bitCnt++] = 'M'; break;
-        case BIT01: bitBuf[bitCnt++] = '0';
-        case BIT1:  bitBuf[bitCnt++] = '1'; break;
-        case BIT1S: bitBuf[bitCnt++] = 'S'; break;
-        case BITEND: bitBuf[bitCnt++] = 'E'; break;
-        case BITBAD: bitBuf[bitCnt++] = 'B'; break;
+
+        if (BIT0 <= bits && bits <= BITBAD) {
+            bitBuf[bitCnt++] = "0m1MsSEB"[bits - 1];
+            if (bits >= BIT0S) {                // resync or bad causes flush
+                printf("%.*s\n", bitCnt, bitBuf);
+                bitCnt = 0;
+            }
         }
 
     }
@@ -384,29 +357,33 @@ int bitLog(int bits) {
 #define DGUARD     (USCLOCK * 3 / 5 )     // 60% guard for dbit
 #define CGUARD     (USCLOCK * 2 / 5)     // 40% guard for cbit
 
-#define FILTERSIZE  32
-
-int nextBitsM2FM() {
+int getM2FMBit() {
     static bool cbit;              // true if last flux transition was control clock
     static int dbitCnt = 0;
-    int val;
-    int us;
+    static int queuedBit = 0;
     static int lastJitter;
 
     if (when(0) == 0) {            // reset bit extract engine
         cbit = true;
-        dbitCnt = 0;
-        lastJitter = 0;
+        dbitCnt = lastJitter = 0;
+        queuedBit = NONE;
         bitLog(BITSTART);
+    } else if (queuedBit) {
+        int tmp = queuedBit;
+        queuedBit = NONE;
+        return bitLog(tmp);
     }
 
     while (1) {
-        val = getNextFlux();
+        int val = getNextFlux();
+
         if (val == END_BLOCK || val == END_FLUX)
             return bitLog(BITEND);
 
         when(val);              // update running sample time
-        us = val / USCLOCK;
+
+        int us = val / USCLOCK;
+
         if (us & 1)
             cbit = !cbit;
 
@@ -426,43 +403,94 @@ int nextBitsM2FM() {
                 return bitLog(BIT1S);       // flag a resync
             }
         }
-//        printf("[%3d %d]", val, us);
+//      printf("[%3d %d]", val, us);
 
         switch (us) {
         case 2:
             return bitLog(cbit ? BIT0M : BIT1); // note 0 value is only vaild in markers
         case 3:
-            return bitLog(cbit ? BIT00 : BIT1); // previous 0 for cbit already sent
+            if (!cbit)
+                return bitLog(BIT1);            // previous 0 for cbit already sent
+            queuedBit = BIT0;
+            return bitLog(BIT0);
         case 4:
-            return bitLog(cbit ? BIT00 : BIT01);
+            queuedBit = (cbit ? BIT0 : BIT1);
+            return bitLog(BIT0);
         case 5:
             if (cbit) {
                 cbit = false;
                 return bitLog(BIT1S);  // must have been a data bit ending so need to resync
             }
-            return bitLog(BIT01);
+            queuedBit = BIT1;
+            return bitLog(BIT0);
         default:                        // all invalid, but keep cbit updated
-
             return bitLog(BITBAD);
         }
 
     }
 }
 
-#define BUCKETCNT   12
-int guessFormat()
+
+int getFMBit()
+{
+    static bool cbit;              // true if last flux transition was control clock
+    static int cbitCnt = 0;
+    int val;
+    int us;
+    static int lastJitter;
+
+    while (1) {
+        val = getNextFlux();
+        if (val == END_BLOCK || val == END_FLUX)
+            return bitLog(BITEND);
+
+        when(val);              // update running sample time
+        us = (val + USCLOCK / 2) / USCLOCK;     // simple rounding
+
+        // use consecutive 0s in the GAPs to sync clock i.e. pulses every 4us
+        if (us != 4)                  // use consecutive 0s in the GAPs to sync clock
+            cbitCnt = 0;
+        else if (++cbitCnt == 5) {          // sync cbit
+            cbitCnt = 0;
+            if (!cbit) {
+                cbit = true;
+                return bitLog(BIT0S);       // flag a resync
+            }
+        }
+
+        switch (us) {
+        case 2:
+            if (!(cbit = !cbit))
+                return bitLog(BIT1);
+            break;
+        case 4:
+            return bitLog(cbit ? BIT0 : BIT1M);
+        default:                        // all invalid, but keep cbit updated
+            return bitLog(BITBAD);
+        }
+
+    }
+}
+
+bool analyseFormat()
 {
     int val;
     int blk = 1;
-    int cnt1, cnt2, cnt3, cnt4, cnt5, cntOther, cntTotal;
+    int cnt2, cnt3, cnt4, cnt5, cntOther, cntTotal;
     int minValid;
 
-    cnt1 = cnt2 = cnt3 = cnt4 = cnt5 = cntOther = cntTotal = 0;
+    memset(&slotInfo, 0, sizeof(slotInfo));     // make sure we start with fresh info
+    memset(&curTrack, 0, sizeof(curTrack));
+
+    /*
+        look at the profile of flux transitions to work out
+        the disk encoding format
+    */
+    cnt2 = cnt3 = cnt4 = cnt5 = cntOther = cntTotal = 0;
 
     while (seekBlock(blk++)) {
         while ((val = getNextFlux()) != END_FLUX && val != END_BLOCK) {
             switch ((val + USCLOCK / 2) / USCLOCK) {
-            case 1: cnt1++; break;
             case 2: cnt2++; break;
             case 3: cnt3++; break;
             case 4: cnt4++; break;
@@ -474,17 +502,89 @@ int guessFormat()
     }
     if (cntTotal > 0)
         minValid = cntTotal / SAMPLESCALER;
-//    printf("cnt1 = %d, cnt2 = %d, cnt3 = %d, cnt4 = %d, cnt5 = %d, cntOther = %d, cntTotal = %d minValid = %d\n",
-//        cnt1, cnt2, cnt3, cnt4, cnt5, cntOther, cntTotal, minValid);
-    if (cntTotal < MINSAMPLE || cnt1 > minValid || cntOther > minValid
-        || cnt2 < minValid || cnt4 < minValid) {
-        logger(ALWAYS, "Unknown format\n");
-        return UNKNOWN_FMT;
+    //    printf("cnt2 = %d, cnt3 = %d, cnt4 = %d, cnt5 = %d, cntOther = %d, cntTotal = %d minValid = %d\n",
+    //        cnt1, cnt2, cnt3, cnt4, cnt5, cntOther, cntTotal, minValid);
+    if (cntTotal < MINSAMPLE || cntOther > minValid || cnt2 < minValid || cnt4 < minValid)
+        curFmt = &formats[UNKNOWN_FMT];
+    else if (cnt5 > minValid)
+        curFmt = &formats[M2FM];
+    else if (cnt3 > minValid)
+        curFmt = &formats[MFM];
+    else
+        curFmt = &formats[FM];
+
+
+    if (curFmt->getBit == NULL) {
+        logger(ALWAYS, "%s format - not supported\n", curFmt->name);
+        return false;
     }
-    if (cnt5 > minValid) {
-        logger(MINIMAL, "M2FM format\n");
-        return M2FM;
+    /* we have the imd mode so record it */
+    curTrack.mode = curFmt->imdMode;
+
+    /*
+        determine the sector sizing and the timing between sectors
+        also timing from id address marker to data address marker
+        finally estimate the sectors per track
+    */
+    int savDebug = debug;       // surpress debug info
+//    debug = 0;
+    seekBlock(1);               // look at first track copy
+    
+
+    int sectorStart = 0, firstSector = 0, lastSectorStart = 0;
+
+    int marker;
+    byte buf[7];
+    bool haveSize = false;
+    /* scan the whole track or until we can determine the sector and interMarker timings */
+    while ((marker = getMarker()) != INDEX_HOLE_MARK && (slotInfo.interSectorByteCnt == 0 || slotInfo.interMarkerByteCnt == 0)) {
+        if (marker == ID_ADDRESS_MARK) {
+            lastSectorStart = sectorStart;
+            sectorStart = time2Byte(when(0));
+            if (firstSector == 0)
+                firstSector = sectorStart;
+            if (!haveSize && getData(marker, buf)) {
+                curTrack.size =  128 << (buf[4] & 0x7f);    // FM used 128, convert to newer form
+                haveSize = true;
+            }
+            if (haveSize && lastSectorStart != 0 && slotInfo.interSectorByteCnt == 0
+              && sectorStart - lastSectorStart < curFmt->fixedSector + (128 << curTrack.size) * 2) // less than 2 sectors
+                slotInfo.interSectorByteCnt = sectorStart - lastSectorStart;
+        }
+        else if (marker == DATA_ADDRESS_MARK && slotInfo.interMarkerByteCnt == 0
+              && time2Byte(when(0)) < sectorStart + 128)      // less than minimum size sector
+            slotInfo.interMarkerByteCnt = time2Byte(when(0)) - sectorStart;
     }
-    logger(ALWAYS, cnt3 > minValid ? "MFM format\n" : "FM format\n");
-    return cnt3 > minValid ? MFM : FM;
+    if (slotInfo.interMarkerByteCnt == 0 || slotInfo.interSectorByteCnt == 0) {
+        logger(ALWAYS, "Couldn't determine sector timing\n");
+        debug = savDebug;
+        return false;
+    }
+    
+    /* if we get here buf holds the cylinder, head and size info. fill in the missing info for curTrack */
+#pragma warning(suppress: 6001)
+    curTrack.cyl = buf[1];
+    curTrack.head = buf[2];
+    /*
+        now find out spt, using get slot to do the hard work of tracking any missing sectors
+    */
+    int trackLen = time2Byte(seekBlock(1));
+    getSlot(INDEX_HOLE_MARK);
+    while ((marker = getMarker()) != INDEX_HOLE_MARK)
+        curTrack.spt = getSlot(marker);
+    do {
+        curTrack.spt++;             // add at least 1 to convert from 0 base
+    } while ((slotInfo.slotByteNumber += slotInfo.interSectorByteCnt) < trackLen - slotInfo.interSectorByteCnt - curFmt->gap4);
+
+    debug = savDebug;               // restore debug options
+
+
+    // if we get here then buf holds
+    logger(MINIMAL, "%s format - cylinder %d, head %d, sector size %d, sectors per track %d\n",
+        curFmt->name, curTrack.cyl, curTrack.head, curTrack.size, curTrack.spt);
+    if (curTrack.spt > MAXSECTORS) {
+        logger(ALWAYS, "Sector count %d too large - setting to %d\n", curTrack.spt, MAXSECTORS);
+        curTrack.spt = MAXSECTORS;
+    }
+    return true;
 }

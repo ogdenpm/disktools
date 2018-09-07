@@ -896,7 +896,11 @@ void extractFile(dir_t *dptr)
     // update the recipe info
 
     strcpy(isisDir[dirIdx].name, isisName);
-    isisDir[dirIdx].len = size ? size : -dptr->lastblksize;
+    if (dptr->blocks)
+        isisDir[dirIdx].dirLen = (dptr->blocks - 1) * (diskType == ISIS_III ? 256 : 128) + sectorSize;
+    else
+        isisDir[dirIdx].dirLen = -dptr->lastblksize;
+    isisDir[dirIdx].actLen = size;
     GetSHA1(isisDir[dirIdx].checksum);
     isisDir[dirIdx].attrib = dptr->attributes;
     isisDir[dirIdx].errors = rdErrorCnt;

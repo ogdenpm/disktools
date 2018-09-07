@@ -1,12 +1,22 @@
 #pragma once
 #include "zip.h"
 
+
+#define SCK 24027428.5714285            //  sampling clock frequency
+#define ICK 3003428.5714285625
+
+#define USCLOCK                 24           // 1 uS clock used for flux calculations 
+#define USCLOCK_D               (SCK / 1000000.0) // 1 uS clock floating point for timing to byte no
+
 typedef unsigned char byte;
 typedef unsigned short word;
-#define MAXTRACKS       80
+
+#define MAXCYLINDER       80
 #define MAXSECTORS      52
-#define SECTORSIZE      128
-#define MAXTRACKSIZE    10417       // max data based on 10417 bytes per unformatted track
+#define MAXHEAD         2
+#define MAXSECTORSIZE   1024
+#define DDTRACKSIZE     8192
+#define SDTRACKSIZE     4096
 
 
 enum {
@@ -19,62 +29,61 @@ enum {
     HASDATA = 2
 };
 
-typedef struct _sector {
-    struct _sector *next;
-    int offset;                         // offset to start of sector in bytes from index mark
-    byte id;                            // the sector id
-    byte *buf;                          // pointer to the sector data or null if not present
-} sector_t;
 
 typedef struct {
-    byte fmt;
-    byte spt;
-    int size;                            // sector size
-    byte smap[MAXSECTORS];               // physical slot to sector map
-    bool hasData[MAXSECTORS];            // in physical slot order
-    byte track[MAXTRACKSIZE]; // in physical slot order
+    byte mode;
+    byte spt;                    // sectors per track
+    byte cyl;                   // cylinder
+    byte head;
+    int  size;                   // sector size in bytes
+    byte smap[MAXSECTORS];       // physical slot to sector map
+    bool hasData[MAXSECTORS];    // in physical slot order
+    byte track[DDTRACKSIZE];    // in physical slot order
 } imd_t;
 
 
 enum {      // bit combinations returned by nextBits
+    NONE = 0,
     BIT0,
-    BIT0M,  // special 0 bit used in marker
+    BIT0M,  // 0 with marker
     BIT1,
-    BIT1S,  // special to note bit 1 on which resync happend
-    BIT00,
-    BIT01,
+    BIT1M,  // 1 with marker
+    BIT0S,  // resync to 0
+    BIT1S,  // resync to 1
     BITEND, // no more bits
     BITBAD,  // illegal flux pattern
 
     BITSTART,   // used to signal start of bitstream for bitLogging
     BITFLUSH,    // used to flush bitstream for bitLogging
-    BITFLUSH_1   // variant that flushes all but last bit (used for marker alignment)
+    BITFLUSH_1,   // variant that flushes all but last bit (used for marker alignment)
 
 };
 
 
 enum {      // disk format types
-    UNKNOWN_FMT,
-    FM,
-    MFM,
-    M2FM
+    FM  = 0,
+    MFM = 1,
+    M2FM = 2,
+    UNKNOWN_FMT
 };
 
-#define MINSAMPLE   20000
+#define MINSAMPLE    40000
 #define SAMPLESCALER 500
 
 extern int debug;
 extern bool showSectorMap;
 
 extern char curFile[];
+extern imd_t curTrack;
 
 #define LINELEN 80
 enum {
     ALWAYS = 0, MINIMAL, VERBOSE, VERYVERBOSE
 };
 
-int nextBitsM2FM();
-size_t seekBlock(int blk);
+int getM2FMBit();
+int getFMBit();
+int seekBlock(int blk);
 void resetFlux();
 void freeMem();
 size_t where();
@@ -82,8 +91,7 @@ long when(int val);
 void *xalloc(void *buf, size_t size);
 size_t readFluxBuffer(byte *buf, size_t bufsize);
 
-int x8ByteTime();
-void addIMD(int track, imd_t *trackPtr);
+void addIMD(imd_t *trackPtr);
 void WriteImgFile(char *fname, char *comment);
 _declspec(noreturn) void error(char *fmt, ...);
 void logger(int level, char *fmt, ...);
@@ -93,4 +101,5 @@ void flux2track();
 int getNextFlux();
 
 int bitLog(int bits);
-int guessFormat();
+bool analyseFormat();
+int time2Byte(long time);

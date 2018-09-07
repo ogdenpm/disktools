@@ -65,8 +65,9 @@ enum { UNKNOWN, ISIS_SD, ISIS_DD, ISIS_III, ISIS_IV, ZXENIX, CPM };
 typedef struct {
     char name[12];      // isis name + optional # prefix for recovered files
     byte attrib;
-    int len;            // used for zero size file check, if -ve then zero size file with header block
-    byte checksum[28];  // base 64 encoding of SHA1 + trailing NULL
+    int dirLen;         // dir record of file size or it no header block -eofcnt
+    int actLen;         // bytes saved
+    byte checksum[640];  // base 64 encoding of SHA1 + trailing NULL(28 chars) + extension for messages
     int errors;
 }  isisDir_t;
 

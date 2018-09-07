@@ -18,19 +18,22 @@ MODIFICATION HISTORY
 enum {
     IMG, IMD
 };
-byte smap[MAXTRACKS][MAXSECTORS];
 
 
-imd_t trackData[MAXTRACKS];
+
+imd_t trackData[MAXCYLINDER][MAXHEAD];  // support 2 heads
+
 #define RECOVERED    0x80        // flag for recovered sector id
 
+
+int cylMax = 0, headMax = 0;
 
 void resetIMD() {
     memset(trackData, 0, sizeof(trackData));
 }
 
 
-void addIMD(int track, imd_t *trackPtr) {
+void addIMD(imd_t *trackPtr) {
     byte fmt[MAXSECTORS];             // skew assignments - assuming starting at 1
     int offset = 0;                      // offset to make fmt align to smap
     byte secToPhsMap[MAXSECTORS];     // map of sectors (-1) to slots
@@ -39,17 +42,17 @@ void addIMD(int track, imd_t *trackPtr) {
 
     bool canRecover = true;
 
-    if (track < 0 || track >= MAXTRACKS) {
-        logger(ALWAYS, "Track %d invalid\n", track);
+    if (trackPtr->cyl >= MAXCYLINDER || trackPtr->head >= MAXHEAD) {
+        logger(ALWAYS, "Track %d/%d invalid\n", trackPtr->cyl, trackPtr->head);
         return;
     }
-    if (trackData[track].smap[0]) {
-        logger(ALWAYS, "Ignoring duplicate track %d\n", track);
+    if (trackData[trackPtr->cyl][trackPtr->head].smap[0]) {
+        logger(ALWAYS, "Ignoring duplicate track %d/%d\n", trackPtr->cyl, trackPtr->head);
         return;
     }
     /* see what sectors are present */
     memset(secToPhsMap, 0xff, sizeof(secToPhsMap));
-    for (int i = 0; i < MAXSECTORS; i++) {
+    for (int i = 0; i < trackPtr->spt; i++) {
         if (trackPtr->smap[i])
             secToPhsMap[trackPtr->smap[i] - 1] = i;
         else
@@ -59,9 +62,9 @@ void addIMD(int track, imd_t *trackPtr) {
     }
     if (missingIdCnt) {
         int skew = -1;
-        for (int i = 0; i < MAXSECTORS - 1; i++)
+        for (int i = 0; i < trackPtr->spt - 1; i++)
             if (secToPhsMap[i] != 0xff && secToPhsMap[i + 1] != 0xff) {
-                skew = (secToPhsMap[i + 1] - secToPhsMap[i] + MAXSECTORS) % MAXSECTORS;
+                skew = (secToPhsMap[i + 1] - secToPhsMap[i] + trackPtr->spt) % trackPtr->spt;
                 break;
             }
         if (skew < 0)
@@ -71,11 +74,11 @@ void addIMD(int track, imd_t *trackPtr) {
             int slot = 0;
 
             memset(fmt, 0, sizeof(fmt));            // 
-            for (int i = 1; i <= MAXSECTORS; i++) {
+            for (int i = 1; i <= trackPtr->spt; i++) {
                 while (fmt[slot])
-                    slot = (slot + 1) % MAXSECTORS;
+                    slot = (slot + 1) % trackPtr->spt;
                 fmt[slot] = i;
-                slot = (slot + skew) % MAXSECTORS;
+                slot = (slot + skew) % trackPtr->spt;
             }
 
             for (slot = 0; trackPtr->smap[slot] == 0; slot++)       // find first slot with allocated sector
@@ -85,8 +88,8 @@ void addIMD(int track, imd_t *trackPtr) {
                 ;
             offset -= slot;                                         // backup to align with first slot 
             /* check whether skew recovery possible */
-            for (int i = 0; i < MAXSECTORS; i++) {
-                if (trackPtr->smap[i] && trackPtr->smap[i] != fmt[(i + offset) % MAXSECTORS]) {
+            for (int i = 0; i < trackPtr->spt; i++) {
+                if (trackPtr->smap[i] && trackPtr->smap[i] != fmt[(i + offset) % trackPtr->spt]) {
                     canRecover = false;
                     break;
                 }
@@ -96,11 +99,12 @@ void addIMD(int track, imd_t *trackPtr) {
     }
 
     if (showSectorMap) {
-        logger(ALWAYS, "Track %d Sector Mapping:\n", track);
+        logger(ALWAYS, "Track %d/%d Sector Mapping:\n", trackPtr->cyl, trackPtr->head);
         for (int i = 0; i < MAXSECTORS; i++) {
             if (trackPtr->smap[i])
                 printf("%02d ", trackPtr->smap[i]);
             else if (canRecover) {
+#pragma warning(suppress: 6001)
                 trackPtr->smap[i] = fmt[(i + offset) % MAXSECTORS];
                 printf("%02dr", trackPtr->smap[i]);
             }
@@ -116,16 +120,17 @@ void addIMD(int track, imd_t *trackPtr) {
     }
     else if (missingIdCnt) {
         if (canRecover) {
-            logger(ALWAYS, "Track %d recovering sector ids:", track);
-            for (int i = 0; i < MAXSECTORS; i++, offset = (offset + 1) % MAXSECTORS) {
+            logger(ALWAYS, "Track %d/%d recovering sector ids:", trackPtr->cyl, trackPtr->head);
+            for (int i = 0; i < trackPtr->spt; i++, offset = (offset + 1) % trackPtr->spt) {
                 if (!trackPtr->smap[i])
-                    printf(" %02d", fmt[(i + offset) % MAXSECTORS]);
+#pragma warning(suppress: 6385)
+                    printf(" %02d", fmt[(i + offset) % trackPtr->spt]);
             }
             putchar('\n');
         }
         else {
-            logger(ALWAYS, "Track %d cannot recover sector ids:", track);
-            for (int i = 0; i < MAXSECTORS; i++, offset = (offset + 1) % MAXSECTORS) {
+            logger(ALWAYS, "Track %d/%d cannot recover sector ids:", trackPtr->cyl, trackPtr->head);
+            for (int i = 0; i < trackPtr->spt; i++, offset = (offset + 1) % trackPtr->spt) {
                 if (secToPhsMap[i] == 0xff)
                     printf(" %02d", i + 1);
             }
@@ -136,7 +141,7 @@ void addIMD(int track, imd_t *trackPtr) {
     }
     if (missingSecCnt) {
         if (missingIdCnt == 0 || canRecover) {
-            logger(ALWAYS, "Track %d missing data for sectors:", track);
+            logger(ALWAYS, "Track %d/%d missing data for sectors:", trackPtr->cyl, trackPtr->head);
             for (int i = 0; i < MAXSECTORS; i++) {
                 if (!trackPtr->hasData[i]) {
                     printf(" %02d", trackPtr->smap[i]);
@@ -145,11 +150,19 @@ void addIMD(int track, imd_t *trackPtr) {
             putchar('\n');
         }
         else
-            logger(ALWAYS, "Track %d not usable - missing %d sector Ids and %d data sectors\n", track, missingIdCnt, missingSecCnt);
-    
+            logger(ALWAYS, "Track %d/%d not usable - missing %d sector Ids and %d data sectors\n",
+                trackPtr->cyl, trackPtr->head, missingIdCnt, missingSecCnt);
+
     }
-    if (missingIdCnt == 0 || canRecover)
-        trackData[track] = *trackPtr;           /* structure copy */
+    if (missingIdCnt == 0 || canRecover) {
+        trackData[trackPtr->cyl][trackPtr->head] = *trackPtr;           /* structure copy */
+        if (trackPtr->cyl > cylMax)
+            cylMax = trackPtr->cyl;
+        if (trackPtr->head > headMax)
+            headMax = trackPtr->head;
+
+
+    }
 }
 
 void WriteIMDHdr(FILE *fp, char *comment) {
@@ -171,8 +184,8 @@ void WriteIMDHdr(FILE *fp, char *comment) {
     putc(0x1A, fp);
 }
 
-bool SameCh(byte *sec) {
-    for (int i = 1; i < SECTORSIZE; i++)
+bool SameCh(byte *sec, int size) {
+    for (int i = 1; i < size; i++)
         if (sec[0] != sec[i])
             return false;
     return true;
@@ -187,34 +200,36 @@ void WriteImgFile(char *fname, char *comment) {
         error("cannot create %s\n", fname);
 
     WriteIMDHdr(fp, comment);
-    for (int track = 0; track < MAXTRACKS; track++) {
-        trackPtr = &trackData[track];
-        if (trackPtr->smap[0] == 0)
+    for (int cyl = 0; cyl <= cylMax; cyl++)
+        for (int head = 0; head <= headMax; head++) {
+            trackPtr = &trackData[cyl][head];
+            if (trackPtr->smap[0] == 0)
 
-//        if ((trackPtr = chkTrack(track)) == NULL)
-            continue;
-        putc(3, fp);        // mode
-        putc(track, fp);    // cylinder
-        putc(0, fp);        // head
-        putc(MAXSECTORS, fp);      // sectors in track
-        putc(0, fp);        // sector size - 128
-        fwrite(trackPtr->smap, 1, MAXSECTORS, fp);    // sector numbering map
+                //        if ((trackPtr = chkTrack(track)) == NULL)
+                continue;
+            putc(trackPtr->mode, fp);           // mode
+            putc(trackPtr->cyl, fp);            // cylinder
+            putc(trackPtr->head, fp);           // head
+            putc(trackPtr->spt, fp);            // sectors in track
+            putc(trackPtr->size >> 8, fp);      // sector size
+            fwrite(trackPtr->smap, 1, trackPtr->spt, fp);    // sector numbering map
 
-        for (int secNum = 0; secNum < MAXSECTORS; secNum++) {
-            if (trackPtr->hasData[secNum]) {
-                sector = trackPtr->track + secNum * SECTORSIZE;
-                if (SameCh(sector)) {
-                     putc(2, fp);
-                    putc(*sector, fp);
-                } else {
-                    putc(1, fp);
-                    fwrite(sector, 1, SECTORSIZE, fp);
+            for (int secNum = 0; secNum < trackPtr->spt; secNum++) {
+                if (trackPtr->hasData[secNum]) {
+                    sector = trackPtr->track + secNum * trackPtr->size;
+                    if (SameCh(sector, trackPtr->size)) {
+                        putc(2, fp);
+                        putc(*sector, fp);
+                    }
+                    else {
+                        putc(1, fp);
+                        fwrite(sector, 1, trackPtr->size, fp);
+                    }
                 }
+                else
+                    putc(0, fp);            // data not available
             }
-            else
-                putc(0, fp);            // data not available
         }
-    }
 
     fclose(fp);
 }

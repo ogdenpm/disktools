@@ -184,11 +184,7 @@ void mkRecipe(char *name, isisDir_t  *isisDir, char *comment, int diskType)
                 fprintf(fp, "# file %s could not be recovered\n", dentry->name + 1);
                 continue;
             }
-            else {
-                fprintf(fp, "# there were errors reading %s\n", dentry->name);
-                strcpy(dentry->checksum, "CORRUPT");
-            }
-        }
+         }
 
         fprintf(fp, "%s,", dentry->name);
         if (dentry->attrib & 0x80) putc('F', fp);
@@ -197,22 +193,28 @@ void mkRecipe(char *name, isisDir_t  *isisDir, char *comment, int diskType)
         if (dentry->attrib & 1) putc('I', fp);
 
         prefix = "";
-        if (dentry->len <= 0)
-            strcpy(dentry->checksum, "NULL");
+        if (dentry->dirLen < 0)
+            sprintf(dentry->checksum, "** EOF count %d **", -dentry->dirLen);
+        else if (dentry->dirLen == 0)
+            strcpy(dentry->checksum, "** null **");
+        else if (dentry->actLen != dentry->dirLen)
+            sprintf(dentry->checksum, "** size %d **", dentry->dirLen);
+        else if (dentry->errors)
+            sprintf(dentry->checksum, "** corrupt **");
 
         if (strcmp(dentry->name, "ISIS.DIR") == 0 ||
             strcmp(dentry->name, "ISIS.LAB") == 0 ||
             strcmp(dentry->name, "ISIS.MAP") == 0 ||
             strcmp(dentry->name, "ISIS.FRE") == 0)
             dbPath = "AUTO";
-        else if (dentry->len == 0)
+        else if (dentry->dirLen == 0)
             dbPath = "ZERO";
-        else if (dentry->len < 0) {
+        else if (dentry->dirLen < 0)
             dbPath = "ZEROHDR";        // zero but link block allocated
-            dentry->len = -dentry->len;
-        }
         else if (dbPath = Dblookup(dentry))
             prefix = "^";
+        else if (dentry->dirLen != dentry->actLen || dentry->errors)
+            dbPath = "*Corrupt - missing data";
         else {
             dbPath = dentry->name;
             _strlwr(dbPath);                     // force to lower case, also avoids conflict with AUTO & ZERO, already used name

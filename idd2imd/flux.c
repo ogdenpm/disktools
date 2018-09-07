@@ -3,22 +3,20 @@
 #include <stdbool.h>
 #include "flux.h"
 
-#define HIST_MAX  168
+#define HIST_MAX  (USCLOCK * 10)        // 10 uS max
 
 // private definitions
 enum {
     OVL16 = -2, PAD = -3
 };
 
-#define FLUXCHUNKSIZE 400000UL        // default chunk size for flux stream
+#define FLUXCHUNKSIZE 100000UL        // default chunk size for flux stream
 #define ARRAYCHUNKSIZE  20          // default chunk size for stream and index info
-#define DEFAULT_8_BYTE_TIME 3075        // 64 bits sample count @ standard flux clock rate of 24027428.5714285Hz
-#define ONEUS       24
 
 /* private types for managing the data from the flux stream */
 typedef struct _flux {
     struct _flux *link;
-    unsigned blkId;
+    word blkId;
     int cnt;
     int flux[FLUXCHUNKSIZE];
 } flux_t;
@@ -112,7 +110,6 @@ static size_t fluxPos;            // current flux transition
 
 static long sampleTime;         // tracks the sample flux time since start of track
 static size_t endTrack;         // flux index for end of track
-static long byteX8Time = DEFAULT_8_BYTE_TIME;         //timing fo 8 bytes used to support variances in disk rotation
 
 /*
     seek to pos in flux stream, updating fluxPos and curBlk as required
@@ -137,16 +134,18 @@ static bool fluxSeek(size_t pos) {
     return true;
 }
 
-// seeks to the start of a full block and returns streamPos of next block
-// or 0 if no full block or seek error
-// if blk is -ve it sets up to read everything
-size_t seekBlock(int blk) {
+// seeks to the start of a block and returns the sck clock count for the track
+// or 0 if no block or seek error
+
+int seekBlock(int blk) {
     sampleTime = 0;                         // reset sample time
     if (blk < 0 || blk >= indexArrayCnt - 1)
         return 0;
     if (!fluxSeek(indexArray[blk].streamPos))
         return 0;
-    return endTrack = indexArray[blk + 1].streamPos;
+    endTrack = indexArray[blk + 1].streamPos;
+#pragma warning(suppress: 26451)
+    return (int)((indexArray[blk+1].indexCnt - indexArray[blk].indexCnt) / ICK * SCK);
 }
 
 /* utility function to return current position in flux stream */
@@ -162,10 +161,6 @@ long when(int val) {
         return sampleTime += val;
     else
         return sampleTime = 0;
-}
-
-int x8ByteTime() {
-    return byteX8Time;
 }
 
 // memory allocator with out of memory detection
@@ -203,6 +198,7 @@ void resetFlux() {
     for (flux_t *p = fluxData; p; p = p->link)  // reset all counts in the allocated blocks
         p->cnt = 0;
     fluxPos = fluxRead = 0;
+    curBlk = fluxData;
     indexArrayCnt = 0;
     streamArrayCnt = 0;
 
@@ -229,6 +225,9 @@ void addFlux(int val) {
             curBlk = p;
         }
     }
+    else if (curBlk->cnt == FLUXCHUNKSIZE)
+        curBlk = curBlk->link;
+
     curBlk->flux[curBlk->cnt++] = val;
     fluxRead++;
 }
@@ -348,7 +347,7 @@ size_t readFluxBuffer(byte *buf, size_t bufsize) {
     addIndexBlock(0, 0, 0);         // mark start of all data
 
     while ((c = get1()) != EOF) {
-        if (c >= 0xe || (c < 7 && (c = get1()) != EOF) || (c == 0xc && (c = get2()) != EOF))
+        if (c >= 0xe || (c <= 7 && (c = get1()) != EOF) || (c == 0xc && (c = get2()) != EOF))
             addFlux(c);
         else
             switch (c) {
@@ -382,7 +381,7 @@ int getNextFlux() {
         val = curBlk->flux[fluxPos++ % FLUXCHUNKSIZE];
 
         if (val == OVL16)
-            ovl16 += 0x1000;
+            ovl16 += 0x10000;
         else if (val >= 0)                  // valid flux . Note PAD is ignored
             return val + ovl16;
     }
@@ -423,9 +422,9 @@ void displayHist(int levels)
         cols[i] = (2 * levels * histogram[i] + maxHistCnt / 2) / maxHistCnt;
 
     int lowVal, highVal;
-    for (lowVal = 0; lowVal < ONEUS / 2 && cols[lowVal] == 0; lowVal++)
+    for (lowVal = 0; lowVal < USCLOCK / 2 && cols[lowVal] == 0; lowVal++)
         ;
-    for (highVal = HIST_MAX; highVal >= ONEUS * 5 + ONEUS / 2 && cols[highVal] == 0; highVal--)
+    for (highVal = HIST_MAX; highVal >= USCLOCK * 5 + USCLOCK / 2 && cols[highVal] == 0; highVal--)
         ;
 
     printf("max flux value = %.1fus, flux values > %.1fus = %d\n", maxHistVal * 1000000.0 / sck, HIST_MAX * 1000000.0 / sck, outRange);
@@ -448,9 +447,9 @@ void displayHist(int levels)
     for (int i = lowVal; i <= highVal; i++)
         putchar('-');
     putchar('\n');
-    for (int i = lowVal; i <= (highVal / ONEUS) * ONEUS; i++)
-        if (i % ONEUS == 0)
-            i += printf("%dus", i / ONEUS) - 1;
+    for (int i = lowVal; i <= (highVal / USCLOCK) * USCLOCK; i++)
+        if (i % USCLOCK == 0)
+            i += printf("%dus", i / USCLOCK) - 1;
         else
             putchar(' ');
     putchar('\n');

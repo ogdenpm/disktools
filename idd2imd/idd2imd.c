@@ -83,7 +83,7 @@ int main(int argc, char **argv) {
 
         if (_stricmp(ext, ".raw") == 0) {
             if ((fp = fopen(argv[arg], "rb")) == NULL)
-                logger(ALWAYS, "Can't open %s\n");
+                logger(ALWAYS, "Can't open\n");
             else {
                 resetIMD();
                 fseek(fp, 0, SEEK_END);
@@ -91,7 +91,7 @@ int main(int argc, char **argv) {
                 rewind(fp);
                 buf = (byte *)xalloc(NULL, bufsize);
                 if (fread(buf, bufsize, 1, fp) != 1)
-                    logger(ALWAYS, "Failed to load %s\n");
+                    logger(ALWAYS, "Failed to load\n");
                 else {
                     readFluxBuffer(buf, bufsize);         // load in the flux data from buffer extracted from zip file
                     flux2track();
@@ -111,10 +111,9 @@ int main(int argc, char **argv) {
             for (int i = 0; i < n; i++) {
                 zip_entry_openbyindex(zip, i);
                 if (!zip_entry_isdir(zip)) {
-                    size_t len;
-                    int trk, sec;
                     const char *name = zip_entry_name(zip);
-                    if ((len = strlen(name)) >= 8 && sscanf(name + len - 8, "%2d.%d.raw", &trk, &sec) == 2 && sec == 0 && trk < 77) {
+                    char *s;
+                    if ((s = strrchr(name, '.')) && _stricmp(s, ".raw") == 0) {
                         sprintf(curFile, "%s%s[%s]", fname, ext, name);
                         bufsize = (size_t)zip_entry_size(zip);
                         if (!(buf = (byte *)calloc(1, bufsize)))
