@@ -1,12 +1,14 @@
 #pragma once
 #include "zip.h"
 
-
 #define SCK 24027428.5714285            //  sampling clock frequency
 #define ICK 3003428.5714285625
 
-#define USCLOCK                 24           // 1 uS clock used for flux calculations 
+#define USCLOCK                 24           // 1 uS clock used for flux calculations
 #define USCLOCK_D               (SCK / 1000000.0) // 1 uS clock floating point for timing to byte no
+#define HALFBIT500              USCLOCK
+#define HALFBIT250              (2 * USCLOCK)
+#define HALFBIT300              (5 * USCLOCK / 3)
 
 typedef unsigned char byte;
 typedef unsigned short word;
@@ -18,17 +20,15 @@ typedef unsigned short word;
 #define DDTRACKSIZE     8192
 #define SDTRACKSIZE     4096
 
-
 enum {
     END_BLOCK = -1,
     END_FLUX = -2,
- };
+};
 
 enum {
     HASID = 1,
     HASDATA = 2
 };
-
 
 typedef struct {
     byte mode;
@@ -40,7 +40,6 @@ typedef struct {
     bool hasData[MAXSECTORS];    // in physical slot order
     byte track[DDTRACKSIZE];    // in physical slot order
 } imd_t;
-
 
 enum {      // bit combinations returned by nextBits
     NONE = 0,
@@ -56,19 +55,17 @@ enum {      // bit combinations returned by nextBits
     BITSTART,   // used to signal start of bitstream for bitLogging
     BITFLUSH,    // used to flush bitstream for bitLogging
     BITFLUSH_1,   // variant that flushes all but last bit (used for marker alignment)
-
 };
 
-
 enum {      // disk format types
-    FM  = 0,
+    FM = 0,
     MFM = 1,
     M2FM = 2,
     UNKNOWN_FMT
 };
 
 #define MINSAMPLE    40000
-#define SAMPLESCALER 500
+#define MINPERCENT   2
 
 extern int debug;
 extern bool showSectorMap;
@@ -81,8 +78,11 @@ enum {
     ALWAYS = 0, MINIMAL, VERBOSE, VERYVERBOSE
 };
 
-int getM2FMBit();
-int getFMBit();
+int getM2FMBit(bool resync);
+int getMFMBitNew(bool resync);
+int getFMBit(bool resync);
+int getMarkerOld();
+int getMarkerNew();
 int seekBlock(int blk);
 void resetFlux();
 void freeMem();

@@ -9,14 +9,11 @@ MODIFICATION HISTORY
     21 Aug 2018 -- original release as unidsk onto github
 */
 
-
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
 #include "unidsk.h"
-
 
 typedef unsigned char byte;
 bool cacheValid = false;
@@ -39,16 +36,12 @@ typedef struct _hlist {
 
 hlist_t *hashTable[HashSize];       // will init to 0
 
-
-
-
 unsigned hash(char *s) {
     unsigned val = 0;
     while (*s)
         val = val * 33 + *s++;
     return val % HashSize;
 }
-
 
 void AddLocInfo(char *isisName, char *checksum, char *locations) {
     unsigned hval = hash(checksum);
@@ -82,7 +75,6 @@ void AddLocInfo(char *isisName, char *checksum, char *locations) {
         *s++ = 0;
     lp->link = hp->nameLocs;
     hp->nameLocs = lp;
-
 }
 
 void loadCache() {
@@ -121,13 +113,10 @@ void loadCache() {
         *checksum++ = 0;      // remove PERLSEP;
         *locations++ = 0;     // and leading :
 //        if (strlen(name) <= 10)     // if not bothered with intel86 names
-            AddLocInfo(name, checksum, locations);
-
+        AddLocInfo(name, checksum, locations);
     }
     cacheValid = true;
-
 }
-
 
 locInfo_t *Lookup(char *name, char *checksum) {
     unsigned hval = hash(checksum);
@@ -149,7 +138,6 @@ locInfo_t *Lookup(char *name, char *checksum) {
     }
     return NULL;
 }
-
 
 /*
     looks up the directory entry in the repo
@@ -185,4 +173,3 @@ char *Dblookup(isisDir_t *entry) {
     lastLoc = lp ? lp->locations : NULL;
     return lastLoc;
 }
-

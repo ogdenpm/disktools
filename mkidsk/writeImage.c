@@ -18,18 +18,17 @@ enum {
 };
 byte smap[TRACKS][DDSECTORS];
 
-
 void BuildSMap(char *skews) {
     word curSkew = 0;
     word curSec = 0;
     byte sectors;
     byte i, interTrackSkew;
 
-
     if (diskType == ISIS_DD) {	/* DD */
         sectors = 52;
         interTrackSkew = 7;
-    } else {
+    }
+    else {
         sectors = 26;
         interTrackSkew = 4;
     }
@@ -38,7 +37,8 @@ void BuildSMap(char *skews) {
         if (!skews) {
             for (i = 1; i <= sectors; i++)
                 smap[curTrack][i - 1] = i;      // no sector mapping
-        } else {
+        }
+        else {
             if (curTrack < 3) {                 // track 0, 1 and 2 restart skew and intertrack skew
                 curSkew = *skews++ - '0';
                 curSec = 0;
@@ -95,7 +95,6 @@ void WriteImgFile(char *fname, char *skews, char *comment) {
     BuildSMap(skews);
     fmtExt = strrchr(fname, '.');
     fmt = _stricmp(fmtExt, ".img") == 0 ? IMG : IMD;
-    
 
     if (fmt == IMD)
         WriteIMDHdr(fp, comment);
@@ -114,16 +113,16 @@ void WriteImgFile(char *fname, char *skews, char *comment) {
                 if (SameCh(sector)) {
                     putc(2, fp);
                     putc(*sector, fp);
-                } else {
+                }
+                else {
                     putc(1, fp);
                     fwrite(sector, 1, SECTORSIZE, fp);
                 }
-            } else
+            }
+            else
                 fwrite(sector, 1, SECTORSIZE, fp);
         }
     }
 
     fclose(fp);
 }
-
-

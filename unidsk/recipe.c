@@ -19,7 +19,6 @@ MODIFICATION HISTORY
     21 Aug 2018 -- Added support for auto looking up files in the repository
                    the new option -l or -L supresses the lookup i.e. local fiiles
 
-
 TODO
     Review the information generated for an ISIS IV disk to see if it is sufficient
     to allow recreation of the original .imd or .img file
@@ -80,14 +79,12 @@ The primary use of this is to change to prefered path names for human reading
 
 */
 
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <direct.h>
 #include <string.h>
 
 #include "unidsk.h"
-
 
 struct {
     char *checksum;
@@ -111,10 +108,6 @@ struct {
 
 char *osFormat[] = { "UNKNOWN", "ISIS II SD", "ISIS II DD", "ISIS III", "ISIS IV" };
 
-
-
-
-
 void mkRecipe(char *name, isisDir_t  *isisDir, char *comment, int diskType)
 {
     FILE *fp;
@@ -124,7 +117,6 @@ void mkRecipe(char *name, isisDir_t  *isisDir, char *comment, int diskType)
     char *dbPath;
     char *prefix;
     isisDir_t *dentry;
-
 
     strcpy(recipeName, "@");
     strcat(recipeName, name);
@@ -184,7 +176,7 @@ void mkRecipe(char *name, isisDir_t  *isisDir, char *comment, int diskType)
                 fprintf(fp, "# file %s could not be recovered\n", dentry->name + 1);
                 continue;
             }
-         }
+        }
 
         fprintf(fp, "%s,", dentry->name);
         if (dentry->attrib & 0x80) putc('F', fp);
@@ -232,7 +224,4 @@ void mkRecipe(char *name, isisDir_t  *isisDir, char *comment, int diskType)
         putc('\n', fp);
     }
     fclose(fp);
-
 }
-
-

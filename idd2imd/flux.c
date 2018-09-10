@@ -21,7 +21,6 @@ typedef struct _flux {
     int flux[FLUXCHUNKSIZE];
 } flux_t;
 
-
 typedef struct {
     long streamPos;
     long sampleCnt;
@@ -32,7 +31,6 @@ typedef struct {
     long streamPos;
     long transferTime;
 } stream_t;
-
 
 /*** input buffer management ***/
 // varaibles used for input buffer management
@@ -99,11 +97,10 @@ static flux_t *fluxData;        // the list of flux data blocks
 static flux_t *curBlk;          // current block being processed
 static index_t *indexArray;     // the array of info block
 static int indexArrayCnt;       // the count of index info records
-static int indexArraySize;      // the current size of indexArray 
+static int indexArraySize;      // the current size of indexArray
 static stream_t *streamArray;   // stream info block equivalent of above
 static int streamArrayCnt;
 static int streamArraySize;
-
 
 static size_t fluxRead;           // total number of flux transitions read
 static size_t fluxPos;            // current flux transition
@@ -145,7 +142,7 @@ int seekBlock(int blk) {
         return 0;
     endTrack = indexArray[blk + 1].streamPos;
 #pragma warning(suppress: 26451)
-    return (int)((indexArray[blk+1].indexCnt - indexArray[blk].indexCnt) / ICK * SCK);
+    return (int)((indexArray[blk + 1].indexCnt - indexArray[blk].indexCnt) / ICK * SCK);
 }
 
 /* utility function to return current position in flux stream */
@@ -188,7 +185,6 @@ void freeMem() {
     free(indexArray);
 }
 
-
 /*
     The Flux read engine
 */
@@ -201,15 +197,12 @@ void resetFlux() {
     curBlk = fluxData;
     indexArrayCnt = 0;
     streamArrayCnt = 0;
-
 }
-
 
 // add a new flux transition entry, allocating more memory if needed
 
 void addFlux(int val) {
     flux_t *p;
-
 
     if (!fluxData || (curBlk->cnt == FLUXCHUNKSIZE && !curBlk->link)) {
         p = (flux_t *)xalloc(NULL, sizeof(flux_t));
@@ -254,9 +247,6 @@ void addIndexBlock(long streamPos, long sampleCnt, long indexCnt) {
     p->sampleCnt = sampleCnt;
     p->indexCnt = indexCnt;
 }
-
-
-
 
 // handle flux Out Of Band info
 void oob() {
@@ -336,7 +326,6 @@ void oob() {
     }
 }
 
-
 /*
     Process the flux stream
 */
@@ -366,7 +355,6 @@ size_t readFluxBuffer(byte *buf, size_t bufsize) {
     return fluxRead;
 }
 
-
 int getNextFlux() {
     int val;
     int ovl16 = 0;
@@ -386,7 +374,6 @@ int getNextFlux() {
             return val + ovl16;
     }
 }
-
 
 void displayHist(int levels)
 {
@@ -453,8 +440,4 @@ void displayHist(int levels)
         else
             putchar(' ');
     putchar('\n');
-
-
 }
-
-

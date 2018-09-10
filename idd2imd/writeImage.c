@@ -19,19 +19,15 @@ enum {
     IMG, IMD
 };
 
-
-
 imd_t trackData[MAXCYLINDER][MAXHEAD];  // support 2 heads
 
 #define RECOVERED    0x80        // flag for recovered sector id
-
 
 int cylMax = 0, headMax = 0;
 
 void resetIMD() {
     memset(trackData, 0, sizeof(trackData));
 }
-
 
 void addIMD(imd_t *trackPtr) {
     byte fmt[MAXSECTORS];             // skew assignments - assuming starting at 1
@@ -73,7 +69,7 @@ void addIMD(imd_t *trackPtr) {
             /* create a skew map for the track based at 1 */
             int slot = 0;
 
-            memset(fmt, 0, sizeof(fmt));            // 
+            memset(fmt, 0, sizeof(fmt));            //
             for (int i = 1; i <= trackPtr->spt; i++) {
                 while (fmt[slot])
                     slot = (slot + 1) % trackPtr->spt;
@@ -86,7 +82,7 @@ void addIMD(imd_t *trackPtr) {
 
             for (offset = 0; fmt[offset] != trackPtr->smap[slot]; offset++)      // find this sector in fmt table
                 ;
-            offset -= slot;                                         // backup to align with first slot 
+            offset -= slot;                                         // backup to align with first slot
             /* check whether skew recovery possible */
             for (int i = 0; i < trackPtr->spt; i++) {
                 if (trackPtr->smap[i] && trackPtr->smap[i] != fmt[(i + offset) % trackPtr->spt]) {
@@ -94,25 +90,24 @@ void addIMD(imd_t *trackPtr) {
                     break;
                 }
             }
-
         }
     }
 
     if (showSectorMap) {
         logger(ALWAYS, "Track %d/%d Sector Mapping:\n", trackPtr->cyl, trackPtr->head);
-        for (int i = 0; i < MAXSECTORS; i++) {
+        for (int i = 0; i < trackPtr->spt; i++) {
             if (trackPtr->smap[i])
                 printf("%02d ", trackPtr->smap[i]);
             else if (canRecover) {
 #pragma warning(suppress: 6001)
-                trackPtr->smap[i] = fmt[(i + offset) % MAXSECTORS];
+                trackPtr->smap[i] = fmt[(i + offset) % trackPtr->spt];
                 printf("%02dr", trackPtr->smap[i]);
             }
             else
                 printf("-- ");
         }
         putchar('\n');
-        for (int i = 0; i < MAXSECTORS; i++) {
+        for (int i = 0; i < trackPtr->spt; i++) {
             putchar(trackPtr->hasData[i] ? 'D' : 'X');
             putchar(' ');
             putchar(' ');
@@ -121,10 +116,10 @@ void addIMD(imd_t *trackPtr) {
     else if (missingIdCnt) {
         if (canRecover) {
             logger(ALWAYS, "Track %d/%d recovering sector ids:", trackPtr->cyl, trackPtr->head);
-            for (int i = 0; i < trackPtr->spt; i++, offset = (offset + 1) % trackPtr->spt) {
+            for (int i = 0; i < trackPtr->spt; i++) {
                 if (!trackPtr->smap[i])
 #pragma warning(suppress: 6385)
-                    printf(" %02d", fmt[(i + offset) % trackPtr->spt]);
+                    printf(" %02d", trackPtr->smap[i] = fmt[(i + offset) % trackPtr->spt]);
             }
             putchar('\n');
         }
@@ -135,14 +130,12 @@ void addIMD(imd_t *trackPtr) {
                     printf(" %02d", i + 1);
             }
             putchar('\n');
-
-
         }
     }
     if (missingSecCnt) {
         if (missingIdCnt == 0 || canRecover) {
             logger(ALWAYS, "Track %d/%d missing data for sectors:", trackPtr->cyl, trackPtr->head);
-            for (int i = 0; i < MAXSECTORS; i++) {
+            for (int i = 0; i < trackPtr->spt; i++) {
                 if (!trackPtr->hasData[i]) {
                     printf(" %02d", trackPtr->smap[i]);
                 }
@@ -152,7 +145,6 @@ void addIMD(imd_t *trackPtr) {
         else
             logger(ALWAYS, "Track %d/%d not usable - missing %d sector Ids and %d data sectors\n",
                 trackPtr->cyl, trackPtr->head, missingIdCnt, missingSecCnt);
-
     }
     if (missingIdCnt == 0 || canRecover) {
         trackData[trackPtr->cyl][trackPtr->head] = *trackPtr;           /* structure copy */
@@ -160,8 +152,6 @@ void addIMD(imd_t *trackPtr) {
             cylMax = trackPtr->cyl;
         if (trackPtr->head > headMax)
             headMax = trackPtr->head;
-
-
     }
 }
 
@@ -233,5 +223,3 @@ void WriteImgFile(char *fname, char *comment) {
 
     fclose(fp);
 }
-
-

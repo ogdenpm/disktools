@@ -120,7 +120,6 @@ opts:	/B			- output Binary image\n\
     X0=track[,to_track]	- eXclude track(s) side 0 only	[None]\n\
     X1=track[,to_track]	- eXclude track(s) side 1 only	[None]\n" };
 
-
 int check_sector(unsigned n);
 
 /*
@@ -267,7 +266,6 @@ int load_track(TRACK *t, FILE *fp)
     }
     return 255;
 }
-
 
 /*
  * Reorder the sectors to the requested interleave.
@@ -429,7 +427,6 @@ void write_track(TRACK *t, FILE *fp)
         else
             fwrite(t->Tbuf + j, 1, s, fp);
     }
-
 }
 
 /*
@@ -642,7 +639,7 @@ secok:	// Sector was found
         warn("Deleted data status differs: %u %u", i, j);
     if (f & 4)
         warn("Bad sector status differs: %u %u", i, j);
-    if (memcmp(t1.Tbuf + i*si, t2.Tbuf + j*si, si)) {
+    if (memcmp(t1.Tbuf + i * si, t2.Tbuf + j * si, si)) {
         warn("Merge data differs from orignal %u %u", i, j);
     }
     return 0;

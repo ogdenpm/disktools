@@ -7,7 +7,6 @@
 #include "flux.h"
 #include "zip.h"
 
-
 int debug = 0;      // debug level
 int histLevels = 0;
 bool showSectorMap = false;
@@ -20,6 +19,7 @@ void error(char *fmt, ...)
     va_list args;
     va_start(args, fmt);
 
+    fprintf(stderr, "%s - ", curFile);
     vfprintf(stderr, fmt, args);
     exit(1);
 }
@@ -29,15 +29,10 @@ void logger(int level, char *fmt, ...) {
     va_start(args, fmt);
 
     if (debug >= level) {
-        printf("File %s - ", curFile);
+        printf("%s - ", curFile);
         vprintf(fmt, args);
     }
 }
-
-
-
-
-
 
 _declspec(noreturn) void usage() {
     error("usage: idd2imd [-d[n]] -h[n] [zipfile|rawfile]+\n"
@@ -135,4 +130,3 @@ int main(int argc, char **argv) {
     }
     return 0;
 }
-

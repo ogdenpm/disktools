@@ -26,7 +26,6 @@ typedef unsigned short word;
 #define EXT ".imd"                      // default extension and hence format
 #define MAXCOMMENT	4096				// upper limit on comment length from source IMD
 
-
 // names for magic numbers
 // disk types
 enum { UNKNOWN = 0, ISIS_SD, ISIS_DD, ISIS_III, ISIS_IV };
@@ -48,7 +47,7 @@ enum { UNKNOWN = 0, ISIS_SD, ISIS_DD, ISIS_III, ISIS_IV };
 #define ISISLAB_HDR 0x19
 #define ISISLAB_DAT 0x1A
 #define ISISLAB_DATA 0x11B      // location of isis.lab additional blocks
-#define ISISLAB_SDSIZE  1       
+#define ISISLAB_SDSIZE  1
 #define ISISLAB_DDSIZE  27
 #define ISISLAB_DDSIZEA 26
 #define ISISDIR_HDR 0x101
@@ -87,7 +86,6 @@ typedef struct {
     word hdrBlk;
 } direct_t;
 
-
 typedef struct {
     byte name[9];
     byte version[2];
@@ -97,7 +95,6 @@ typedef struct {
 } label_t;
 
 #pragma pack(pop)
-
 
 extern byte diskType;
 extern label_t label;

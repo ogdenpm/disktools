@@ -42,7 +42,6 @@ TODO
 #include <stdarg.h>
 #include "unidsk.h"
 
-
 char targetPath[_MAX_PATH];
 
 isisDir_t isisDir[MAXDIR];
@@ -75,9 +74,9 @@ typedef struct {
     unsigned	Size;				// Sector size
     unsigned char	startSec,			// starting sector
         Hflag;				// extra bits embedded in Head
-    unsigned char Smap[MAXSECTOR+1];		// Sector numbering map
-    unsigned char Cmap[MAXSECTOR+1];		// Cylinder numbering map
-    unsigned char Hmap[MAXSECTOR+1];		// Head numbering map
+    unsigned char Smap[MAXSECTOR + 1];		// Sector numbering map
+    unsigned char Cmap[MAXSECTOR + 1];		// Cylinder numbering map
+    unsigned char Hmap[MAXSECTOR + 1];		// Head numbering map
     byte *buf;				// de interlaced track buffer
 } TRACK;	// Sector type flags
 
@@ -85,7 +84,7 @@ int maxCylinder;
 
 TRACK *disk[MAXCYLINDER][MAXHEAD];
 
-            // Mode (data rate) index to value conversion table
+// Mode (data rate) index to value conversion table
 unsigned Mtext[] = { 500, 300, 250 };
 
 // Encoded sector size to actual size conversion table
@@ -128,7 +127,6 @@ typedef struct {
     byte	aux[3];
 } fnode_t;
 
-
 typedef struct {
     byte status;
     char name[6];
@@ -145,20 +143,16 @@ typedef struct {
     byte track;
 } linkage_t;
 
-
 typedef struct {
     linkage_t prev, next, pointers[1];
 } isisLinkage_t;
 
-
 #pragma pack(pop)
-
 
 struct {
     int inuse;
     fnode_t *fn;
 } ifiles[NIFILES];
-
 
 /*
 * Display error message and exit
@@ -184,10 +178,7 @@ void rdError(char *fmt, ...)
     if (showRdError)
         vfprintf(stderr, fmt, args);
     rdErrorCnt++;
-
 }
-
-
 
 int volGran, volSize, maxFnode, fnodeStart, fnodeSize, rootFnode;
 /*
@@ -200,8 +191,6 @@ int issame(unsigned char *buf, int size)
             return 0;
     return 1;
 }
-
-
 
 void free_track(TRACK *t)
 {
@@ -216,10 +205,9 @@ int tracksSame(TRACK *t1, TRACK *t2)
     if (t1->Cyl != t2->Cyl || t1->Head != t2->Head || t1->Nsec != t2->Nsec)
         return 0;
     return	memcmp(t1->Smap, t2->Smap, t1->Nsec) == 0 &&
-            memcmp(t1->Cmap, t2->Cmap, t1->Nsec) == 0 &&
-            memcmp(t1->Hmap, t2->Hmap, t1->Nsec) == 0 &&
-            memcmp(t1->buf, t2->buf, t1->Nsec * t1->Size) == 0;
-    
+        memcmp(t1->Cmap, t2->Cmap, t1->Nsec) == 0 &&
+        memcmp(t1->Hmap, t2->Hmap, t1->Nsec) == 0 &&
+        memcmp(t1->buf, t2->buf, t1->Nsec * t1->Size) == 0;
 }
 
 /*
@@ -294,12 +282,12 @@ TRACK *load_track(FILE *fp)
         fprintf(stderr, "alloc track buf - out of memory\n");
         exit(1);
     }
-    
+
     // Decode sector data blocks
     for (i = 0; i < n; ++i) {
         if ((c = getc(fp)) == EOF)
             error("EOF at sector %d/%d flag", i, t->Smap[i]);
-        
+
         if (c & 1) {
             if (fread(t->buf + s * (t->Smap[i] - t->startSec), 1, s, fp) != s)
                 error("EOF in sector %d/%d data", i, t->Smap[i]);
@@ -309,14 +297,12 @@ TRACK *load_track(FILE *fp)
                 error("EOF in sector %d/%d compress data", i, t->Smap[i]);
             memset(t->buf + s * (t->Smap[i] - t->startSec), h, s);
         }
-
     }
 
     if (t->Cyl > maxCylinder)
         maxCylinder = t->Cyl;
     return t;
 }
-
 
 void load_imd(FILE *fp)
 {
@@ -362,8 +348,6 @@ void load_imd(FILE *fp)
     }
 }
 
-
-
 struct {
     int size;
     byte diskType;
@@ -392,7 +376,6 @@ void load_img(FILE *fp) {
     fseek(fp, 0, SEEK_END);
     fileSize = ftell(fp);
     rewind(fp);
-    
 
     for (diskopt = 0; diskopt < DISKOPT; diskopt++)
         if (fileSize == diskSizes[diskopt].size)
@@ -431,13 +414,12 @@ void load_img(FILE *fp) {
     maxCylinder = diskSizes[diskopt].tracks - 1;
 }
 
-
 byte *getTS(int track, int sector)
 {
     TRACK *p;
     int head = 0;
     int spt;
-    
+
     sector--;					// 0 base sector
     if (track > maxCylinder) {
         rdError("track %d > maxCylinder %d\n", track, maxCylinder);
@@ -449,14 +431,14 @@ byte *getTS(int track, int sector)
         return NULL;
     else
         spt = diskType == ISIS_III ? 16 : 15;
-    if (sector >= spt && disk[track][1]) {      // overflow onto other head ?
+    if (sector >= spt && heads > 0) {      // overflow onto other head ?
         head++;
         sector -= spt;
     }
 
     if (!(p = disk[track][head]))       // sector is still missing track
         return NULL;
-    
+
     if (sector >= p->Nsec) {
         rdError("sector %d > max sector %d for cylinder %d head %d\n", sector + 1, p->Nsec, head, track);
         return NULL;
@@ -465,10 +447,8 @@ byte *getTS(int track, int sector)
     return p->buf + sector * p->Size;
 }
 
-
 byte *getBlock(int blk)
 {
-
     int logicalCylinder, offset;
     int t00cnt, t10cnt;
 
@@ -478,10 +458,11 @@ byte *getBlock(int blk)
         t00cnt = 4;
     t10cnt = (disk[1][0]->Nsec * disk[1][0]->Size + volGran - 1) / volGran;
 
-    if (blk < t00cnt)	{// track 0, head 0
+    if (blk < t00cnt) {// track 0, head 0
         logicalCylinder = 0;
         offset = (blk * volGran);
-    } else {
+    }
+    else {
         blk += (t10cnt - t00cnt);	// trick to assume track 0, head 0 is same as others
         logicalCylinder = blk / t10cnt;
         offset = blk % t10cnt * volGran;
@@ -497,7 +478,6 @@ int readWord(byte *p)
     return p[0] + p[1] * 256;
 }
 
-
 int readBlockNumber(byte *p)
 {
     return p[0] + p[1] * 0x100 + p[2] * 0x10000;
@@ -507,9 +487,6 @@ int readDWord(byte *p)
 {
     return readWord(p) + readWord(p + 2) * 0x10000;
 }
-
-
-
 
 byte *getFileLoc(fnode_t *fn, unsigned pos)
 {
@@ -547,14 +524,13 @@ byte *getFileLoc(fnode_t *fn, unsigned pos)
     return p + pos % volGran;
 }
 
-
 int iRead(int fd, byte *buf, int pos, int count);
 
 int iOpen(int node)
 {
     if (!ifiles[0].inuse) {
         ifiles[0].inuse = 1;
-        ifiles[0].fn = (fnode_t *) getBlock(fnodeStart / volGran);
+        ifiles[0].fn = (fnode_t *)getBlock(fnodeStart / volGran);
     }
 
     for (int i = 1; i < NIFILES; i++) {
@@ -569,9 +545,6 @@ int iOpen(int node)
     return -1;
 }
 
-
-
-
 int iRead(int fd, byte *buf, int pos, int count)
 {
     fnode_t *fn;
@@ -585,7 +558,7 @@ int iRead(int fd, byte *buf, int pos, int count)
 
     if ((int)fn->totalSize - pos < count)
         count = fn->totalSize - pos;
-    
+
     while (count > 0) {
         delta = volGran - pos % volGran;
         if (delta > count)
@@ -603,12 +576,10 @@ int iRead(int fd, byte *buf, int pos, int count)
     return n;
 }
 
-
 void iClose(int fd)
 {
     if (0 <= fd && fd < NIFILES)
         ifiles[fd].inuse = 0;
-
 }
 
 #define READCHUNK	2048
@@ -624,7 +595,6 @@ void dumpfile(int fd, char *filename)
         return;
     }
 
-
     while (1) {
         cnt = iRead(fd, buf, pos, READCHUNK);
         if (cnt != 0)
@@ -635,7 +605,6 @@ void dumpfile(int fd, char *filename)
     }
     fclose(fout);
 }
-
 
 dumpdirectory(int directory, char *dirPath)       // note recover not yet implemented
 {
@@ -660,16 +629,16 @@ dumpdirectory(int directory, char *dirPath)       // note recover not yet implem
                 fprintf(stderr, "can't read fnode %d - %s\n", dentry.fnode, path);
             else {
                 fn = ifiles[fd].fn;
-                fprintf(logfp,"fnode = %d, flags = %02X ", dentry.fnode, fn->flags);
+                fprintf(logfp, "fnode = %d, flags = %02X ", dentry.fnode, fn->flags);
                 switch (fn->type) {
-                case 0: fprintf(logfp,"%s -> fnode file - size %d\n", path, fn->totalSize); break;
-                case 1: fprintf(logfp,"%s -> volume free space map - size %d\n", path, fn->totalSize); break;
-                case 2: fprintf(logfp,"%s -> free nodes map - size %d\n", path, fn->totalSize); break;
-                case 3: fprintf(logfp,"%s -> space accounting file - size %d\n", path, fn->totalSize); break;
-                case 4: fprintf(logfp,"%s -> bad device blocks file - size %d\n", path, fn->totalSize); break;
-                case 6: fprintf(logfp,"%s -> directory file - size %d\n", path, fn->totalSize);  break;
-                case 8: fprintf(logfp,"%s -> data file - size %d\n", path, fn->totalSize); break;
-                default: fprintf(logfp,"%s -> unknown file format %d - size %d\n", path, fn->type, fn->totalSize); break;
+                case 0: fprintf(logfp, "%s -> fnode file - size %d\n", path, fn->totalSize); break;
+                case 1: fprintf(logfp, "%s -> volume free space map - size %d\n", path, fn->totalSize); break;
+                case 2: fprintf(logfp, "%s -> free nodes map - size %d\n", path, fn->totalSize); break;
+                case 3: fprintf(logfp, "%s -> space accounting file - size %d\n", path, fn->totalSize); break;
+                case 4: fprintf(logfp, "%s -> bad device blocks file - size %d\n", path, fn->totalSize); break;
+                case 6: fprintf(logfp, "%s -> directory file - size %d\n", path, fn->totalSize);  break;
+                case 8: fprintf(logfp, "%s -> data file - size %d\n", path, fn->totalSize); break;
+                default: fprintf(logfp, "%s -> unknown file format %d - size %d\n", path, fn->type, fn->totalSize); break;
                 }
 
                 s = path;
@@ -700,11 +669,9 @@ void isis4()
 {
     byte *p;
     int fd;
-//	fnode_t *fn;
-//	int offset;
+    //	fnode_t *fn;
+    //	int offset;
     int *probe;
-
-
 
     if ((logfp = fopen("__log__", "wt")) == NULL) {
         fprintf(stderr, "can't create __log__ file\n");
@@ -798,7 +765,6 @@ void isis4()
     //}
 }
 
-
 /* simplified interface to sha1 code */
 SHA1Context ctx;
 
@@ -817,7 +783,7 @@ void GetSHA1(byte *checksum) {
 
     SHA1Result(&ctx, sha1);
     sha1[SHA1HashSize] = 0;     // 0 pad to triple boundary
-    
+
     for (int i = 0; i < SHA1HashSize; i += 3) {
         int triple = (sha1[i] << 16) + (sha1[i + 1] << 8) + sha1[i + 2];
         for (int j = 0; j < 4; j++)
@@ -887,7 +853,7 @@ void extractFile(dir_t *dptr)
             size += sectorSize;
         }
         else {
-            size += (int) fwrite(p, 1, sectorSize, fout);
+            size += (int)fwrite(p, 1, sectorSize, fout);
             AddSHA1(p, sectorSize);
         }
     }
@@ -914,8 +880,6 @@ void extractFile(dir_t *dptr)
         else
             recoveredFiles++;
 }
-
-
 
 void isis2_3(dir_t *dptr)
 {
@@ -945,8 +909,6 @@ void isis2_3(dir_t *dptr)
         printf("%d deleted files recovered for checking\n", recoveredFiles);
 }
 
-
-
 void main(int argc, char **argv)
 {
     byte *p;
@@ -956,16 +918,16 @@ void main(int argc, char **argv)
     char fname[_MAX_FNAME];
     char ext[_MAX_EXT];
 
-    
     if (argc > 2 && _stricmp(argv[1], "-l") == 0) {
         argv++;
         argc--;
-    } else
+    }
+    else
         loadCache();
 
     if (argc != 2 || (fp = fopen(*++argv, "rb")) == NULL) {
         fprintf(stderr, "usage: unidsk [-l] file\n"
-                        "-l for local names only\n");
+            "-l for local names only\n");
         exit(1);
     }
 
@@ -973,7 +935,6 @@ void main(int argc, char **argv)
         fprintf(stderr, "invalid file name %s\n", argv[1]);
         exit(1);
     }
-
 
     if (_stricmp(ext, ".imd") == 0)
         load_imd(fp);
@@ -990,9 +951,10 @@ void main(int argc, char **argv)
     _mkdir(targetPath);
     _chdir(targetPath);                                                 // move to new directory for simple file creation
     if (((p = getTS(1, 2)) && memcmp(p + 1, "ISIS\0\0DIR", 9) == 0)
-      || ((p = getTS(0x27, 2)) && memcmp(p + 1, "ISIS\0\0DIR", 9) == 0)) {
+        || ((p = getTS(0x27, 2)) && memcmp(p + 1, "ISIS\0\0DIR", 9) == 0)) {
         isis2_3((dir_t *)p);
         mkRecipe(fname, isisDir, comment, diskType);
-    } else
+    }
+    else
         isis4();
 }

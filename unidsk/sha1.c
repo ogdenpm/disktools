@@ -124,7 +124,6 @@ int SHA1Result(SHA1Context *context,
         context->Length_Low = 0;    /* and clear length */
         context->Length_High = 0;
         context->Computed = 1;
-
     }
 
     for (i = 0; i < SHA1HashSize; ++i)
@@ -368,7 +367,6 @@ void SHA1PadMessage(SHA1Context *context)
         context->Message_Block[context->Message_Block_Index++] = 0x80;
         while (context->Message_Block_Index < 56)
         {
-
             context->Message_Block[context->Message_Block_Index++] = 0;
         }
     }

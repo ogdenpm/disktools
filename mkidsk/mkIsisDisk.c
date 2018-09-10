@@ -45,7 +45,6 @@ TODO
     Add support for ISIS III, this depends on understanding the format of ISIS.LAB and
     ISIS.FRE for ISIS III
 
-
 RECIPE file format
 The following is the current recipe format, which has change a little recently
 with attributes split out and new locations behaviour
@@ -83,7 +82,6 @@ where
 
 #include "mkIsisDisk.h"
 
-
 char comment[MAXCOMMENT];
 char root[_MAX_PATH + 1];
 byte diskType = ISIS_DD;
@@ -95,7 +93,6 @@ byte formatCh = FMTBYTE;                     // default format character -e over
 char *forcedSkew = NULL;
 
 char *special[] = { "AUTO", "DIR", "ZERO", "ZEROHDR", NULL };
-
 
 void InitFmtTable(byte t0Interleave, byte t1Interleave, byte interleave) {
     label.fmtTable[0] = t0Interleave + '0';
@@ -118,13 +115,12 @@ int Match(char *s, char *ref) {
         return 0;
     while (isblank(*s))
         s++;
-    return (int) (s - start);
+    return (int)(s - start);
 }
-
 
 bool checkSkew(char *s) {    // check skew is valid
     for (int i = 0; i < 3; i++)
-        if (s[i] < '1' || '0' + 52 < s[i] )
+        if (s[i] < '1' || '0' + 52 < s[i])
             return false;
     return true;
 }
@@ -174,7 +170,8 @@ void ParseRecipeHeader(FILE *fp) {
             for (int i = 6; i < 9; i++)
                 if (isalnum(*s))
                     label.name[i] = toupper(*s++);
-        } else if ((cnt = Match(line, "version:"))) {
+        }
+        else if ((cnt = Match(line, "version:"))) {
             s = line + cnt;
             for (int i = 0; i < 2; i++)
                 if (isalnum(*s) || *s == '.')
@@ -190,7 +187,8 @@ void ParseRecipeHeader(FILE *fp) {
                 fprintf(stderr, "Unsupported disk format %s\n", s);
                 exit(1);
             }
-        } else if ((cnt = Match(line, "skew:"))) {      // we have non standard skew
+        }
+        else if ((cnt = Match(line, "skew:"))) {      // we have non standard skew
             s = line + cnt;
             if ('1' <= s[0] && s[0] <= 52 + '0' &&
                 '1' <= s[1] && s[1] <= 52 + '0' &&
@@ -242,9 +240,7 @@ enum {
     DIRLIST = 2,
     IGNORE = 3,
     TOOLONG = 4
-
 };
-
 
 void ParsePath(char *path, char *src, char *isisName) {
     char *s;
@@ -266,7 +262,6 @@ void ParsePath(char *path, char *src, char *isisName) {
             strcpy(path, src);
             return;
         }
-
     }
     if (*src == '*') {				// special entry
         strcpy(path, strlen(src) < _MAX_PATH ? src : "*bad special path");
@@ -298,7 +293,6 @@ void ParseFiles(FILE *fp) {
     char *s;
     int c;
 
-
     while (fgets(line, MAXLINE, fp)) {
         if (line[0] == '#')
             continue;
@@ -311,7 +305,6 @@ void ParseFiles(FILE *fp) {
                 ;
             continue;
         }
-
 
         s = ParseIsisName(isisName, line);                      // get the isisFile
         if (isisName[0] == '\0' || *s != ',') {
@@ -339,7 +332,6 @@ void ParseFiles(FILE *fp) {
         else
             fprintf(stderr, "%s - missing path information\n", line);
     }
-
 }
 
 void usage() {
@@ -402,7 +394,7 @@ void main(int argc, char **argv) {
             break;
         }
     }
-    if (i != argc - 1  &&  i != argc - 2) {                 // allow for recipe and optional diskname
+    if (i != argc - 1 && i != argc - 2) {                 // allow for recipe and optional diskname
         usage();
         exit(1);
     }
@@ -419,13 +411,15 @@ void main(int argc, char **argv) {
             exit(1);
         }
         strcpy(outfile, diskname);
-    } else
+    }
+    else
         _makepath_s(outfile, _MAX_PATH, drive, dir, *fname == '@' ? fname + 1 : fname, ext); // create the default name
 
     if ((s = strrchr(diskname, '.')) && (_stricmp(s, ".imd") == 0 || _stricmp(s, ".img") == 0)) {
         if (s == diskname)                           // we had .fmt only so add
             strcat(outfile, s);
-    } else
+    }
+    else
         strcat(outfile, EXT);                          // we didn't have ext
 
     if (strlen(outfile) >= _MAX_PATH) {
@@ -453,7 +447,4 @@ void main(int argc, char **argv) {
     ParseFiles(fp);
     fclose(fp);
     WriteImgFile(outfile, interleave ? (forcedSkew ? forcedSkew : label.fmtTable) : NULL, comment);
-
-
-
 }

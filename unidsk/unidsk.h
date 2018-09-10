@@ -12,7 +12,6 @@ MODIFICATION HISTORY
     21 Aug 2018 -- Added support for auto looking up files in the repository
                    the new option -l or -L supresses the lookup i.e. local fiiles
 
-
 NOTES
     This version relies on visual studio's pack pragma to force structures to be byte
     aligned.
@@ -27,7 +26,6 @@ TODO
     recreate the ISIS.LAB and ISIS.FRE files.
 
 */
-
 
 #include <stdbool.h>
 #include "sha1.h"
@@ -53,14 +51,10 @@ enum { UNKNOWN, ISIS_SD, ISIS_DD, ISIS_III, ISIS_IV, ZXENIX, CPM };
 #define	ST_BAD		3				// Number Bad
 #define	ST_UNAVAIL	4				// Number unavailable
 
-
-
 #define MAXDIR      200
 #define MAXCOMMENT  2048
 #define MAXINLINE   512
 #define MAXOUTLINE  120
-
-
 
 typedef struct {
     char name[12];      // isis name + optional # prefix for recovered files
