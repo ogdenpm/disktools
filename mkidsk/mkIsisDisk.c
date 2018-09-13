@@ -16,6 +16,8 @@ MODIFICATION HISTORY
                    local files
     20 Aug 2019 -- Updated to use SHA1 checksum, removing the len field
     21 Aug 2019 -- correted handling of a directory path before the recipe file
+    13 Sep 2018 -- renamed skew to interleave to align with normal terminology
+
 
 LIMITATIONS
     There are three cases where mkidsk will not create an exact image, although physical
@@ -59,7 +61,8 @@ and can be separated with multiple comment lines starting with #. These comments
     label: name[.|-]ext     Used in ISIS.LAB name has max 6 chars, ext has max 3 chars
     version: nn             Up to 2 chars used in ISIS.LAB
     format: diskFormat      ISIS II SD, ISIS II DD or ISIS III
-    skew:  skewInfo         optional non standard skew info taken from ISIS.LAB. Rarely needed
+    interleave:  interleaveInfo     optional non standard interleave info taken from ISIS.LAB. Rarely needed
+    skew: skewInfo                  inter track skew - not currently used
     os: operatingSystem     operating system on disk. NONE or ISIS ver, PDS ver, OSIRIS ver
 marker for start of files
     Files:
@@ -188,7 +191,7 @@ void ParseRecipeHeader(FILE *fp) {
                 exit(1);
             }
         }
-        else if ((cnt = Match(line, "skew:"))) {      // we have non standard skew
+        else if ((cnt = Match(line, "interleave:"))) {      // we have non standard interleave
             s = line + cnt;
             if ('1' <= s[0] && s[0] <= 52 + '0' &&
                 '1' <= s[1] && s[1] <= 52 + '0' &&

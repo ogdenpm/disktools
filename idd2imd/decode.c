@@ -242,6 +242,7 @@ int getMarkerNew() {
         if (marker == 8 && am == 0xc2) {
             isIndex = true;
             bitCnt = 0;
+            bitLog(BITFLUSH);
         }
         else if (marker == 4 && am == 0xa1) {
             isIndex = false;
@@ -571,6 +572,115 @@ int getMFMBitNew(bool resync) {
 }
 
 
+#ifdef EXPERIMENTAL
+/* alternative considered based on libdsk code */
+/* currently doesn't perform as well */
+
+#define CLOCK_MAX_ADJ 3     /* +/- 10% adjustment */
+#define CLOCK_MIN(_c) (((_c) * (100 - CLOCK_MAX_ADJ)) / 100)
+#define CLOCK_MAX(_c) (((_c) * (100 + CLOCK_MAX_ADJ)) / 100)
+
+
+int getFluxNextBit(int guardPct) {
+    static int flux, clock, clockCentre;
+    static int clockedZeros;
+    static const int pll_phase_adj_pct = 40;
+    static const int pll_period_adj_pct = 3;
+
+    if (when(0) == 0) {
+        flux = 0;
+        clockedZeros = 0;
+        clock = clockCentre = 2000;         // 2000ns = 2us
+    }
+
+    while (flux < (clock * guardPct / 100)) {
+        int f = getNextFlux();
+        when(f);
+        if (f == END_BLOCK || f == END_FLUX)
+            return BITEND;
+        flux += f * 1000000 / 24027;
+    }
+
+
+    flux -= clock;
+
+    if (flux >= (clock * (100 - guardPct)/ 100)) {
+        clockedZeros++;
+        return BIT0;
+    }
+
+    /* PLL: Adjust clock frequency according to phase mismatch.
+     * eg. pll_period_adj_pct=0% -> timing-window centre freq. never changes */
+    if (clockedZeros <= 3) {
+        /* In sync: adjust base clock by a fraction of phase mismatch. */
+        clock += flux * pll_period_adj_pct / 100;
+    }
+    else {
+        /* Out of sync: adjust base clock towards centre. */
+        clock += (clockCentre - clock) * pll_period_adj_pct / 100;
+    }
+
+    /* Clamp the clock's adjustment range. */
+    clock = max(CLOCK_MIN(clockCentre),
+        min(CLOCK_MAX(clockCentre), clock));
+
+    /* PLL: Adjust clock phase according to mismatch.
+     * eg. pll_phase_adj_pct=100% -> timing window snaps to observed flux. */
+    flux *= (100 - pll_phase_adj_pct) / 100;
+
+    clockedZeros = 0;
+    return BIT1;
+}
+
+
+
+int getMFMBitTest(bool resync) {
+    static bool lastResync = false;
+    static int cguard = 50, dguard = 50;
+    static unsigned int bits;
+    int bit;
+
+    if (resync && !lastResync) {
+        cguard = dguard = 50;
+        bits = 1;                   // will not resync on 0s for at least 31 bits
+    }
+    lastResync = resync;
+
+    if ((bit = getFluxNextBit(cguard)) == BITEND)
+        return bitLog(BITEND);
+    bits <<= 1;
+    if (bit == BIT1) {
+        if ((++bits & 0xffff) == 0x4489) {
+//            cguard = 40; dguard = 60;
+            return bitLog(BIT1S);
+        }
+    }
+    else if ((bits & 0xffff) == 0x5224 || (resync && ((bits & 0xffffffff) == 0xaaaaaaaa || (bits & 0xffff) == 0x9254))) {
+//        cguard = 40; dguard = 60;
+        return bitLog(BIT0S);
+    }
+
+    if ((bit = getFluxNextBit(dguard)) == BITEND)
+        return bitLog(BITEND);
+    bits <<= 1;
+    if (bit == BIT1) {
+        if ((++bits & 0xffff) == 0x4489)
+            ;   // cguard = 40; dguard = 60;
+    }
+    else if ((bits & 0xffff) == 0x5224 || (resync && ((bits & 0xffffffff) == 0xaaaaaaaa || (bits & 0xffff) == 0x9254)))
+        ; // cguard = 40; dguard = 60;
+
+    switch (bits & 3) {
+    case 3: return bitLog(BITBAD);
+    case 2: return bitLog(BIT0);
+    case 1: return bitLog(BIT1);
+    }
+    if ((bits & 0xf) == 8)
+        return bitLog(BIT0M);
+    return bitLog((bits & 0xf) == 4 ? BIT0 : BITBAD);
+}
+#endif
+
 int getFMBit(bool resync)
 {
     static bool cbit;              // true if last flux transition was control clock
@@ -687,7 +797,7 @@ bool analyseFormat()
         finally estimate the sectors per track
     */
     int savDebug = debug;       // surpress debug info
-//    debug = 0;
+    debug = 0;
     seekBlock(1);               // look at first track copy
 
     int sectorStart = 0, firstSector = 0, lastSectorStart = 0;

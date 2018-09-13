@@ -816,6 +816,12 @@ void extractFile(dir_t *dptr)
 
     strcpy(filename, isisName);
     _strlwr(filename);
+    if (strcmp(filename, "#") == 0)     // ignore missing name if deleted file
+        return;
+    else if (!*filename) {
+        fprintf(stderr, "Missing file name in ISIS.DIR\n");
+        return;
+    }
     if ((fout = fopen(filename, "wb")) == NULL) {
         fprintf(stderr, "can't create %s\n", filename);
         return;

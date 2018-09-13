@@ -80,6 +80,7 @@ enum {
 
 int getM2FMBit(bool resync);
 int getMFMBitNew(bool resync);
+int getMFMBitTest(bool resync);
 int getFMBit(bool resync);
 int getMarkerOld();
 int getMarkerNew();

@@ -8,6 +8,7 @@ MODIFICATION HISTORY
     17 Aug 2018 -- original release as mkidsk onto github
     18 Aug 2018 -- added copyright info
     19 Aug 2018 -- added non system boot file incase ISIS.T0 is not specified
+    13 Sep 2018 -- renamed skew to interleave to align with normal terminology
 
 */
 #include "mkIsisDisk.h"

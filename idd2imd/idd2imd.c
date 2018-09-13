@@ -41,6 +41,134 @@ _declspec(noreturn) void usage() {
         "-s display sector mapping\n"
         "No IMD file is created for non zip files\n");
 }
+
+
+bool loadFile(char *name, bool warnNoOpen) {
+    size_t bufsize;
+    byte *buf;
+    FILE *fp;
+    bool ok = false;;
+
+    if ((fp = fopen(name, "rb")) == NULL) {
+        if (warnNoOpen)
+            logger(ALWAYS, "Can't open\n");
+        return false;
+    }
+
+    fseek(fp, 0, SEEK_END);
+    bufsize = ftell(fp);
+    rewind(fp);
+
+    buf = (byte *)xalloc(NULL, bufsize);
+    if (fread(buf, bufsize, 1, fp) != 1)
+        logger(ALWAYS, "Failed to load\n");
+    else {
+        readFluxBuffer(buf, bufsize);         // load in the flux data from buffer extracted from zip file
+        ok = true;
+    }
+    free(buf);
+    fclose(fp);
+    return ok;
+}
+
+bool loadZipFile(struct zip_t *zip) {
+    size_t bufsize;
+    byte *buf;
+    const char *name = zip_entry_name(zip);
+    char *s;
+
+    if (zip_entry_isdir(zip))
+        return false;
+
+    if (!(s = strrchr(name, '.')) || _stricmp(s, ".raw") != 0)
+        return false;
+    
+    bufsize = (size_t)zip_entry_size(zip);
+    buf = (byte *)xalloc(NULL, bufsize);
+    memset(buf, 0, bufsize);
+    if (zip_entry_noallocread(zip, (void *)buf, bufsize) < 0) {
+        logger(ALWAYS, "Failed to load\n");
+        free(buf);
+        return false;
+    }
+    readFluxBuffer(buf, bufsize);         // load in the flux data from buffer extracted from zip file
+    free(buf);
+    return true;
+}
+
+
+void decodeFile(char *name) {
+
+    char dir[_MAX_DIR];
+    char drive[_MAX_DRIVE];
+    char fname[_MAX_FNAME];
+    char ext[_MAX_EXT];
+    char filename[_MAX_PATH];
+    int cntRaw = 0;
+
+    _splitpath_s(name, drive, _MAX_DRIVE, dir, _MAX_DIR, fname, _MAX_FNAME, ext, _MAX_EXT);
+    
+    resetIMD();
+
+    if (_stricmp(ext, ".raw") == 0) {
+        sprintf(curFile, "%s%s", fname, ext);
+        if (!loadFile(name, true))
+            return;
+         flux2track();
+         if (histLevels)
+            displayHist(histLevels);
+         cntRaw = 1;
+    }
+    else if (_stricmp(ext, ".zip") == 0) {
+        struct zip_t *zip;
+        if ((zip = zip_open(name, 0, 'r')) == NULL)
+            logger(ALWAYS, "Can't open\n");
+        else {
+            int n = zip_total_entries(zip);
+            for (int i = 0; i < n; i++) {
+                zip_entry_openbyindex(zip, i);
+                sprintf(curFile, "%s%s[%s]", fname, ext, zip_entry_name(zip));
+                if (loadZipFile(zip)) {
+                    cntRaw++;
+                    flux2track();
+                    if (histLevels)
+                        displayHist(histLevels);
+                }
+                zip_entry_close(zip);
+            }
+            zip_close(zip);
+        }
+    }
+    else if (!*ext) {       // use name as a prefix
+        for (int cyl = 0; cyl < MAXCYLINDER; cyl++)
+            for (int head = 0; head < 2; head++) {
+                sprintf(curFile, "%s%02d.%1d.raw", fname, cyl, head);
+                _makepath_s(filename, _MAX_PATH, drive, dir, curFile, NULL);
+                if (loadFile(filename, false)) {
+                    cntRaw++;
+                    flux2track();
+                    if (histLevels)
+                        displayHist(histLevels);
+                }
+            }
+    }
+    else
+        usage();
+
+    sprintf(curFile, "%s%s", fname, *ext ? ext : "*.raw");
+    if (cntRaw > 10) {
+        _makepath_s(filename, _MAX_PATH, drive, dir, fname, ".imd"); // create the default name
+        WriteImgFile(filename, "Created by idd2imd\n");
+        logger(ALWAYS, "%d files processed - %s.imd created\n", cntRaw, fname);
+    }
+    else
+        logger(ALWAYS, "%d files processed - no IMD created\n", cntRaw);
+}
+
+
+
+
+
 int main(int argc, char **argv) {
     int arg;
     int optCnt, optVal;
@@ -61,72 +189,7 @@ int main(int argc, char **argv) {
     if (arg == argc)
         usage();
 
-    for (; arg < argc; arg++) {
-        struct zip_t *zip;
-        byte *buf;
-        size_t bufsize;
-        char dir[_MAX_DIR];
-        char drive[_MAX_DRIVE];
-        char fname[_MAX_FNAME];
-        char ext[_MAX_EXT];
-        char imdFile[_MAX_PATH];
-        FILE *fp;
-
-        _splitpath_s(argv[arg], drive, _MAX_DRIVE, dir, _MAX_DIR, fname, _MAX_FNAME, ext, _MAX_EXT);
-        _makepath_s(imdFile, _MAX_PATH, drive, dir, fname, ".imd"); // create the default name
-        sprintf(curFile, "%s%s", fname, ext);
-
-        if (_stricmp(ext, ".raw") == 0) {
-            if ((fp = fopen(argv[arg], "rb")) == NULL)
-                logger(ALWAYS, "Can't open\n");
-            else {
-                resetIMD();
-                fseek(fp, 0, SEEK_END);
-                bufsize = ftell(fp);
-                rewind(fp);
-                buf = (byte *)xalloc(NULL, bufsize);
-                if (fread(buf, bufsize, 1, fp) != 1)
-                    logger(ALWAYS, "Failed to load\n");
-                else {
-                    readFluxBuffer(buf, bufsize);         // load in the flux data from buffer extracted from zip file
-                    flux2track();
-                    if (histLevels)
-                        displayHist(histLevels);
-                }
-                fclose(fp);
-            }
-        }
-        else if (_stricmp(ext, ".zip") != 0)
-            usage();
-        else if ((zip = zip_open(argv[arg], 0, 'r')) == NULL)
-            logger(ALWAYS, "Can't open\n");
-        else {
-            resetIMD();
-            int n = zip_total_entries(zip);
-            for (int i = 0; i < n; i++) {
-                zip_entry_openbyindex(zip, i);
-                if (!zip_entry_isdir(zip)) {
-                    const char *name = zip_entry_name(zip);
-                    char *s;
-                    if ((s = strrchr(name, '.')) && _stricmp(s, ".raw") == 0) {
-                        sprintf(curFile, "%s%s[%s]", fname, ext, name);
-                        bufsize = (size_t)zip_entry_size(zip);
-                        if (!(buf = (byte *)calloc(1, bufsize)))
-                            error("Fatal Error - Out of memory\n");
-
-                        zip_entry_noallocread(zip, (void *)buf, bufsize);
-                        readFluxBuffer(buf, bufsize);         // load in the flux data from buffer extracted from zip file
-                        flux2track();
-                        if (histLevels)
-                            displayHist(histLevels);
-                        free(buf);
-                    }
-                }
-                zip_entry_close(zip);
-            }
-            zip_close(zip);
-            WriteImgFile(imdFile, "Created by idd2imd\n");
-        }
-    }
+    for (; arg < argc; arg++)
+        decodeFile(argv[arg]);
     return 0;
 }

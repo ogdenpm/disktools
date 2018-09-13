@@ -18,6 +18,8 @@ MODIFICATION HISTORY
                    with the thames emulator and the repository file names
     21 Aug 2018 -- Added support for auto looking up files in the repository
                    the new option -l or -L supresses the lookup i.e. local fiiles
+    13 Sep 2018 -- Renamed skew to interleave to align with normal terminolgy
+                   skew is kept as an option but not currently used
 
 TODO
     Review the information generated for an ISIS IV disk to see if it is sufficient
@@ -36,11 +38,12 @@ initial comment lines
     the current date /time
 information lines which can occur in any order, although the order below is the default
 and can be separated with multiple comment lines starting with #. These comments are ignored
-    label: name[.|-]ext     Used in ISIS.LAB name has max 6 chars, ext has max 3 chars
-    version: nn             Up to 2 chars used in ISIS.LAB
-    format: diskFormat      ISIS II SD, ISIS II DD or ISIS III
-    skew:  skewInfo         optional non standard skew info taken from ISIS.LAB. Rarely needed
-    os: operatingSystem     operating system on disk. NONE or ISIS ver, PDS ver, OSIRIS ver
+    label: name[.|-]ext             Used in ISIS.LAB name has max 6 chars, ext has max 3 chars
+    version: nn                     Up to 2 chars used in ISIS.LAB
+    format: diskFormat              ISIS II SD, ISIS II DD or ISIS III
+    interleave:  interleaveInfo     optional non standard interleave info taken from ISIS.LAB. Rarely needed
+    skew: skewInfo                  inter track skew - not currently used
+    os: operatingSystem             operating system on disk. NONE or ISIS ver, PDS ver, OSIRIS ver
 marker for start of files
     Files:
 List of files to add to the image in ISIS.DIR order. Comment lines starting with # are ignored
@@ -138,13 +141,13 @@ void mkRecipe(char *name, isisDir_t  *isisDir, char *comment, int diskType)
         fprintf(fp, "# %s\n", name);
 
     if ((lab = fopen("isis.lab", "rb")) == 0 || fread(&label, sizeof(label), 1, lab) != 1)
-        fputs("label:\nversion:\n", fp);
+        fputs("label:\nversion:", fp);
     else {
         fputs("label:", fp);
         if (label.name[0]) {
             fprintf(fp, " %.6s", label.name);
             if (label.name[6])
-                fprintf(fp, "-%.3s", label.name + 6);
+                fprintf(fp, ".%.3s", label.name + 6);
         }
         fputs("\nversion:", fp);
         if (label.version[0])
@@ -152,9 +155,9 @@ void mkRecipe(char *name, isisDir_t  *isisDir, char *comment, int diskType)
     }
 
     fprintf(fp, "\nformat: %s\n", osFormat[diskType]);     // the disk format
-    if (lab && diskType == ISIS_SD && strncmp(label.fmtTable, "1<6", 3) ||  // nonstandard skew suffix
+    if (lab && diskType == ISIS_SD && strncmp(label.fmtTable, "1<6", 3) ||  // nonstandard interleave suffix
         diskType == ISIS_DD && strncmp(label.fmtTable, "145", 3))
-        fprintf(fp, "skew: %.3s\n", label.fmtTable);
+        fprintf(fp, "interleave: %.3s\n", label.fmtTable);
 
     char *os;
     if (osIdx >= 0) {
