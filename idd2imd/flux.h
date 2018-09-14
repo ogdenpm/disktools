@@ -35,7 +35,8 @@ typedef struct {
     byte spt;                    // sectors per track
     byte cyl;                   // cylinder
     byte head;
-    int  size;                   // sector size in bytes
+    int  size;                  // sector size in bytes
+    byte firstSector;           // first sector (0 or 1)
     byte smap[MAXSECTORS];       // physical slot to sector map
     bool hasData[MAXSECTORS];    // in physical slot order
     byte track[DDTRACKSIZE];    // in physical slot order

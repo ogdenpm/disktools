@@ -32,7 +32,7 @@ void resetIMD() {
 void addIMD(imd_t *trackPtr) {
     byte fmt[MAXSECTORS];             // skew assignments - assuming starting at 1
     int offset = 0;                      // offset to make fmt align to smap
-    byte secToPhsMap[MAXSECTORS];     // map of sectors (-1) to slots
+    byte secToPhsMap[MAXSECTORS + 1];     // map of sectors to slots
     int missingIdCnt = 0;
     int missingSecCnt = 0;
 
@@ -49,8 +49,8 @@ void addIMD(imd_t *trackPtr) {
     /* see what sectors are present */
     memset(secToPhsMap, 0xff, sizeof(secToPhsMap));
     for (int i = 0; i < trackPtr->spt; i++) {
-        if (trackPtr->smap[i])
-            secToPhsMap[trackPtr->smap[i] - 1] = i;
+        if (trackPtr->smap[i] != 0xff)
+            secToPhsMap[trackPtr->smap[i] - trackPtr->firstSector] = i;
         else
             missingIdCnt++;
         if (!trackPtr->hasData[i])
@@ -69,15 +69,15 @@ void addIMD(imd_t *trackPtr) {
             /* create a skew map for the track based at 1 */
             int slot = 0;
 
-            memset(fmt, 0, sizeof(fmt));            //
-            for (int i = 1; i <= trackPtr->spt; i++) {
-                while (fmt[slot])
+            memset(fmt, 0xff, sizeof(fmt));            //
+            for (int i = 0; i < trackPtr->spt; i++) {
+                while (fmt[slot] != 0xff)
                     slot = (slot + 1) % trackPtr->spt;
-                fmt[slot] = i;
+                fmt[slot] = i + trackPtr->firstSector;
                 slot = (slot + skew) % trackPtr->spt;
             }
 
-            for (slot = 0; trackPtr->smap[slot] == 0; slot++)       // find first slot with allocated sector
+            for (slot = 0; trackPtr->smap[slot] == 0xff; slot++)       // find first slot with allocated sector
                 ;
 
             for (offset = 0; fmt[offset] != trackPtr->smap[slot]; offset++)      // find this sector in fmt table
@@ -85,7 +85,7 @@ void addIMD(imd_t *trackPtr) {
             offset -= slot;                                         // backup to align with first slot
             /* check whether skew recovery possible */
             for (int i = 0; i < trackPtr->spt; i++) {
-                if (trackPtr->smap[i] && trackPtr->smap[i] != fmt[(i + offset) % trackPtr->spt]) {
+                if (trackPtr->smap[i] != 0xff && trackPtr->smap[i] != fmt[(i + offset) % trackPtr->spt]) {
                     canRecover = false;
                     break;
                 }
@@ -127,7 +127,7 @@ void addIMD(imd_t *trackPtr) {
             logger(ALWAYS, "Track %d/%d cannot recover sector ids:", trackPtr->cyl, trackPtr->head);
             for (int i = 0; i < trackPtr->spt; i++, offset = (offset + 1) % trackPtr->spt) {
                 if (secToPhsMap[i] == 0xff)
-                    printf(" %02d", i + 1);
+                    printf(" %02d", i + trackPtr->firstSector);
             }
             putchar('\n');
         }
