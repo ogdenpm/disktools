@@ -175,7 +175,7 @@ void mkRecipe(char *name, isisDir_t  *isisDir, char *comment, int diskType)
     fprintf(fp, "os: %s\nFiles:\n", os);
 
     for (dentry = isisDir; dentry < &isisDir[MAXDIR] && dentry->name[0]; dentry++) {
-        if (dentry->errors) {
+        if (dentry->errors || (dentry->name[0] == '#' && dentry->dirLen <= 0)) {
             if (dentry->name[0] == '#') {           // if the file was deleted and has errors note it and skip
                 fprintf(fp, "# file %s could not be recovered\n", dentry->name + 1);
                 continue;
@@ -211,10 +211,8 @@ void mkRecipe(char *name, isisDir_t  *isisDir, char *comment, int diskType)
             prefix = "^";
         else if (dentry->dirLen != dentry->actLen || dentry->errors)
             dbPath = "*Corrupt - missing data";
-        else {
-            dbPath = dentry->name;
-            _strlwr(dbPath);                     // force to lower case, also avoids conflict with AUTO & ZERO, already used name
-        }
+        else
+            dbPath = dentry->fname;
 
         fprintf(fp, ",%s,%s%s", dentry->checksum, prefix, dbPath);
         // print the alternative names if available

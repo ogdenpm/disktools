@@ -638,6 +638,7 @@ dumpdirectory(int directory, char *dirPath)       // note recover not yet implem
                 case 4: fprintf(logfp, "%s -> bad device blocks file - size %d\n", path, fn->totalSize); break;
                 case 6: fprintf(logfp, "%s -> directory file - size %d\n", path, fn->totalSize);  break;
                 case 8: fprintf(logfp, "%s -> data file - size %d\n", path, fn->totalSize); break;
+                case 9: fprintf(logfp, "%s -> volume label file - size %d\n", path, fn->totalSize); break;
                 default: fprintf(logfp, "%s -> unknown file format %d - size %d\n", path, fn->type, fn->totalSize); break;
                 }
 
@@ -792,9 +793,9 @@ void GetSHA1(byte *checksum) {
     *--checksum = 0;            // replace 28th char with 0;
 }
 
-void extractFile(dir_t *dptr)
+void extractFile(dir_t *dptr, int dirSlot)
 {
-    char filename[11];
+    char filename[16];
     char isisName[11];
     FILE *fout;
     byte *p;
@@ -804,24 +805,26 @@ void extractFile(dir_t *dptr)
     int sectorSize = diskType == ISIS_III ? 256 : 128;
     int size = 0;
 
-    isisName[0] = 0;
+    if (*dptr->ext)
+        sprintf(isisName, "%.6s.%.3s", dptr->name, dptr->ext);
+    else
+        sprintf(isisName, "%.6s", dptr->name);
+
+    if (!*isisName)        
+        if (dptr->status != 0)  // ignore missing name if deleted file
+            return;
+        else {
+            fprintf(stderr, "Missing file name for ISIS.DIR entry %d\n", dirSlot);
+            return;
+        }
+
     if (dptr->status != 0)
-        strcat(isisName, "#");          // mark recovered file
+        sprintf(filename, "#%d_%s", dirSlot, isisName);          // mark recovered file
+    else
+        strcpy(filename, isisName);
 
-    strncat(isisName, dptr->name, 6);
-    if (dptr->ext[0]) {
-        strcat(isisName, ".");
-        strncat(isisName, dptr->ext, 3);
-    }
-
-    strcpy(filename, isisName);
     _strlwr(filename);
-    if (strcmp(filename, "#") == 0)     // ignore missing name if deleted file
-        return;
-    else if (!*filename) {
-        fprintf(stderr, "Missing file name in ISIS.DIR\n");
-        return;
-    }
+
     if ((fout = fopen(filename, "wb")) == NULL) {
         fprintf(stderr, "can't create %s\n", filename);
         return;
@@ -866,8 +869,9 @@ void extractFile(dir_t *dptr)
 
     fclose(fout);
     // update the recipe info
-
-    strcpy(isisDir[dirIdx].name, isisName);
+    strcpy(isisDir[dirIdx].name, dptr->status != 0 ? "#" : "");
+    strcat(isisDir[dirIdx].name, isisName);
+    strcpy(isisDir[dirIdx].fname, filename);
     if (dptr->blocks)
         isisDir[dirIdx].dirLen = (dptr->blocks - 1) * (diskType == ISIS_III ? 256 : 128) + sectorSize;
     else
@@ -881,7 +885,7 @@ void extractFile(dir_t *dptr)
 
     dirIdx++;
     if (dptr->status != 0)          // deleted file
-        if (rdErrorCnt)
+        if (rdErrorCnt || size == 0)
             _unlink(filename);
         else
             recoveredFiles++;
@@ -891,10 +895,11 @@ void isis2_3(dir_t *dptr)
 {
     FILE *fp;
     dir_t dentry;
+    int dirSlot;
 
     printf("Looks like an ISIS %s disk\n", diskType == ISIS_III ? "III" : "II");
 
-    extractFile(dptr);		// get the ISIS.DIR file, leaves filename in targetPath
+    extractFile(dptr, 0);		// get the ISIS.DIR file, leaves filename in targetPath
     /* although processing of the header file could be done here
        it is simpler to re-read the ISIS.DIR file that has just been saved
     */
@@ -903,13 +908,16 @@ void isis2_3(dir_t *dptr)
         return;
     }
     fseek(fp, sizeof(dir_t), 0);	// skip ISIS.DIR entry it has already been done
-    while (fread(&dentry, sizeof(dir_t), 1, fp) == 1 && dentry.status != 0x7f)
+    dirSlot = 0;
+    while (fread(&dentry, sizeof(dir_t), 1, fp) == 1 && dentry.status != 0x7f) {
+        dirSlot++;
         if (dentry.status == 0 || dentry.status == 0xff)
-            extractFile(&dentry);
+            extractFile(&dentry, dirSlot);
         else {
             fprintf(stderr, "corrupt directory - status byte %02X\n", dentry.status);
             break;
         }
+    }
     fclose(fp);
     if (recoveredFiles)
         printf("%d deleted files recovered for checking\n", recoveredFiles);

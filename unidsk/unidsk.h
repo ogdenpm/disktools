@@ -58,6 +58,7 @@ enum { UNKNOWN, ISIS_SD, ISIS_DD, ISIS_III, ISIS_IV, ZXENIX, CPM };
 
 typedef struct {
     char name[12];      // isis name + optional # prefix for recovered files
+    char fname[16];     // name file saved as - isis name + possibly #nnn_ prefix
     byte attrib;
     int dirLen;         // dir record of file size or it no header block -eofcnt
     int actLen;         // bytes saved
