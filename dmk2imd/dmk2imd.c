@@ -354,6 +354,9 @@ main(int argc, char *argv[])
 			k = (k << 1) ^ ((k & 0x8000) ? 0x1021 : 0);
 		crctab[i] = k; }
 
+	if ((Dheader.Dflags & 0x10) == 0)	// if double sided read twice as many tracks
+		Dheader.Tracks *= 2;
+
 	for(t = 0; t < Dheader.Tracks; ++t) {
 		for(i=0; i < Dheader.Tsize; ++i) {
 			if((c = getc(fpi)) == EOF)
