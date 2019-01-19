@@ -231,7 +231,8 @@ int option(char flag)
 	case 'C=':
 		if (*ptr == '@') {
 			filename(fname, ptr + 1, ".TXT");
-			fp = fopen(fname, "rb");
+			if ((fp = fopen(fname, "rb")) == NULL)
+				error("can't open %s\n", fname);
 			while ((i = getc(fp)) != EOF) {
 				checksize(Cmtsize, sizeof(Buffer));
 				Buffer[Cmtsize++] = i;
@@ -492,7 +493,8 @@ main(int argc, char *argv[])
 	// If option file, open it and read first set of parameters
 	// Apply them if they apply to track-0
 	if (*Ffile) {
-		fpf = fopen(Ffile, "rt");
+		if ((fpf = fopen(Ffile, "rt")) == NULL)
+			error("can't open %s\n", Ffile);
 		read_format();
 		if (!Fmtnext) {			// Initial parameters
 			while (skip())
@@ -508,8 +510,11 @@ main(int argc, char *argv[])
 	if (Cylinders == -1)
 		error("N= (cylinders) not specified");
 
-	fpi = fopen(Ifile, "rb");
-	fpo = fopen(Ofile, "wb");
+	if ((fpi = fopen(Ifile, "rb")) == NULL)
+		error("can't open %s\n", Ifile);
+	if ((fpo = fopen(Ofile, "wb")) == NULL)
+		error("can't create %s\n", Ofile);
+
 
 	time_t ltime;
 	time(&ltime);

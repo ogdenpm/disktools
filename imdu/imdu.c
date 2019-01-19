@@ -716,7 +716,8 @@ void main(int argc, char *argv[])
         }
         if (!fp) {											// 1st = Input
             filename(ptr - 3, ".IMD");
-            fp = fopen(Lsmap, "rb");
+			if ((fp = fopen(Lsmap, "rb")) == NULL)
+				error("can't open %s\n", Lsmap);
             continue;
         }
         if (!Mfile) { Mfile = ptr - 3;				continue; }	// 2nd = Merge
@@ -741,7 +742,8 @@ void main(int argc, char *argv[])
     // If extracting comment, retrieve from segment and write to file
     if (CEfile) {
         filename(CEfile, ".TXT");
-        fpw = fopen(Lsmap, "wt");
+		if ((fpw = fopen(Lsmap, "wt")) == NULL)
+			error("can't create %s\n", Lsmap);
         for (i = 0; i < t; ++i)
             putc(t1.Tbuf[i], fpw);
         fclose(fpw);
@@ -754,7 +756,8 @@ void main(int argc, char *argv[])
     if (CIfile) {
         Wflag = 0;
         filename(CIfile, ".TXT");
-        fpw = fopen(Lsmap, "rb");
+		if ((fpw = fopen(Lsmap, "rb")) == NULL)
+			error("can't open %s\n", Lsmap);
         while ((c = getc(fpw)) != EOF)
             t1.Tbuf[t++] = c;
         fclose(fpw);
@@ -766,7 +769,8 @@ void main(int argc, char *argv[])
     if (Mfile) {
         if (Wfile || Wflag) {
             filename(Mfile, ".IMD");
-            fpm = fopen(Lsmap, "rb");
+			if ((fpm = fopen(Lsmap, "rb")) == NULL)
+				error("can't open %s\n", Lsmap);
         }
         else
             Wfile = Mfile;
@@ -793,7 +797,8 @@ void main(int argc, char *argv[])
         }
              fclose(fpw);
         }
-        fpw = fopen(Lsmap, "wb");
+		if ((fpw = fopen(Lsmap, "wb")) == NULL)
+			error("can't create %s\n", Lsmap);
     }
     else {		// No output file specified
         if (!Wflag)		// Error if we are converting

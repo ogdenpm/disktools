@@ -880,7 +880,8 @@ void main(int argc, char *argv[])
     // Open .TD0 file, read and validate header
 //	IOB_size = 4096;
     filename(File, ".TD0", 255);
-    fpi = fopen(Smap, "rb");
+	if ((fpi = fopen(Smap, "rb")) == NULL)
+		error("can't open %s\n", Smap);
     fread(&Header, sizeof(Header), 1, fpi);
     dump(&Header, Htemplate, DEBUG_DUMPH);
     c = 0;
@@ -909,7 +910,8 @@ void main(int argc, char *argv[])
     if(Verbose)
         fputs(Cmap, stdout);
     filename(Ofile ? Ofile : File, ".IMD", 0);
-    fpo = fopen(Smap, "wb");
+	if((fpo = fopen(Smap, "wb")) == NULL)
+		error("can't create %s\n", Smap);
     if(fpo) {
         fputs("IMD ", fpo);
         fputs(Cmap, fpo); }

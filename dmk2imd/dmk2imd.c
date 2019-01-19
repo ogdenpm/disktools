@@ -298,7 +298,8 @@ main(int argc, char *argv[])
 	// If comment file specified, preload it into buffer
 	j = k = 0;
 	if(Comment && *Comment) {
-		fpi = fopen(Comment, "rt");
+		if ((fpi = fopen(Comment, "rt")) == NULL)
+			error("can't open %s\n", Comment);
 		while((c = getc(fpi)) != EOF)
 			poke(Seg, j++, c);
 		fclose(fpi); }
@@ -307,9 +308,11 @@ main(int argc, char *argv[])
 
 	// Open files
 	filename(File, ".DMK", 255);
-	fpi = fopen(Smap, "rb");
+	if ((fpi = fopen(Smap, "rb")) == NULL)
+		error("can't open %s\n", Smap);
 	filename(Wfile ? Wfile : File, ".IMD", 0);
-	fpo = fopen(Smap, "wb");
+	if ((fpo = fopen(Smap, "wb")) == NULL)
+		error("can't create %s\n", Smap);
 
 	// Read header
 	if (fread(&Dheader, sizeof(Dheader), 1, fpi) != 1) {
