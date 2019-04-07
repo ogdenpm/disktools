@@ -7,10 +7,8 @@
 #include "flux.h"
 
 #define MAX_SECTOR 31
-#define RESYNC	16
-void FMDump();
-int newGetFMBit();
-void newResetGetFMBit();
+#define RESYNCTIME	100
+#define SYNCCNT	32
 
 struct {
 	byte sector;
@@ -289,6 +287,7 @@ void flux2track()
 	int dbyte;
 	int rcnt;
 	int secId;
+	bool done;
 
 	if (!analyseFormat())
 		return;
@@ -297,32 +296,37 @@ void flux2track()
 		matched[i] = false;
 	}
 	for (int blk = 0; seekBlock(blk); blk++) {
-		for (int len = 96; len > 8; len -= 16) {
-			resetGetFMBit(0, len);
-			if ((dbyte = getFMByte(true)) < 0)
-				continue;
-			data[0] = dbyte;
-			for (rcnt = 1; rcnt < sizeof(data); rcnt++)
-				if ((dbyte = getFMByte(false)) < 0)
-					break;
-				else
-					data[rcnt] = dbyte;
-			if (crcCheck(data, sizeof(data))) {
-				secId = data[0] & 0x7f;
-				if (secId > MAX_SECTOR || data[1] > 76) {
-					printf("bad track/sector %d/%d", data[1], secId);
+		done = false;
+		for (int initSync = 16; !done && initSync <= 96; initSync += 16) {
+			for (int resync = 2048; !done && resync > 16; resync /= 2) {
+				seekBlock(blk);			// retry with different sync period
+				resetGetFMBit(resync, initSync);
+				memset(data, 0, sizeof(data));
+				if ((dbyte = getFMByte(true)) < 0)
 					continue;
-				}
-				if (sectors[secId].sector == 255)
-					memcpy(&sectors[secId].sector, data, sizeof(sectors[0]));
-				else if (memcmp(&sectors[data[0] & 0x7f], data, sizeof(sectors[0])) == 0)
-					matched[secId] = true;
-				else
-					printf("different info for track/sector %d/%d\n", data[1], secId);
-				break;
+				data[0] = dbyte;
+				for (rcnt = 1; rcnt < sizeof(data); rcnt++)
+					if ((dbyte = getFMByte(false)) < 0)
+						break;
+					else
+						data[rcnt] = dbyte;
+				if (rcnt == sizeof(data) && crcCheck(data, sizeof(data))) {
+					secId = data[0] & 0x7f;
+					if (secId > MAX_SECTOR || data[1] > 76) {
+						printf("bad track/sector %d/%d\n", data[1], secId);
+						continue;
+					}
+					if (sectors[secId].sector == 255)
+						memcpy(&sectors[secId].sector, data, sizeof(sectors[0]));
+					else if (memcmp(&sectors[data[0] & 0x7f], data, sizeof(sectors[0])) == 0)
+						matched[secId] = true;
+					else
+						printf("different info for track/sector %d/%d\n", data[1], secId);
+//					printf("%d/%d init %d resync %d\n", secId, data[1], initSync, resync);
+					done = true;
+				} else
+					logger(VERBOSE, "failed blk %d init sync %d resync %d\n", blk, initSync, resync);
 			}
-			logger(VERBOSE, "failed blk %d synclen %d\n", blk, len);
-			seekBlock(blk);
 		}
 	}
 	for (secId = 0; secId <= MAX_SECTOR; secId++) {
@@ -405,54 +409,64 @@ int bitLog(int bits)
    hence there should be a clock every ~ 4us and possibly an interleaved data pulse
    at around 2us
 */
-static int cbitCnt = 0;
 static bool synced = false;
-static int valCnt = 0;
-static int syncLen = RESYNC;
-static int syncOff = 16;
+static int syncPeriod = RESYNCTIME;
+static int syncCnt;
 
-void resetGetFMBit(int off, int len)
+void resetGetFMBit(int resync, int initSync)
 {
 	synced = false;
-	cbitCnt = valCnt = 0;
-	syncLen = len;
-	syncOff = off;
-
+	syncPeriod = resync;
+	syncCnt = initSync;
 }
+
+double newClock(int cnt, double oldClock)
+{
+	int ticks = cnt / oldClock + 0.5;
+//	printf("%f\n", (double)cnt / ticks);
+	return (double)cnt / ticks;
+}
+
 int getFMBit()
 {
 	static bool cbit = false;
 	static double clock;
 	static int val;
+	static int resyncCnt;
 
-	while (!synced) {
-		if ((val = getNextFlux()) == END_BLOCK || val == END_FLUX)
-			return bitLog(BITEND);
+	if (!synced) {
+		int zeroCnt = 0;
+		resyncCnt = 0;
 
-		if (val < 3 * USCLOCK || val > 5 * USCLOCK) {
-			cbitCnt = valCnt = 0;
-		}
-		else if (++cbitCnt == syncOff)
-			valCnt = 0;
-		else {
-			valCnt += val;
-			if (cbitCnt == syncLen) {
-				clock = valCnt / (4.0 * (cbitCnt - syncOff));		// 1us Clock
-//				printf("clock %f\n", clock);
-				cbit = true;
-				synced = true;
-				break;
+		clock = USCLOCK;
+		while (1) {
+			if ((val = getNextFlux()) == END_BLOCK || val == END_FLUX)
+				return bitLog(BITEND);
+			if (val < 3 * clock || val > 5 * clock)
+				zeroCnt = resyncCnt = 0;
+			else {
+				resyncCnt += val;
+				if (++zeroCnt == syncCnt) {
+					clock = resyncCnt / (4.0 * zeroCnt);
+					cbit = true;
+					resyncCnt = 0;
+					synced = true;
+					break;
+				}
 			}
 		}
 	}
-
 
 	while (1) {
 		while (val < clock) {
 			int newval = getNextFlux();
 			if (newval == END_BLOCK || newval == END_FLUX)
 				return bitLog(BITEND);
-			val = newval;
+			if ((resyncCnt += newval) > syncPeriod * clock) {
+				clock = newClock(resyncCnt, clock);
+				resyncCnt = 0;
+			}
+			val += newval;
 		}
 
 		if (val < (3 * clock)) {	// either d or c bit
