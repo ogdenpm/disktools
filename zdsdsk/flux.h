@@ -43,6 +43,10 @@ typedef struct _secList {
 	sector_t secData;
 } secList_t;
 
+typedef struct {
+	size_t fluxPos;
+	size_t bitPos;
+} location_t;
 
 #define MINSAMPLE    40000
 #define MINPERCENT   2
@@ -60,7 +64,7 @@ enum {
 int seekBlock(int blk);
 void resetFlux();
 void freeMem();
-size_t where();
+location_t where();
 long when(int val);
 void *xalloc(void *buf, size_t size);
 void openFluxBuffer(byte *buf, size_t bufsize);
@@ -75,5 +79,5 @@ void dumpTrack();
 bool setPass(int pass);
 void forceFixupFlux(int blk);
 void ungetFlux(int val);
-void seekFlux(size_t pos);
-int getFMByte(int bcnt);
+void seekFlux(location_t pos, size_t lastPos);
+int getFMByte(int bcnt, int adaptRate);

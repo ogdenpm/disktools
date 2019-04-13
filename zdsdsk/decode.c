@@ -13,19 +13,14 @@
 #define RESYNCTIME	100
 #define SYNCCNT	32
 
+struct {
+	int minSyncCnt;
+	int adaptRate;
+} passOptions[] = { { 96, 128}, {96, 64}, {96, 8}, {8, 128}, {8, 16} };
 
 
 secList_t track[NUMSECTOR];
 
-
-
-enum {
-	INDEX_HOLE_MARK,
-	INDEX_ADDRESS_MARK,
-	ID_ADDRESS_MARK,
-	DATA_ADDRESS_MARK,
-	DELETED_ADDRESS_MARK
-};
 
 #define JITTER_ALLOWANCE        20
 
@@ -123,47 +118,19 @@ bool crcCheck(const uint16_t * data, uint16_t size) {
 }
 
 
-int  minSyncCnt = 64;	// minimum 0 syncs at start
 int  adaptRate = 8;		// adjustment factor for clock change
 
-
-bool setPass(int pass) {
-	switch (pass) {
-	case 1:
-		minSyncCnt = 96;
-		adaptRate = 128;
-		break;
-	case 2:
-		minSyncCnt = 96;
-		adaptRate = 64;
-		break;
-	case 3:
-		minSyncCnt = 96;
-		adaptRate = 8;
-		break;
-	case 4:
-		minSyncCnt = 8;
-		adaptRate = 16;
-		break;
-	case 5:
-		minSyncCnt = 8;
-		adaptRate = 128;
-		break;
-	default:
-		return false;
-	}
-	return true;
-}
 
 
 int clock = NSCLOCK;	// used to keep track of nS clock sample count
 
-bool syncFMByte()
+bool syncFMByte(int minSyncCnt)
 {
 	int syncCnt = 0;	// count of clock samples for resync
 	int sampleCnt = 0;	// count of clock bit only ticks for resync
 	int glitch = 0;
 	int val;
+	location_t pos = where();
 
 	clock = NSCLOCK;
 
@@ -175,10 +142,11 @@ bool syncFMByte()
 		if (abs(val - 4 * NSCLOCK) <= NSCLOCK) {	// looks like a clock bit spacing
 			syncCnt += 2;
 			sampleCnt += val;
+			pos = where();							// start of next bit
 		}
 		else if (abs(val - 2 * NSCLOCK) <= NSCLOCK && syncCnt > minSyncCnt) {
 			clock = (sampleCnt / syncCnt + 1) / 2;
-			ungetFlux(val / 1000);
+			seekFlux(pos, 0);						// back to start of this bit
 			return true;
 		}
 		else
@@ -189,7 +157,7 @@ bool syncFMByte()
 
 
 
-int getFMByte(int bcnt)
+int getFMByte(int bcnt, int adaptRate)
 {
 	int cellVal[MAXFLUX];		// used to store the cell value for each flux transition
 	int cellIdx = 0;			// if there are more then there are real problems
@@ -290,77 +258,56 @@ void flux2track()
 	bool goodCRC;
 	int trk = 99;
 	int secValid[NUMSECTOR];	// holds the pass on which valid sector detected
+	int cntValid = 0;			// number of unique valid sectors
+	int attempt = 0;
+	int good = 0;
+	location_t start;
+	location_t end;
 
 	memset(track, 0, sizeof(track));
 	memset(secValid, 0, sizeof(secValid));
 
-#if 0
-	for (int blk = 1; seekBlock(blk); blk++) {
-			if (!syncFMByte()) {
-				logger(VERBOSE, "blk %d - failed to sync", blk);
-				continue;
-			}	
-			for (int pass = 1; setPass(pass); pass++, seekBlock(blk)) {
-//			printf("\nblk %d, pass %d\n", blk, pass);
-			memset(&data, 0, sizeof(data));
 
-			for (rcnt = 0; rcnt < SECSIZE + SECMETA + SECPOSTAMBLE; rcnt++)
-				if ((dbyte = getFMByte(rcnt)) < 0) {
-					if (dbyte == BAD_FLUX)
-						logger(VERBOSE, "blk %d - flux data unusable\n", blk);
-					break;
-				}
-				else
-					data.raw[rcnt] = dbyte;
-			if (rcnt < SECSIZE + SECMETA + SECPOSTAMBLE)
-				logger(VERBOSE, "blk %d pass %d - ran out of data\n", blk, pass);
-			else {
-				addSector(&data, goodCRC = crcCheck(data.raw, SECSIZE + SECMETA));
-				if (goodCRC) {
-					forceFixupFlux(blk);
-					int secId = data.raw[0] & 0x7f;
-					if (trk == 99)
-						trk = data.raw[1] & 0xff;
-					if (secValid[secId] == 0)
-						secValid[secId] = pass;
-					break;
-				}
-			}
-
-		}
-	}
-#else
-	for (int pass = 1; setPass(pass); pass++) {
-		size_t restart = 0;
+	for (int pass = 0; pass < sizeof(passOptions)/sizeof(passOptions[0]); pass++) {
+		start.fluxPos = 0;
+		start.bitPos = 0;
+		printf("---- Pass %d\n", pass + 1);
+		cntValid = 0;						// to see how each pass works
+		attempt = 0;
+		good = 0;
 		while (1) {
-			seekFlux(restart);
-			if (!syncFMByte())
+			seekFlux(start, ~0);
+			if (!syncFMByte(passOptions[pass].minSyncCnt))
 				break;
-			restart = where();		// where to restart if a problem
+			attempt++;
+			start = where();		// where to restart if a problem
 			memset(&data, 0, sizeof(data));
 
 			for (rcnt = 0; rcnt < SECSIZE + SECMETA + SECPOSTAMBLE; rcnt++)
-				if ((dbyte = getFMByte(rcnt)) < 0)
+				if ((dbyte = getFMByte(rcnt, passOptions[pass].adaptRate)) < 0)
 					break;
 				else
 					data.raw[rcnt] = dbyte;
 			if (rcnt == SECSIZE + SECMETA + SECPOSTAMBLE) {
 				if (goodCRC = crcCheck(data.raw, SECSIZE + SECMETA)) {
-					restart = where();
+					good++;
+					end = where();
 					addSector(&data, goodCRC);
 					int secId = data.raw[0] & 0x7f;
 					if (trk == 99)
 						trk = data.raw[1] & 0xff;
-					if (secValid[secId] == 0)
+					printf("%d/%d - %d/%d @ %lu(%lu) - %lu(%lu) length %lu\n", attempt, good, trk, secId, start.bitPos, start.fluxPos, end.bitPos, end.fluxPos, end.bitPos - start.bitPos);
+					if (secValid[secId] == 0) {
 						secValid[secId] = pass;
+						if (++cntValid == NUMSECTOR)
+							printf("Success\n");
 
+					}
 				}
-
 			}
-
 		}
+		printf("Score %d out of %d\n", good, attempt);
 	}
-#endif
 	/* now display the results */
 	if (trk == 99)
 		printf("could not identify track reliably\n");

@@ -114,33 +114,24 @@ static int streamArraySize;
 
 static size_t fluxRead;           // total number of flux transitions read
 static size_t fluxPos;            // current flux transition
+static size_t bitPos;		      // current bit position in data
+static size_t lastFluxPos;
 
-static size_t endTrack;         // flux index for end of track
-
-// seeks to the start of a block and returns the sck clock count for the track
-// or 0 if no block or seek error
-
-void seekFlux(size_t pos)
+// seek to the specified position, setting flux and bit position information
+void seekFlux(location_t pos, size_t lastPos)
 {
-	if (pos < inSize)
-		fluxPos = pos;
-	savedFlux = 0;
+
+		fluxPos = pos.fluxPos;
+		bitPos = pos.bitPos;
+		if (lastPos != 0)
+			lastFluxPos = lastPos != ~0 ? lastPos : inSize;
+
 }
-
-int seekBlock(int blk) {
-    if (blk < 0 || blk >= indexArrayCnt - 1)
-        return 0;
-    seekFlux(indexArray[blk].streamPos);
-    endTrack = indexArray[blk + 1].streamPos;
-#pragma warning(suppress: 26451)
-    return (int)((indexArray[blk + 1].indexCnt - indexArray[blk].indexCnt) / ICK * SCK);
-}
-
-
 
 /* utility function to return current position in flux stream */
-size_t where() {
-    return fluxPos;
+location_t where() {
+	location_t pos = { fluxPos, bitPos };
+	return pos;
 }
 
 
@@ -331,19 +322,15 @@ int fluxLog(int n)
 		case END_FLUX: printf("END_FLUX"); break;
 		case END_BLOCK: printf("END_BLOCK"); break;
 		default:
-//			printf("%d,", n);
 			printf("%d,", (n + USCLOCK)/(2 * USCLOCK));
 			break;
 		}
+	if (n > 0)
+		bitPos += n;
 	return n;
 }
 
 
-
-void ungetFlux(int val)
-{
-	savedFlux = val;
-}
 
 
 
@@ -351,16 +338,10 @@ int getNextFlux() {
     int ovl16 = 0;
 	int val;
 
-	if (savedFlux) {
-		val = savedFlux;
-		savedFlux = 0;
-		return fluxLog(val);
-	}
-
-	while (fluxPos < inSize) {
+	while (fluxPos < lastFluxPos) {
 		val = inBuf[fluxPos];
 		if (val <= 7) {
-			if (++fluxPos >= inSize)
+			if (++fluxPos >= lastFluxPos)
 				return fluxLog(END_FLUX);
 			return fluxLog(ovl16 + inBuf[fluxPos++]);
 		}
@@ -368,22 +349,22 @@ int getNextFlux() {
 			return fluxLog(ovl16 + inBuf[fluxPos++]);
 		else
 			switch (val) {
-			case 0xa:	if (++fluxPos >= inSize) return fluxLog(END_FLUX);
-			case 0x9:	if (++fluxPos >= inSize) return fluxLog(END_FLUX);
-			case 0x8:	if (++fluxPos >= inSize) return fluxLog(END_FLUX);
+			case 0xa:	if (++fluxPos >= lastFluxPos) return fluxLog(END_FLUX);
+			case 0x9:	if (++fluxPos >= lastFluxPos) return fluxLog(END_FLUX);
+			case 0x8:	if (++fluxPos >= lastFluxPos) return fluxLog(END_FLUX);
 				break;
-			case 0xb:	if (++fluxPos >= inSize) return fluxLog(END_FLUX);
+			case 0xb:	if (++fluxPos >= lastFluxPos) return fluxLog(END_FLUX);
 				ovl16 += 0x10000;
 				break;
-			case 0xc:	if ((fluxPos += 3) >= inSize) return fluxLog(END_FLUX);
+			case 0xc:	if ((fluxPos += 3) >= lastFluxPos) return fluxLog(END_FLUX);
 				return fluxLog(ovl16 + getWord(fluxPos - 2));
 			case 0xd:
-				if (fluxPos + 4 >= inSize) return fluxLog(END_FLUX);
+				if (fluxPos + 4 >= lastFluxPos) return fluxLog(END_FLUX);
 
 				int type = inBuf[fluxPos + 1];
 				int size = getWord(fluxPos + 2);
 				fluxPos += 4;
-				if (type == 0xd || fluxPos + size >= inSize)		// EOF?
+				if (type == 0xd || fluxPos + size >= lastFluxPos)		// EOF?
 					return fluxLog(END_FLUX);
 				fluxPos += size;
 				break;
@@ -403,20 +384,21 @@ void displayHist(int levels)
     int maxHistVal = 0;
     int outRange = 0;
     double sck = 24027428.5714285;
+	location_t start = { 0, 0 };
 
     /* read all of the flux data */
     memset(histogram, 0, sizeof(histogram));
 
-    while (seekBlock(blk++)) {
-        while ((val = getNextFlux()) != END_FLUX && val != END_BLOCK) {
-            if (val > maxHistVal)
-                maxHistVal = val;
-            if (val > HIST_MAX)
-                outRange++;
-            else if (++histogram[val] > maxHistCnt)
-                maxHistCnt++;
-        }
+	seekFlux(start, ~0);
+	    while ((val = getNextFlux()) != END_FLUX && val != END_BLOCK) {
+        if (val > maxHistVal)
+            maxHistVal = val;
+        if (val > HIST_MAX)
+            outRange++;
+        else if (++histogram[val] > maxHistCnt)
+            maxHistCnt++;
     }
+
     if (maxHistCnt == 0) {
         logger(ALWAYS, "No histogram data\n");
         return;
@@ -464,57 +446,3 @@ void forceFixupFlux(int blk)
 	//indexArray[blk + 1].streamPos = where();
 }
 
-void fixupFlux()
-{
-	int saveDebug = debug;		// disable debug whilst probing for real starts
-	debug = 0;
-	for (int blk = 1; blk < indexArrayCnt; blk++) {
-
-	}
-	for (int blk = 0; seekBlock(blk); blk++) {
-#ifdef OPTION1
-		endTrack = indexArray[blk].streamPos;			// look at 100 samples before registered start
-		fluxSeek(endTrack > 1000 ? endTrack - 1000 : 0);	// to check if start occured earlier
-		unsigned long start;
-		int run = 0, c;
-		endTrack += 100;
-		while ((c = getNextFlux()) > 0) {
-			if (abs(c - 4 * USCLOCK) < USCLOCK) {
-				if (run++ == 0) {
-					start = where();
-				}
-				else if (run > 20)
-					break;
-			}
-			else
-				run = 0;
-		}
-		if (c > 0) {
-			indexArray[blk].streamPos = start;
-			logger(VERYVERBOSE, "blk %d moved from %u to %u\n", blk, endTrack - 100, start);
-		}
-		else {
-			logger(VERYVERBOSE, "blk %d not moved\n", blk);
-		}
-#else
-		unsigned long maxLoc, start;
-		maxLoc = start = where();
-		int maxFlux = 0, c;
-		int sectorTime = 0;
-		while ((c = getNextFlux()) >= 0) {
-			sectorTime += c;
-			if (blk == 0 || sectorTime > (8 + 138) * 32 * USCLOCK) {
-				if (c >= maxFlux) {
-					maxFlux = c;
-					maxLoc = where();
-				}
-			}
-		}
-		if (maxLoc > start)
-			indexArray[blk + 1].streamPos = maxLoc;
-
-#endif
-
-	}
-	debug = saveDebug;
-}
