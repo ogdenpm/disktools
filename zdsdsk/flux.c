@@ -11,7 +11,8 @@ enum {
 };
 
 #define FLUXCHUNKSIZE 100000UL        // default chunk size for flux stream
-#define ARRAYCHUNKSIZE 100            // default chunk size for stream and index info
+#define ARRAYCHUNKSIZE 250            // default chunk size for stream and index info
+
 
 /* private types for managing the data from the flux stream */
 typedef struct _flux {
@@ -22,9 +23,9 @@ typedef struct _flux {
 } flux_t;
 
 typedef struct {
-    long streamPos;
-    long sampleCnt;
-    long indexCnt;
+    unsigned long streamPos;
+    unsigned long sampleCnt;
+    unsigned long indexCnt;
 } index_t;
 
 typedef struct {
@@ -34,15 +35,14 @@ typedef struct {
 
 /*** input buffer management ***/
 // varaibles used for input buffer management
-static byte *inBuf;
+static byte* inBuf;
 static size_t inSize;
 static size_t inIdx;
 
-void initInput(byte *buf, size_t size) {
-    inBuf = buf;
-    inSize = size;
-    inIdx = 0;
-}
+void fixupFlux();
+static int savedFlux = 0;
+
+
 // get next byte from input
 int get1() {
     if (inIdx < inSize)
@@ -51,7 +51,7 @@ int get1() {
 }
 
 // read in 2 byte little edian word
-int get2() {
+unsigned int get2() {
     int cl;
     int ch;
 
@@ -60,8 +60,18 @@ int get2() {
     return (ch << 8) + cl;
 }
 
+unsigned inline getWord(int n)
+{
+	return inBuf[n] + (inBuf[n + 1] << 8);
+}
+
+unsigned long inline getDWord(int n)
+{
+	return inBuf[n] + (inBuf[n + 1] << 8) + (inBuf[n + 2] << 16) + (inBuf[n + 3] << 24);
+}
+
 // read in 4 byte little edian word
-long get4() {
+unsigned long get4() {
     int cl;
     int ch;
 
@@ -105,60 +115,34 @@ static int streamArraySize;
 static size_t fluxRead;           // total number of flux transitions read
 static size_t fluxPos;            // current flux transition
 
-static long sampleTime;         // tracks the sample flux time since start of track
 static size_t endTrack;         // flux index for end of track
-
-/*
-    seek to pos in flux stream, updating fluxPos and curBlk as required
-    returns true if ok else false
-*/
-static bool fluxSeek(size_t pos) {
-    if (pos >= fluxRead)
-        return false;
-    fluxPos = pos;
-
-    if (curBlk->blkId != fluxPos / FLUXCHUNKSIZE) {     // does curBlk need updating
-        if (curBlk->blkId > fluxPos / FLUXCHUNKSIZE)    // if moving backwards start search from first block
-            curBlk = fluxData;
-        while (curBlk->blkId != fluxPos / FLUXCHUNKSIZE)    // find the correct block
-            if (curBlk->link)
-                curBlk = curBlk->link;
-            else {
-                logger(ALWAYS, "fluxSeek beyond end\n");
-                return false;
-            }
-    }
-    return true;
-}
 
 // seeks to the start of a block and returns the sck clock count for the track
 // or 0 if no block or seek error
 
+void seekFlux(size_t pos)
+{
+	if (pos < inSize)
+		fluxPos = pos;
+	savedFlux = 0;
+}
+
 int seekBlock(int blk) {
-    sampleTime = 0;                         // reset sample time
     if (blk < 0 || blk >= indexArrayCnt - 1)
         return 0;
-    if (!fluxSeek(indexArray[blk].streamPos))
-        return 0;
+    seekFlux(indexArray[blk].streamPos);
     endTrack = indexArray[blk + 1].streamPos;
 #pragma warning(suppress: 26451)
     return (int)((indexArray[blk + 1].indexCnt - indexArray[blk].indexCnt) / ICK * SCK);
 }
+
+
 
 /* utility function to return current position in flux stream */
 size_t where() {
     return fluxPos;
 }
 
-/* utility function to return current sampleTime of last flux transition
-   after adding in the current flux val or setting to zero if val -ve
-*/
-long when(int val) {
-    if (val >= 0)
-        return sampleTime += val;
-    else
-        return sampleTime = 0;
-}
 
 // memory allocator with out of memory detection
 void *xalloc(void *blk, size_t size) {
@@ -191,39 +175,10 @@ void freeMem() {
 // reset the flux machine for the next track
 
 void resetFlux() {
-    for (flux_t *p = fluxData; p; p = p->link)  // reset all counts in the allocated blocks
-        p->cnt = 0;
-    fluxPos = fluxRead = 0;
-    curBlk = fluxData;
     indexArrayCnt = 0;
     streamArrayCnt = 0;
 }
 
-// add a new flux transition entry, allocating more memory if needed
-
-void addFlux(int val) {
-    flux_t *p;
-
-    if (!fluxData || (curBlk->cnt == FLUXCHUNKSIZE && !curBlk->link)) {
-        p = (flux_t *)xalloc(NULL, sizeof(flux_t));
-        p->cnt = 0;
-        p->link = NULL;
-        if (!fluxData) {
-            fluxData = curBlk = p;
-            p->blkId = 0;
-        }
-        else {
-            p->blkId = curBlk->blkId + 1;
-            curBlk->link = p;
-            curBlk = p;
-        }
-    }
-    else if (curBlk->cnt == FLUXCHUNKSIZE)
-        curBlk = curBlk->link;
-
-    curBlk->flux[curBlk->cnt++] = val;
-    fluxRead++;
-}
 
 // add another stream Info entry allocating more memory if needed
 void addStreamInfo(long streamPos, long transferTime) {
@@ -237,74 +192,82 @@ void addStreamInfo(long streamPos, long transferTime) {
 }
 
 // add another index block entry allocating more memory if needed
-void addIndexBlock(long streamPos, long sampleCnt, long indexCnt) {
-	long delta, prevDelta;
-	index_t *p;
+void addIndexBlock(unsigned long streamPos, unsigned long sampleCnt, unsigned long indexCnt) {
+	index_t* p;
 
-	if (indexArrayCnt == indexArraySize) {
-		indexArray = (index_t *)xalloc(indexArray, (indexArraySize + ARRAYCHUNKSIZE) * sizeof(index_t));
-		indexArraySize += ARRAYCHUNKSIZE;
+	/* junk index hole */
+	if (indexArrayCnt >= 2 && indexCnt - indexArray[indexArrayCnt - 1].indexCnt < 10000
+		&& indexArray[indexArrayCnt - 1].indexCnt - indexArray[indexArrayCnt - 2].indexCnt < 10000) {
+		p = &indexArray[indexArrayCnt - 1];
+		p->streamPos = streamPos;
+		p->indexCnt = indexCnt;
+		p->sampleCnt += sampleCnt;
 	}
-	delta = indexArrayCnt >  0 ? indexCnt - indexArray[indexArrayCnt - 1].indexCnt : indexCnt;
-	prevDelta = indexArrayCnt > 1 ? indexArray[indexArrayCnt - 1].indexCnt - indexArray[indexArrayCnt - 2].indexCnt : 15000;
+	else {
+		if (indexArrayCnt == indexArraySize) {
+			indexArray = (index_t*)xalloc(indexArray, (indexArraySize + ARRAYCHUNKSIZE) * sizeof(index_t));
+			indexArraySize += ARRAYCHUNKSIZE;
+		}
 
-	if (delta < 10000 && prevDelta < 10000)
-		p = &indexArray[indexArrayCnt - 1];		// overwrite previous data assume split due to index hole
-	else
 		p = &indexArray[indexArrayCnt++];
-
-	p->streamPos = streamPos;
-	p->sampleCnt = sampleCnt;
-	p->indexCnt = indexCnt;
+		p->streamPos = streamPos;
+		p->sampleCnt = sampleCnt;
+		p->indexCnt = indexCnt;
+	}
 }
 
 // handle flux Out Of Band info
-void oob() {
-    unsigned here = (unsigned)inPos();
-    int type = get1();
-    int size = get2();
-
-    if (type != 0xd && (size < 0 || !atLeast(size))) {
-        logger(ALWAYS, "EOF in OOB block @ %lX\n", here);
-        skip(-1);
-        return;
-    }
+int oob(size_t pos) {
+	if (pos + 4 >= inSize) {
+		logger(VERBOSE, "EOF in OOB block\n");
+		return END_FLUX;
+	}
+	int type = inBuf[pos + 1];
+	int size = getWord(pos + 2);
+	pos += 4;
+	if (type == 0xd) {		// EOF?
+		inSize = pos;	// update to reflect real end
+		return END_FLUX;
+	}
+	if (pos + size >= inSize) {
+		logger(VERBOSE, "EOF in OOB block\n");
+		return END_FLUX;
+	}
 
     switch (type) {
     case 0:
         logger(MINIMAL, "Invaild OOB - skipped\n");
-        skip(size);
-        break;
+		break;
     case 1:
     case 3:
         if (size != 8) {
             logger(MINIMAL, "bad OOB block type %d size %d - skipped\n", type, size);
-            skip(size);
+			break;
         }
-        else if (type == 1) {
-            unsigned streamPos = get4();
-            unsigned transferTime = get4();
+
+		unsigned streamPos = getDWord(pos);
+
+        if (type == 1) {
+            unsigned transferTime = getDWord(pos + 4);
 
             logger(VERBOSE, "StreamInfo block, Stream Position = %lu, Transfer Time = %lu\n", streamPos, transferTime);
             addStreamInfo(streamPos, transferTime);
         }
         else {
-            long streamPos = get4();
-            long resultCode = get4();
+			unsigned long resultCode = getDWord(pos + 4);
+
             if (resultCode != 0)
                 logger(ALWAYS, "Read error %ld %s\n", resultCode, resultCode == 1 ? "Buffering problem" :
                     resultCode == 2 ? "No index signal" : "Unknown error");
         }
-        break;
+		break;
     case 2:
-        if (size != 12) {
+        if (size != 12)
             logger(MINIMAL, "bad OOB block type %d size %d - skipped\n", type, size);
-            skip(size);
-        }
         else {
-            unsigned streamPos = get4();
-            unsigned sampleCounter = get4();
-            unsigned indexCounter = get4();
+            unsigned streamPos = getDWord(pos);
+            unsigned sampleCounter = getDWord(pos + 4);
+            unsigned indexCounter = getDWord(pos + 8);
 
             logger(VERBOSE, "Index block, Stream Position = %lu, Sample Counter = %lu, Index Counter = %lu\n", streamPos, sampleCounter, indexCounter);
 
@@ -312,77 +275,121 @@ void oob() {
         }
         break;
     case 4:
-
         logger(VERBOSE, "KFInfo block:\n");
         if (debug >= VERBOSE) {
-            int c;
-            while (size-- > 0 && (c = get1()) != EOF)
-                if (c)
-                    putchar(c);
-                else
-                    putchar('\n');
+			for (int i = 0; i < size; i++)
+				putchar(inBuf[pos + i] ? inBuf[pos + i] : '\n');
         }
-        else
-
-            skip(size);
-
         break;
-    case 0xd:
-        skip(-1);           // force to end of input stream
-        return;
+
     default:
-        logger(MINIMAL, "unknown OOB block type = %d @ %lX\n", type, here);
-        skip(size);
+        logger(MINIMAL, "unknown OOB block type = %d @ %lX\n", type, pos);
     }
+	return 4 + size;
 }
 
 /*
-    Process the flux stream
+    Open the flux stream and extract the oob data to locate stream & index info
 */
-size_t readFluxBuffer(byte *buf, size_t bufsize) {
-    int c;
-    initInput(buf, bufsize);
-    resetFlux();
-    addIndexBlock(0, 0, 0);         // mark start of all data
+void openFluxBuffer(byte* buf, size_t size) {
+	if (inBuf)
+		free(inBuf);
+	inBuf = buf;
+	inSize = size;
+	if (!inBuf)
+		return;
+	resetFlux();
+	addIndexBlock(0, 0, 0);         // mark start of all data
 
-    while ((c = get1()) != EOF) {
-        if (c >= 0xe || (c <= 7 && (c = get1()) != EOF) || (c == 0xc && (c = get2()) != EOF))
-            addFlux(c);
-        else
-            switch (c) {
-            case 0xa: get1(); addFlux(PAD);    // NOP3
-            case 0x9: get1(); addFlux(PAD);    // NOP2
-            case 0x8:         addFlux(PAD);    // NOP1
-                break;
-            case 0xb: addFlux(OVL16);
-                break;
-            case 0xd:
-                oob();
-                break;
-            default: error("coding error case %d\n", c);
-            }
-    }
-    return fluxRead;
+	for (size_t i = 0; i < inSize;) {
+		int c = inBuf[i];
+		if (c <= 7)
+			i += 2;
+		else if (c >= 0xe)
+			i++;
+		else
+			switch (c) {
+			case 0xa:	i++;
+			case 0x9:	i++;
+			case 0x8:	i++; break;
+			case 0xb:	i++;  break;
+			case 0xc:	i += 3;	 break;
+			case 0xd:
+				if ((c = oob(i)) < 0)
+					return;
+				i += c;
+				break;
+			}
+	}
 }
 
+
+int fluxLog(int n)
+{
+	if (debug >= VERYVERBOSE)
+		switch (n) {
+		case END_FLUX: printf("END_FLUX"); break;
+		case END_BLOCK: printf("END_BLOCK"); break;
+		default:
+//			printf("%d,", n);
+			printf("%d,", (n + USCLOCK)/(2 * USCLOCK));
+			break;
+		}
+	return n;
+}
+
+
+
+void ungetFlux(int val)
+{
+	savedFlux = val;
+}
+
+
+
 int getNextFlux() {
-    int val;
     int ovl16 = 0;
+	int val;
 
-    while (1) {
-        if (fluxPos % FLUXCHUNKSIZE == 0 && !fluxSeek(fluxPos) || fluxPos >= fluxRead)
-            return END_FLUX;
+	if (savedFlux) {
+		val = savedFlux;
+		savedFlux = 0;
+		return fluxLog(val);
+	}
 
-        if (endTrack && fluxPos >= endTrack)
-            return END_BLOCK;
+	while (fluxPos < inSize) {
+		val = inBuf[fluxPos];
+		if (val <= 7) {
+			if (++fluxPos >= inSize)
+				return fluxLog(END_FLUX);
+			return fluxLog(ovl16 + inBuf[fluxPos++]);
+		}
+		else if (val >= 0xe)
+			return fluxLog(ovl16 + inBuf[fluxPos++]);
+		else
+			switch (val) {
+			case 0xa:	if (++fluxPos >= inSize) return fluxLog(END_FLUX);
+			case 0x9:	if (++fluxPos >= inSize) return fluxLog(END_FLUX);
+			case 0x8:	if (++fluxPos >= inSize) return fluxLog(END_FLUX);
+				break;
+			case 0xb:	if (++fluxPos >= inSize) return fluxLog(END_FLUX);
+				ovl16 += 0x10000;
+				break;
+			case 0xc:	if ((fluxPos += 3) >= inSize) return fluxLog(END_FLUX);
+				return fluxLog(ovl16 + getWord(fluxPos - 2));
+			case 0xd:
+				if (fluxPos + 4 >= inSize) return fluxLog(END_FLUX);
 
-        val = curBlk->flux[fluxPos++ % FLUXCHUNKSIZE];
-
-        if (val == OVL16)
-            ovl16 += 0x10000;
-        else if (val >= 0)                  // valid flux . Note PAD is ignored
-            return val + ovl16;
-    }
+				int type = inBuf[fluxPos + 1];
+				int size = getWord(fluxPos + 2);
+				fluxPos += 4;
+				if (type == 0xd || fluxPos + size >= inSize)		// EOF?
+					return fluxLog(END_FLUX);
+				fluxPos += size;
+				break;
+			}
+	}
+	return fluxLog(END_FLUX);
 }
 
 void displayHist(int levels)
@@ -450,4 +457,64 @@ void displayHist(int levels)
         else
             putchar(' ');
     putchar('\n');
+}
+
+void forceFixupFlux(int blk)
+{
+	//indexArray[blk + 1].streamPos = where();
+}
+
+void fixupFlux()
+{
+	int saveDebug = debug;		// disable debug whilst probing for real starts
+	debug = 0;
+	for (int blk = 1; blk < indexArrayCnt; blk++) {
+
+	}
+	for (int blk = 0; seekBlock(blk); blk++) {
+#ifdef OPTION1
+		endTrack = indexArray[blk].streamPos;			// look at 100 samples before registered start
+		fluxSeek(endTrack > 1000 ? endTrack - 1000 : 0);	// to check if start occured earlier
+		unsigned long start;
+		int run = 0, c;
+		endTrack += 100;
+		while ((c = getNextFlux()) > 0) {
+			if (abs(c - 4 * USCLOCK) < USCLOCK) {
+				if (run++ == 0) {
+					start = where();
+				}
+				else if (run > 20)
+					break;
+			}
+			else
+				run = 0;
+		}
+		if (c > 0) {
+			indexArray[blk].streamPos = start;
+			logger(VERYVERBOSE, "blk %d moved from %u to %u\n", blk, endTrack - 100, start);
+		}
+		else {
+			logger(VERYVERBOSE, "blk %d not moved\n", blk);
+		}
+#else
+		unsigned long maxLoc, start;
+		maxLoc = start = where();
+		int maxFlux = 0, c;
+		int sectorTime = 0;
+		while ((c = getNextFlux()) >= 0) {
+			sectorTime += c;
+			if (blk == 0 || sectorTime > (8 + 138) * 32 * USCLOCK) {
+				if (c >= maxFlux) {
+					maxFlux = c;
+					maxLoc = where();
+				}
+			}
+		}
+		if (maxLoc > start)
+			indexArray[blk + 1].streamPos = maxLoc;
+
+#endif
+
+	}
+	debug = saveDebug;
 }

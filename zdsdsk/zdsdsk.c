@@ -7,6 +7,7 @@
 #include "flux.h"
 #include "zip.h"
 
+
 int debug = 0;      // debug level
 int histLevels = 0;
 bool showSectorMap = false;
@@ -35,11 +36,9 @@ void logger(int level, char *fmt, ...) {
 }
 
 _declspec(noreturn) void usage() {
-    error("usage: idd2imd [-d[n]] -h[n] [zipfile|rawfile]+\n"
+    error("usage: zdsdsk [-d[n]] -h[n] [zipfile|rawfile]+\n"
         "-d sets debug. n is optional level 0,1,2,3\n"
-        "-h displays flux histogram. n is optional number of levels\n"
-        "-s display sector mapping\n"
-        "No IMD file is created for non zip files\n");
+        "-h displays flux histogram. n is optional number of levels\n");
 }
 
 
@@ -63,10 +62,9 @@ bool loadFile(char *name, bool warnNoOpen) {
     if (fread(buf, bufsize, 1, fp) != 1)
         logger(ALWAYS, "Failed to load\n");
     else {
-        readFluxBuffer(buf, bufsize);         // load in the flux data from buffer extracted from zip file
+        openFluxBuffer(buf, bufsize);         // load in the flux data from buffer extracted from zip file
         ok = true;
     }
-    free(buf);
     fclose(fp);
     return ok;
 }
@@ -91,8 +89,7 @@ bool loadZipFile(struct zip_t *zip) {
         free(buf);
         return false;
     }
-    readFluxBuffer(buf, bufsize);         // load in the flux data from buffer extracted from zip file
-    free(buf);
+    openFluxBuffer(buf, bufsize);         // load in the flux data from buffer extracted from zip file
     return true;
 }
 
@@ -139,7 +136,7 @@ void decodeFile(char *name) {
         }
     }
     else if (!*ext) {       // use name as a prefix
-        for (int cyl = 0; cyl < MAXCYLINDER; cyl++)
+        for (int cyl = 0; cyl < NUMCYLINDER; cyl++)
             for (int head = 0; head < 2; head++) {
                 sprintf(curFile, "%s%02d.%1d.raw", fname, cyl, head);
                 _makepath_s(filename, _MAX_PATH, drive, dir, curFile, NULL);
@@ -173,8 +170,6 @@ int main(int argc, char **argv) {
             debug = optCnt == 2 ? optVal : MINIMAL; break;
         case 'h':
             histLevels = (optCnt == 2 && optVal > 5) ? optVal : 10; break;
-        case 's':
-            showSectorMap = true; break;
         default:
             usage();
         }
@@ -184,5 +179,6 @@ int main(int argc, char **argv) {
 
     for (; arg < argc; arg++)
         decodeFile(argv[arg]);
+	openFluxBuffer(NULL, 0);		// open null buffer causes any previous buffer to be freed
     return 0;
 }

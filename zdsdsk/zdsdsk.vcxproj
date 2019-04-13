@@ -21,7 +21,6 @@
   <ItemGroup>
     <ClCompile Include="decode.c" />
     <ClCompile Include="flux.c" />
-    <ClCompile Include="writeImage.c" />
     <ClCompile Include="zdsdsk.c" />
     <ClCompile Include="zip.c" />
   </ItemGroup>
@@ -120,6 +119,9 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
     </Link>
+    <PostBuildEvent>
+      <Command>copy /y /b $(TargetPath) d:\bin</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
