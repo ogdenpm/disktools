@@ -83,14 +83,16 @@ static size_t fluxPos;            // current flux transition
 static size_t bitPos;		      // current bit position in data
 static size_t lastFluxPos;
 
+
 // seek to the specified position, setting flux and bit position information
-void seekSector(location_t pos, size_t lastPos)
+bool seekSector(location_t pos, size_t lastPos)
 {
 
 		fluxPos = pos.fluxPos;
 		bitPos = pos.bitPos;
 		if (lastPos != 0)
 			lastFluxPos = lastPos != ~0 ? lastPos : inSize;
+		return fluxPos < lastFluxPos;
 }
 
 /* utility function to return current position in flux stream */
@@ -214,8 +216,9 @@ void openFluxBuffer(byte* buf, size_t size) {
 			case 0xb:	i++;  break;
 			case 0xc:	i += 3;	 break;
 			case 0xd:
-				if ((c = oob(i)) < 0)
+				if ((c = oob(i)) < 0) {
 					return;
+				}
 				i += c;
 				break;
 			}
@@ -227,7 +230,7 @@ int fluxLog(int n)
 {
 	if (debug >= VERYVERBOSE)
 		switch (n) {
-		case END_FLUX: printf("END_FLUX"); break;
+		case END_FLUX: printf("END_FLUX");  break;
 		case END_BLOCK: printf("END_BLOCK"); break;
 		default:
 			printf("%d,", (n + USCLOCK)/(2 * USCLOCK));
@@ -235,6 +238,8 @@ int fluxLog(int n)
 		}
 	if (n > 0)
 		bitPos += n;
+	if (n == END_FLUX)
+		fluxPos = bitPos = ~0;
 	return n;
 }
 

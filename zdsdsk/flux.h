@@ -77,5 +77,6 @@ int getNextFlux();
 void displaySector(sector_t* sec, bool showSuspect);
 void dumpTrack();
 void ungetFlux(int val);
-void seekSector(location_t pos, size_t lastPos);
+bool seekSector(location_t pos, size_t lastPos);
 int getFMByte(int bcnt, int adaptRate);
+location_t endWhere();
