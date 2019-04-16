@@ -58,7 +58,7 @@ bool loadFile(char *name, bool warnNoOpen) {
     bufsize = ftell(fp);
     rewind(fp);
 
-    buf = (byte *)xalloc(NULL, bufsize);
+    buf = (byte *)xmalloc(bufsize);
     if (fread(buf, bufsize, 1, fp) != 1)
         logger(ALWAYS, "Failed to load\n");
     else {
@@ -82,7 +82,7 @@ bool loadZipFile(struct zip_t *zip) {
         return false;
     
     bufsize = (size_t)zip_entry_size(zip);
-    buf = (byte *)xalloc(NULL, bufsize);
+    buf = (byte *)xmalloc(bufsize);
     memset(buf, 0, bufsize);
     if (zip_entry_noallocread(zip, (void *)buf, bufsize) < 0) {
         logger(ALWAYS, "Failed to load\n");

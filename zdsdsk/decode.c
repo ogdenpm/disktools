@@ -12,23 +12,30 @@
 
 #define RESYNCTIME	100
 #define SYNCCNT	32
-
+#define SECTORBITS	((16+138) * USCLOCK * 32)		// minimum sector size
+#define MAXMISSING	5		// max missing sectors to allow for for sector Id check
 struct {
 	int minSyncCnt;
 	int adaptRate;
-} passOptions[] = { { 96, 128}, {96, 64}, {96, 8}, {8, 128}, {8, 16} };
+} passOptions[] = { { 96, 128},  {96, 8}, {8, 128}, {8, 16} };
 
 
 secList_t track[NUMSECTOR];
 
+typedef struct _blk {
+	struct _blk *next;
+	location_t start;
+	location_t end;
+	int secId;
+} blk_t;
 
 #define JITTER_ALLOWANCE        20
 
 #define BYTES_PER_LINE  16      // for display of data dumps
 
-void removeSectors(secList_t* p)
+void removeSectors(secList_t *p)
 {
-	secList_t* q, * s;
+	secList_t *q, *s;
 	for (q = p->next; q; q = s) {
 		s = q->next;
 		free(q);
@@ -37,7 +44,7 @@ void removeSectors(secList_t* p)
 	p->next = NULL;
 }
 
-void addSector(sector_t* sec, bool goodCRC) {		// track and sector must be in range
+void addSector(sector_t *sec, bool goodCRC) {		// track and sector must be in range
 	if ((sec->sector & 0x7f) >= NUMSECTOR) {
 		if (debug == VERBOSE) {
 			printf("Bad sector\n");
@@ -46,7 +53,7 @@ void addSector(sector_t* sec, bool goodCRC) {		// track and sector must be in ra
 		return;
 	}
 
-	secList_t* p = &track[sec->sector & 0x7f];
+	secList_t *p = &track[sec->sector & 0x7f];
 	secList_t *q;
 
 	switch (p->flags) {
@@ -55,9 +62,8 @@ void addSector(sector_t* sec, bool goodCRC) {		// track and sector must be in ra
 			removeSectors(p);
 			p->secData = *sec;
 			p->flags = 1;
-		}
-		else {										// allocate another failed sector
-			q = (secList_t*)malloc(sizeof(secList_t));
+		} else {										// allocate another failed sector
+			q = (secList_t *)xmalloc(sizeof(secList_t));
 			q->next = p->next;
 			p->next = q;
 			q->secData = *sec;						// flags are currently irrelevant
@@ -71,7 +77,7 @@ void addSector(sector_t* sec, bool goodCRC) {		// track and sector must be in ra
 	}
 }
 
-bool crcCheck(const uint16_t * data, uint16_t size) {
+bool crcCheck(const uint16_t *data, uint16_t size) {
 #define CRC16 0x8005
 #define INIT 0
 
@@ -143,13 +149,11 @@ bool syncFMByte(int minSyncCnt)
 			syncCnt += 2;
 			sampleCnt += val;
 			pos = where();							// start of next bit
-		}
-		else if (abs(val - 2 * NSCLOCK) <= NSCLOCK && syncCnt > minSyncCnt) {
+		} else if (abs(val - 2 * NSCLOCK) <= NSCLOCK && syncCnt > minSyncCnt) {
 			clock = (sampleCnt / syncCnt + 1) / 2;
-			seekFlux(pos, 0);						// back to start of this bit
+			seekSector(pos, 0);						// back to start of this bit
 			return true;
-		}
-		else
+		} else
 			syncCnt = sampleCnt = 0;
 
 	}
@@ -169,9 +173,10 @@ int getFMByte(int bcnt, int adaptRate)
 	if (!bcnt)
 		initial = 0;
 
-	if (initial)
+	if (initial) {
 		val = initial;
-	else if ((val = getNextFlux()) < 0)	// ran out of data
+		initial = 0;
+	}  else if ((val = getNextFlux()) < 0)	// ran out of data
 		return val;
 	else
 		val *= 1000; // scale to nS
@@ -223,10 +228,14 @@ int getFMByte(int bcnt, int adaptRate)
 
 
 
-void displaySector(sector_t* sec, bool showSuspect)
+void displaySector(sector_t * sec, bool showSuspect)
 {
 	printf(showSuspect && sec->track > 255 ? "%d*" : "%d", sec->track & 0xff);
-	printf(showSuspect && sec->sector > 255 ? "/%d*:\n" : "/%d:\n", sec->sector & 0x7f);
+	printf(showSuspect && sec->sector > 255 ? "/%d*:" : "/%d:", sec->sector & 0x7f);
+	if (showSuspect) {
+		printf(" [%d%%]", ((138 - badness(sec)) * 100 + 138 / 2) / 138);
+	}
+	putchar('\n');
 
 	for (int i = 0; i < SECSIZE; i += 16) {
 		for (int j = i; j < i + 16; j++)
@@ -250,6 +259,65 @@ void displaySector(sector_t* sec, bool showSuspect)
 	printf("\n\n");
 }
 
+
+
+/* block management */
+blk_t endBlk = { NULL, {~0, ~0}, {~0, ~0}, -1 };		// sentinals for linked list
+blk_t startBlk = { &endBlk, {0,0},{0,0}, -1 };
+blk_t *head = &startBlk;
+
+blk_t *curBlk;
+
+blk_t *blkAdd(int secId, location_t start, location_t end)
+{
+	blk_t *p = (blk_t *)xmalloc(sizeof(blk_t));
+	p->secId = secId;
+	p->start = start;
+	p->end = end;
+
+	blk_t *q;
+
+	for (q = head; q->next->end.fluxPos < start.fluxPos; q = q->next)
+		;
+	p->next = q->next;
+	return curBlk = q->next = p;
+}
+
+
+void blkFree()
+{
+	blk_t *p, *q;
+	for (p = startBlk.next; p != &endBlk; p = q) {
+		q = p->next;
+		free(p);
+	}
+	head->next = &endBlk;
+	curBlk = head;
+}
+
+blk_t *blkFindNext(int mode)
+{
+	if (mode < 0)		// reset
+		curBlk = head;
+	if (mode > 0 && curBlk->next)
+		curBlk = curBlk->next;
+
+	for (; curBlk->next; curBlk = curBlk->next)
+		if (curBlk->end.bitPos + SECTORBITS < curBlk->next->start.bitPos)
+			return curBlk;
+	return NULL;
+}
+
+
+int badness(sector_t *p)
+{
+	int cnt = 0;
+	for (int i = 0; i < SECMETA + SECSIZE + SECPOSTAMBLE; i++)
+		if (p->raw[i] > 0xff)
+			cnt++;
+	return cnt;
+}
+
 void flux2track()
 {
 	sector_t data;
@@ -263,59 +331,77 @@ void flux2track()
 	int good = 0;
 	location_t start;
 	location_t end;
+	blk_t *range;
+	int nextMode = -1;			// controls how next block is found, -1 restart, 0 start from curblk, 1 advance to next block
+	int secId;
 
 	memset(track, 0, sizeof(track));
 	memset(secValid, 0, sizeof(secValid));
 
+	cntValid = 0;
 
-	for (int pass = 0; pass < sizeof(passOptions)/sizeof(passOptions[0]); pass++) {
-		start.fluxPos = 0;
-		start.bitPos = 0;
-		printf("---- Pass %d\n", pass + 1);
-		cntValid = 0;						// to see how each pass works
-		attempt = 0;
-		good = 0;
+	for (int pass = 0; pass < sizeof(passOptions) / sizeof(passOptions[0]) && cntValid != NUMSECTOR; pass++) {
+		if (!(range = blkFindNext(-1)))
+			break;
+		start = range->end;
+		end = range->next->start;
 		while (1) {
-			seekFlux(start, ~0);
-			if (!syncFMByte(passOptions[pass].minSyncCnt))
-				break;
-			attempt++;
-			start = where();		// where to restart if a problem
-			memset(&data, 0, sizeof(data));
+			nextMode = 1;
+			seekSector(start, end.fluxPos);
+			if (syncFMByte(passOptions[pass].minSyncCnt)) {
+				start = where();		// where to restart if a problem
 
-			for (rcnt = 0; rcnt < SECSIZE + SECMETA + SECPOSTAMBLE; rcnt++)
-				if ((dbyte = getFMByte(rcnt, passOptions[pass].adaptRate)) < 0)
-					break;
-				else
-					data.raw[rcnt] = dbyte;
-			if (rcnt == SECSIZE + SECMETA + SECPOSTAMBLE) {
-				if (goodCRC = crcCheck(data.raw, SECSIZE + SECMETA)) {
-					good++;
-					end = where();
+				for (rcnt = 0; rcnt < SECSIZE + SECMETA + SECPOSTAMBLE; rcnt++)
+					if ((dbyte = getFMByte(rcnt, passOptions[pass].adaptRate)) < 0)
+						break;
+					else
+						data.raw[rcnt] = dbyte;
+
+				if (dbyte == BAD_FLUX)
+					continue;
+				if (dbyte >= 0) {
+					secId = data.sector & 0x7f;
+					if (!(goodCRC = crcCheck(data.raw, SECSIZE + SECMETA))) {		// save if it looks like an expected sector
+						if (trk != 99 && (data.track & 0xff) == trk					// valid track
+							&& 0x80 <= (data.sector & 0xff) && (data.sector & 0xff) <= 0x9f			// plausible sector
+							&& (data.post[0] & 0xff) == 0 && (data.post[1] & 0xff) == 0) {			// has postamble
+							int lowSecId = range->secId;											// check secId is in expected range
+							int highSecId = range->next->secId;
+							if ((lowSecId == -1 || lowSecId < secId || (lowSecId + MAXMISSING) % NUMSECTOR > secId)
+								&& (highSecId == -1 || secId < highSecId || (secId + MAXMISSING) % NUMSECTOR > highSecId))
+								addSector(&data, false);
+						}
+						continue;												// try a later resync
+					}
 					addSector(&data, goodCRC);
-					int secId = data.raw[0] & 0x7f;
 					if (trk == 99)
 						trk = data.raw[1] & 0xff;
-					printf("%d/%d - %d/%d @ %lu(%lu) - %lu(%lu) length %lu\n", attempt, good, trk, secId, start.bitPos, start.fluxPos, end.bitPos, end.fluxPos, end.bitPos - start.bitPos);
+					blkAdd(secId, start, where());
+					nextMode = 0;
 					if (secValid[secId] == 0) {
-						secValid[secId] = pass;
+						secValid[secId] = pass + 1;
 						if (++cntValid == NUMSECTOR)
-							printf("Success\n");
-
+							break;
 					}
-				}
+				} 
 			}
+			if (!(range = blkFindNext(nextMode)))
+				break;
+			start = range->end;
+			end = range->next->start;
+
 		}
-		printf("Score %d out of %d\n", good, attempt);
+//		printf("pass %d score %d good %d looked at\n", pass + 1, good, attempt);
 	}
+	blkFree();
 	/* now display the results */
 	if (trk == 99)
 		printf("could not identify track reliably\n");
-//	for (int i = 0; i < NUMSECTOR; i++)
-//		printf("%d", secValid[i]);
+	//	for (int i = 0; i < NUMSECTOR; i++)
+	//		printf("%d", secValid[i]);
 	putchar('\n');
 	for (int sec = 0; sec < NUMSECTOR; sec++) {
-		secList_t* p = &track[sec];
+		secList_t *p = &track[sec];
 		switch (p->flags) {
 		case 0:
 			printf("%d/%d: No data\n\n", trk, sec);
@@ -327,12 +413,11 @@ void flux2track()
 			if (debug >= MINIMAL) {
 				printf("---%d/%d--------------- Corrupt Sector ---------------------\n", trk, sec);
 				displaySector(&p->secData, true);
-				for (secList_t* q = p->next; q; q = q->next)
+				for (secList_t *q = p->next; q; q = q->next)
 					displaySector(&q->secData, true);
 				removeSectors(p);
 				printf("--------------------- End Corrupt Sector--------------------\n\n");
-			}
-			else
+			} else
 				printf("%d/%d: failed to extract clean sector\n", trk, sec);
 		}
 	}

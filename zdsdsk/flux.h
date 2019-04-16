@@ -66,7 +66,7 @@ void resetFlux();
 void freeMem();
 location_t where();
 long when(int val);
-void *xalloc(void *buf, size_t size);
+void *xmalloc(size_t size);
 void openFluxBuffer(byte *buf, size_t bufsize);
 
 _declspec(noreturn) void error(char *fmt, ...);
@@ -76,8 +76,6 @@ void flux2track();
 int getNextFlux();
 void displaySector(sector_t* sec, bool showSuspect);
 void dumpTrack();
-bool setPass(int pass);
-void forceFixupFlux(int blk);
 void ungetFlux(int val);
-void seekFlux(location_t pos, size_t lastPos);
+void seekSector(location_t pos, size_t lastPos);
 int getFMByte(int bcnt, int adaptRate);
