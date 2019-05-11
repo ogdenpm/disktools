@@ -93,6 +93,14 @@ bool loadZipFile(struct zip_t *zip) {
     return true;
 }
 
+int getCylinder(char *fname)
+{
+	char *s = strrchr(fname, '.');
+	int cyl, head;
+	if (s && s - fname > 4 && sscanf(s-4, "%d.%d", &cyl, &head) == 2)
+		return cyl;
+	return 99;
+}
 
 void decodeFile(char *name) {
 
@@ -102,6 +110,7 @@ void decodeFile(char *name) {
     char ext[_MAX_EXT];
     char filename[_MAX_PATH];
     int cntRaw = 0;
+	int cyl;
 
     _splitpath_s(name, drive, _MAX_DRIVE, dir, _MAX_DIR, fname, _MAX_FNAME, ext, _MAX_EXT);
 
@@ -109,7 +118,7 @@ void decodeFile(char *name) {
         sprintf(curFile, "%s%s", fname, ext);
         if (!loadFile(name, true))
             return;
-         flux2track();
+         flux2track(getCylinder(curFile));
          if (histLevels)
             displayHist(histLevels);
          cntRaw = 1;
@@ -126,7 +135,7 @@ void decodeFile(char *name) {
 				printf("%s\n", curFile);
                 if (loadZipFile(zip)) {
                     cntRaw++;
-                    flux2track();
+                    flux2track(getCylinder(curFile));
                     if (histLevels)
                         displayHist(histLevels);
                 }
@@ -136,13 +145,13 @@ void decodeFile(char *name) {
         }
     }
     else if (!*ext) {       // use name as a prefix
-        for (int cyl = 0; cyl < NUMCYLINDER; cyl++)
+        for (cyl = 0; cyl < NUMCYLINDER; cyl++)
             for (int head = 0; head < 2; head++) {
                 sprintf(curFile, "%s%02d.%1d.raw", fname, cyl, head);
                 _makepath_s(filename, _MAX_PATH, drive, dir, curFile, NULL);
                 if (loadFile(filename, false)) {
                     cntRaw++;
-                    flux2track();
+                    flux2track(cyl);
                     if (histLevels)
                         displayHist(histLevels);
                 }
