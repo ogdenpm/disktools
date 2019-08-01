@@ -783,7 +783,7 @@ void filename(unsigned char *file, unsigned char *ext, char dropext)
 }
 
 char help[] = { "\
-TD0-2-IMG VERSION / __DATE__\n\
+TD0-2-IMG " VERSION "/ " __DATE__ "\n\
 Copyright 2017 Mark Ogden based on\n\
 TD0-2-IMageDisk Copyright 2007-2008 Dave Dunfield - All rights reserved.\n\n\
 Use:	TD02IMG filename[.TD0] [options]\n\n\

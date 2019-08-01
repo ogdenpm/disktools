@@ -796,7 +796,7 @@ void filename(unsigned char *file, unsigned char *ext, char dropext)
 }
 
 char help[] = { "\
-TD0-2-IMageDisk VERSION / __DATE__\n\
+TD0-2-IMageDisk " VERSION " / " __DATE__"\n\
 Copyright 2007-2008 Dave Dunfield - All rights reserved.\n\n\
 Use:	TD02IMD filename[.TD0] [options]\n\n\
 Opts:	/Dx,l,h	- enable Debug options\n\

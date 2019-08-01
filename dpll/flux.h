@@ -1,5 +1,4 @@
 #pragma once
-#include "zip.h"
 #include <stdint.h>
 
 #define SCK 24027428.5714285            //  sampling clock frequency
@@ -11,13 +10,14 @@
 #define CELLTICKS				(NSCLOCK * 2)
 
 
+
 typedef unsigned char byte;
 typedef unsigned short word;
 
 enum {
-    END_BLOCK = -1,		// no longer used
+    END_BLOCK = -1,
     END_FLUX = -2,
-	BAD_FLUX = -3		// no longer used
+	BAD_FLUX = -3
 };
 
 #define NUMCYLINDER		77
@@ -25,7 +25,6 @@ enum {
 #define SECSIZE			128
 #define SECMETA			8
 #define SECPOSTAMBLE	2	// should be 0, 0
-#pragma pack(push, 2)
 typedef union {
 	uint16_t raw[SECMETA + SECSIZE + SECPOSTAMBLE];
 	struct {
@@ -37,7 +36,7 @@ typedef union {
 		uint16_t post[2];
 	};
 } sector_t;
-#pragma pack(pop)
+
 typedef struct _secList {
 	struct _secList* next;
 	uint16_t	flags;
@@ -55,7 +54,7 @@ typedef struct {
 extern int debug;
 extern bool showSectorMap;
 
-extern char curFile[];
+extern char *curFile;
 
 #define LINELEN 80
 enum {
@@ -78,6 +77,6 @@ int getNextFlux();
 void displaySector(secList_t *secPtr, int trkId, int secId);
 void dumpTrack();
 void ungetFlux(int val);
-void seekSector(location_t pos);
+bool seekSector(location_t pos, size_t lastPos);
 int getFMByte(int bcnt, int adaptRate, int sensitivity);
 location_t endWhere();

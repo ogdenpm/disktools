@@ -6,26 +6,27 @@
 #include <stdint.h>
 #include "flux.h"
 
+
+#define MAXCELL				(CELLTICKS + 6 * (CELLTICKS / 100))
+#define MINCELL				(CELLTICKS - 6 * (CELLTICKS / 100))
+
+#define NOSYNC	-4
+#define NOTS	-5
+
 #define MAXFLUX			32	// max flux transitions in a byte
 
 #define	SUSPECT			0x100
 
 #define RESYNCTIME	100
 #define SYNCCNT	32
-#define SECTORBITS	105000		// minimum sector size
-#define MAXMISSING	8		// max missing sectors to allow for for sector Id check
-struct {
-	int minSyncCnt;			// min number of 0 bits to sync up on
-	int adaptRate;			// number of bytes to average over for clock delta
-	int sesnsitivity;		// fraction of clock delta applied
-} passOptions[] = {{ 96, 16, 32},	// long sync stable adaption - gets most good sectors
-				   {96, 1, 128},	// long sync slow  resync every byte
-				   { 96, 1, 8},		// reasonable long sync agressive adapt
-				   {8, 1, 128},		// short sync slow adapt
-				   {8, 1, 16},		// short sync medium adapt
-				   {8, 1, 1}		// last throw of the dice, short adapt agressive adapt
-					};		// short sync agressive adapt every byte	
+#define SYNCCELLS	(16 * 8 * 2)	// number of clock cells for a sync
+#define SECTORCELLS	(SYNCCELLS + 138 * 8 * 2)	// number of clock cells for a whole sector (sync + data + links + crc + postamble)
+#define MAXLEADIN	200
+#define MINLEADOUT	50
 
+#define SECTORBITS	105000		// minimum sector size in bitpos
+
+#define MAXMISSING	8		// max missing sectors to allow for for sector Id check
 
 secList_t track[NUMSECTOR];
 
@@ -58,7 +59,7 @@ void removeSectors(secList_t *p)
 void addSector(sector_t *sec, bool goodCRC) {		// track and sector must be in range
 
 
-	secList_t *p = &track[sec->sector & 0x7f];
+	secList_t *p = &track[sec->sector & 0x1f];
 	secList_t *q;
 
 	if (p->flags == 1)				// already good
@@ -97,136 +98,196 @@ bool crcCheck(const uint16_t *data, uint16_t size) {
 	return crc == 0;
 }
 
-int  adaptRate = 8;		// adjustment factor for clock change
 
+static uint8_t phaseAdjust[3][16] = {		// C1/C2, C3
+  //  8  9   A   B   C    D   E   F   0   1   2   3   4   5   6  7 
+	{120, 130, 135, 140, 145, 150, 155, 160, 160, 165, 170, 175, 180, 185, 190, 200},
+	{130, 140, 145, 150, 155, 160, 160, 160, 160, 160, 160, 165, 170, 175, 180, 185}
 
+};
+static uint32_t ctime, etime;
+static uint32_t cellTicks = CELLTICKS;
+static uint8_t fCnt, aifCnt, adfCnt, pcCnt;
+static bool up = false;
+static bool resync = true;
+static uint32_t maxCell = CELLTICKS + 6 * (CELLTICKS / 100);
+static uint32_t minCell = CELLTICKS - 6 * (CELLTICKS / 100);
+static int minSyncClk = 128;
+static uint32_t cellDelta = CELLTICKS / 100;
+static int samplingGuard = 0;
+static bool cbitOnly = false;
 
-int clock = NSCLOCK;	// used to keep track of nS clock sample count
-#define FIRSTADJUST	32
-bool syncFMByte(int minSyncCnt)
+void dumpstate()
 {
-	int syncCnt = 0;	// count of clock samples for resync
-	int sampleCnt = 0;	// count of clock bit only ticks for resync
-	int glitch = 0;
-	int val;
-	location_t pos = where();
+	printf("ctime = %ld, etime = %ld, cellTicks = %ld, fCnt = %d, aifCnt = %d, adfCnt = %d pcCnt = %d\n", ctime, etime, cellTicks, fCnt, aifCnt, adfCnt, pcCnt);
+}
 
-	clock = NSCLOCK;
+bool resetPLL(int syncClk, int percent, int guard, bool cbit)
+{
+	int fluxVal = getNextFlux();
+	if (fluxVal >= 0) {
+		ctime = fluxVal;
+		cellTicks = CELLTICKS;
+		fCnt = aifCnt = adfCnt = pcCnt = 0;
+		up = false;
+		etime = fluxVal + cellTicks / 2;	// prime with first sample
+		resync = true;
+		cellDelta = cellTicks / 100;
+		maxCell = cellTicks + percent * cellDelta;
+		minCell = cellTicks - percent * cellDelta;
+		minSyncClk = syncClk;
+		samplingGuard = guard;
+		cbitOnly = cbit;
+	}
+	return true;
+}
 
-	while (1) {
-		if ((val = getNextFlux()) < 0)	// ran out of data
-			return false;
-		val *= 1000;	// scale up to avoid fp calculations
+void synced()
+{
+	resync = false;
+	cellDelta = cellTicks / 100;
+	maxCell = cellTicks + 8 * cellDelta;
+	minCell = cellTicks - 8 * cellDelta;
+}
 
-		if (abs(val - 4 * clock) <= clock) {	// looks like a clock bit spacing
-			sampleCnt += val;
-#if 1
-			syncCnt += 2;
-#else
-			if ((syncCnt += 2) == FIRSTADJUST) {
-				clock = (sampleCnt + FIRSTADJUST) / (FIRSTADJUST * 2);
-//				printf("clock adjust: %d\n", clock);
+
+int nextBit()
+{
+	int fluxVal;
+	int slot;
+	uint8_t cstate = 1;			// default is IPC
+	static bool cbit = false;
+
+	while (ctime < etime) {					// get next transition in a cell
+		if ((fluxVal = getNextFlux()) < 0)
+			return fluxVal;
+		if ((ctime += fluxVal) < etime) {
+			if (ctime + samplingGuard >= etime)	// treat as sampling error i.e. 3/4 clock out
+				etime = ctime;
+			else if (resync) {
+				ctime = fluxVal;
+				cellTicks = CELLTICKS;
+				fCnt = aifCnt = adfCnt = pcCnt = 0;
+				up = false;
+				etime = fluxVal + cellTicks / 2;	// prime with first sample
 			}
-#endif
-			pos = where();							// start of next bit
-		} else if (abs(val - 2 * clock) <= clock && syncCnt > minSyncCnt) {
-//			printf("clock = %d", clock);
-			clock = (sampleCnt + syncCnt) / (syncCnt * 2);
-//			printf(" - new clock: %d\n", clock);
-//			printf("syncCnt = %d\n", syncCnt);
-			seekSector(pos, 0);						// back to start of this bit
-			return true;
-		} else
-			syncCnt = sampleCnt = 0;
-
+		}
 	}
+	while ((slot = 16 * (ctime - etime) / (cellTicks + samplingGuard)) >= 16) {
+		etime += cellTicks;
+		cbit = false;
+		return 0;
+	}
+	if ( (cbit = !cbit) || !cbitOnly) {		// sync on all or only clock transitions
+		if (slot < 7 || slot > 8) {
+			if (slot <= 6 && !up || slot >= 9 && up) {			// check for up/down switch
+				up = !up;
+				pcCnt = fCnt = 0;
+			}
+			if (++fCnt >= 3 || slot < 3 && ++aifCnt >= 3 || slot > 12 && ++adfCnt >= 3) {	// check for frequency change
+				if (up && cellTicks > minCell)
+					cellTicks -= cellDelta;
+				else if (!up && cellTicks < maxCell)
+					cellTicks += cellDelta;
+				cstate = fCnt = pcCnt = aifCnt = adfCnt = 0;
+			} else if (++pcCnt >= 2) {
+				cstate = pcCnt = 0;
+			}
+		}
+		etime += phaseAdjust[cstate][slot] * cellTicks / 160;
+	} else
+		etime +=  cellTicks;
+	return 1;
 }
 
 
-
-int getFMByte(int bcnt, int adaptRate, int sensitivity)
+location_t skip(size_t bitPos)
 {
-	int cellVal[MAXFLUX];		// used to store the cell value for each flux transition
-	int cellIdx = 0;			// if there are more then there are real problems
-	static int initial = 0;	// only non 0 if last flux exceeded a byte boundary
-	static int bitPos, byteCnt;
-	int val;
-	int frame = 0;			// used to track frame size
-	int result = 0;			// byte returned + (suspect features >> 8)
-
-	if (!bcnt) {
-		initial = 0;
-		bitPos = where().bitPos;
-		byteCnt = 0;
-	}
-	if (initial) {
-		val = initial;
-		initial = 0;
-	} else {
-		if (byteCnt >= adaptRate) {
-			int nsDelta = (where().bitPos - bitPos) * 1000;
-			clock += ((nsDelta + 16 * byteCnt) / (32 * byteCnt) - clock + sensitivity / 2) / sensitivity;
-//			printf("clock adapt = %d\n", clock);
-			bitPos = where().bitPos;
-			byteCnt = 0;
-		}
-		if ((val = getNextFlux()) < 0)	// ran out of data
-			return val;
-		else
-			val *= 1000; // scale to ns
-	}
-	byteCnt++;
-	while (1) {
-		if (val > 512000) {
-			return BAD_FLUX;
-		}
-		if (abs(val - 2 * clock) > clock / 2 && abs(val - 4 * clock) > clock / 2)	// suspect if > .5uS jitter
-			result++;
-		if (frame + val >= 31 * clock)
-			break;
-		frame += val;
-		if (cellIdx < MAXFLUX)
-			cellVal[cellIdx++] = (frame + clock) / (2 * clock);
-		if ((val = getNextFlux()) < 0)
-			return val;
-		val *= 1000;
-	}
-
-	if (frame + val > 33 * clock) {		// overrun so limit to last clock pulse
-		result++;
-		while (frame + val > 33 * clock) {
-			initial += 2 * clock;
-			val -= 2 * clock;
-		}
-	}
-
-	frame += val;						// add in last clock bit
-	if (cellIdx < MAXFLUX)
-		cellVal[cellIdx++] = (frame + clock) / (2 * clock);
-
-	int bitStream = 0;
-	for (int i = 0; i < cellIdx; i++) {
-		if (bitStream & (1 << (cellVal[i] - 1)))							// duplicate pluse in a single cell
-			result++;
-		else
-			bitStream |= (1 << (cellVal[i] - 1));
-	}
-	if ((bitStream & 0xAAAA) != 0xAAAA)							// missing clock bit
-		result++;
-
-	for (int i = 0; i < 16; i += 2, bitStream >>= 2)				// high byte will be number of suspect features
-		result = (result << 1) | (bitStream & 1);
-
-//	clock += ((frame + 31) / 32 - clock + adaptRate / 2) / adaptRate;	// tweak clock
-	return result;
+	while (where().bitPos < bitPos && getNextFlux() >= 0)
+		;
+	return where();
 }
+
+
+int sync(int trk)
+{
+	uint64_t pattern = 0;
+	uint64_t clkPattern, dataPattern;
+	int bit;
+	int clkCnt = 0;
+	uint64_t matchPattern, matchMask;
+	if (trk >= 0) {
+		matchMask = 0xFFFFFFE0FF;
+		matchPattern = 0x8000 | trk;
+	} else {
+		matchMask = 0xFFFFFFE0;
+		matchPattern = 0x80;
+	}
+
+	while ((pattern & 0xFFFFFFFFFFFFFFFF) != 0xAAAAAAAAAAAAAAAA) {			// minumum sync is 32 zeros of data i.e. 64 cells
+		if (++clkCnt > MAXLEADIN + 64 && (pattern & 0xffff) != 0xAAAA && (pattern & 0xffff) != 0x5555)	// do if no sync
+																			// extra test is in case it has started
+			return NOSYNC;
+		if ((bit = nextBit()) < 0)
+			return bit;
+		pattern = (pattern << 1) + bit;
+	}
+	synced();
+
+	clkPattern = 0;
+	dataPattern = 0;
+	// check for a clean start (32 clock bits and 24 0 data bits and last 8 data bits are 10xxxxxx i.e. possible sector
+	for (clkCnt = 64; clkCnt < minSyncClk || (dataPattern & matchMask) != matchPattern; clkCnt += 2) {
+		if (clkCnt > MAXLEADIN + SYNCCELLS + 8 * 2)
+			return NOTS;
+		if ((clkPattern & 0xffff) == 0 && (dataPattern & 0xffff) == 0xffff) {		// we syned too early so flip
+			synced();											// reset clock paramaters
+			clkPattern = 0xffff;
+			dataPattern = 0;
+			clkCnt = 32;
+		} else {
+			if ((bit = nextBit()) < 0)
+				return bit;
+			clkPattern = (clkPattern << 1) + bit;
+		}
+		if ((bit = nextBit()) < 0)
+			return bit;
+		dataPattern = (dataPattern << 1) + bit;
+	}
+
+	return 0xff00 | (uint16_t)((trk >= 0 ? (dataPattern >> 8) : dataPattern) & 0xff);
+}
+
+int getByte()		// returns data in bits 0-7 and the clock bits in bits 8-15
+{
+	int bit;
+	int bval = 0;
+	int bitCnt = 8;
+	if (debug >= VERYVERBOSE)
+		putchar('\n');
+	while (bitCnt-- > 0) {
+		if ((bit = nextBit()) < 0)
+			return bit;
+		bval = (bval << 1) + (bit << 8);
+		if ((bit = nextBit()) < 0)
+			return bit;
+		bval += bit;
+	}
+	if (debug >= VERYVERBOSE)
+		printf("[%4X]", bval);
+	return bval;
+}
+
+
+
+
 
 void printDataLine(uint16_t *p, int marker)
 {
 	if (marker)
 		putchar(marker);
 	for (int j = 0; j < 16; j++)
-		printf("%02X%c ", p[j] & 0xff, marker && p[j] > 255 ? '*' : ' ');
+		printf("%02X%c ", p[j] & 0xff, marker && (p[j] >> 8) != 0xff ? '*' : ' ');
 
 	for (int j = 0; j < 16; j++) {
 		int c = p[j] & 0xff;
@@ -240,14 +301,14 @@ void printLinkLine(uint16_t *p, int marker)
 	// data stored in order, fsector, ftrack, bsector, btrack, crc1, crc2, postamble1, postable2
 	if (marker)
 		putchar(marker);
-	printf(marker && p[3] > 255 ? "forward %d*" : "forward %d", p[3] & 0xff);
-	printf(marker && p[2] > 255 ? "/%d*" : "/%d", p[2] & 0xff);
-	printf(marker && p[1] > 255 ? " backward %d*" : " backward %d", p[1] & 0xff);
-	printf(marker && p[0] > 255 ? "/%d*" : "/%d", p[0] & 0xff);
-	printf(marker && p[4] > 255 ? " crc %02X*" : " crc %02X", p[4] & 0xff);
-	printf(marker && p[5] > 255 ? " %02X*" : " %02X", p[5] & 0xff);
-	printf((marker || (p[6] & 0xff)) && p[6] > 255 ? " Postamble %02X*" : " Postamble %02X", p[6] & 0xff);
-	printf((marker || (p[7] & 0xff)) && p[7] > 255 ? " %02X*\n" : " %02X\n", p[7] & 0xff);
+	printf(marker && (p[3] >> 8) != 0xff ? "forward %d*" : "forward %d", p[3] & 0xff);
+	printf(marker && (p[2] >> 8) != 0xff ? "/%d*" : "/%d", p[2] & 0xff);
+	printf(marker && (p[1] >> 8) != 0xff ? " backward %d*" : " backward %d", p[1] & 0xff);
+	printf(marker && (p[0] >> 8) != 0xff ? "/%d*" : "/%d", p[0] & 0xff);
+	printf(marker && (p[4] >> 8) != 0xff ? " crc %02X*" : " crc %02X", p[4] & 0xff);
+	printf(marker && (p[5] >> 8) != 0xff ? " %02X*" : " %02X", p[5] & 0xff);
+	printf((marker || (p[6] & 0xff)) && (p[6] >> 8) != 0xff ? " Postamble %02X*" : " Postamble %02X", p[6] & 0xff);
+	printf((marker || (p[7] & 0xff)) && (p[7] >> 8) != 0xff ? " %02X*\n" : " %02X\n", p[7] & 0xff);
 
 }
 
@@ -266,7 +327,7 @@ int mergeData(secList_t *p, uint16_t *line, int i)
 	p->flags = i;
 	for (q = p->next; q; q = q->next) {
 		for (j = 0; j < cmpLen; j++)
-			if ((line[j] & 0xff) != (q->secData.raw[2 + i + j] & 0xff))
+			if ((line[j] & 0xff) != (q->secData.raw[2 + i + j] & 0xff) && (q->secData.raw[2 + i + j] >> 8) == 0xff)
 				break;
 		if (j == cmpLen) {
 			q->flags = i;
@@ -276,6 +337,17 @@ int mergeData(secList_t *p, uint16_t *line, int i)
 		}
 	}
 	return cnt;
+}
+
+
+void dumpSector(sector_t *secPtr)
+{
+	printf("%d/%d\n", secPtr->track & 0xff, secPtr->sector & 0x7f);
+	for (int i = 0; i < SECSIZE; i += 16) {
+			printDataLine(&secPtr->data[i], 0);
+	}
+	printLinkLine((uint16_t *)&secPtr->bsector, 0);
+	printf("\n");
 }
 
 
@@ -304,91 +376,13 @@ void displaySector(secList_t *secPtr, int trkId, int secId)
 
 }
 
-
-
-/* block management */
-blkList_t endBlk = { NULL, {{~0, ~0}, {~0, ~0}}, -1 };		// sentinals for linked list
-blkList_t startBlk = { &endBlk, {{0,0},{0,0}}, -1 };
-blkList_t *head = &startBlk;
-
-blkList_t *curBlk = &startBlk;
-
-blkList_t *addBlock(int secId, blk_t blk)
+bool reasonable(sector_t *sptr, int limit)		// returns true if < limit bytes of bad clock
 {
-	blkList_t *p = (blkList_t *)xmalloc(sizeof(blkList_t));
-	p->secId = secId;
-	p->block = blk;
-
-
-	blkList_t *q;
-
-	for (q = head; q->next->block.end.fluxPos < blk.start.fluxPos; q = q->next)
-		;
-	p->next = q->next;
-//	printf("sector %d fluxpos %lu - %lu bitpos %lu - %lu\n", secId, blk.start.fluxPos, blk.end.fluxPos, blk.start.bitPos, blk.end.bitPos);
-	return curBlk = q->next = p;
-}
-
-
-void blkFree()
-{
-	blkList_t *p, *q;
-	for (p = startBlk.next; p != &endBlk; p = q) {
-		q = p->next;
-		free(p);
-	}
-	head->next = &endBlk;
-	curBlk = head;
-}
-
-blk_t nextBlk(blk_t blk)
-{
-	blk_t newBlk;
-
-	if (blk.start.bitPos < curBlk->block.start.bitPos)	
-		curBlk = head;
-	while (curBlk->next && blk.start.bitPos > curBlk->next->block.start.bitPos)		// find starting block
-		curBlk = curBlk->next;
-	for (; curBlk->next; curBlk = curBlk->next)
-		if (blk.start.bitPos + SECTORBITS >= curBlk->next->block.start.bitPos)
-			blk.start = curBlk->next->block.end;
-		else {
-			newBlk.start = blk.start;
-			newBlk.end = curBlk->next->block.start;
-			return newBlk;
-		}
-	newBlk.start = endBlk.block.start;
-	newBlk.end = endBlk.block.end;
-	return newBlk;
-}
-
-int lastSecId()
-{
-	return curBlk->secId;
-}
-
-int nextSecId()
-{
-	if (curBlk->next)
-		return curBlk->next->secId;
-	return -1;
-}
-
-
-void printBlockChain()
-{
-	for (blkList_t *p = head->next; p->next; p = p->next) {
-		printf("%d %lu-%lu length %lu gap %lu\n", p->secId, p->block.start.bitPos, p->block.end.bitPos, p->block.end.bitPos - p->block.start.bitPos,
-												  p->next->block.start.bitPos - p->block.end.bitPos);
-	}
-}
-
-
-bool isValidRef(int t, int s)
-{
-	t &= 0xff;
-	s &= 0xff;
-	return ((0 <= t && t < 77) || t == 255) && ((0 <= s && s < NUMSECTOR) || s == 255);
+	int bad = 0;
+	for (int i = 0; i < SECSIZE + SECMETA; i++)
+		if ((sptr->raw[i] >> 8) != 0xff && ++bad >= limit)
+			return false;
+	return true;
 }
 
 void flux2track(int trk)
@@ -398,69 +392,81 @@ void flux2track(int trk)
 	int rcnt;
 	int secValid[NUMSECTOR];	// holds the pass on which valid sector detected
 	int cntValid = 0;			// number of unique valid sectors
-	int attempt = 0;
-	int good = 0;
-	blk_t blk;
-	int secId;
+	int sval;
+	int guard = 0;
+	int tolerance = 16;
+	bool gotSector = false;
+	bool cbit = false;
 
 	memset(track, 0, sizeof(track));
 	memset(secValid, 0, sizeof(secValid));
 
-	cntValid = 0;
-	for (int pass = 0; pass < sizeof(passOptions) / sizeof(passOptions[0]) && cntValid != NUMSECTOR; pass++) {
-		blk = nextBlk(startBlk.block);
-		while (seekSector(blk.start, blk.end.fluxPos)) {
-			if (syncFMByte(passOptions[pass].minSyncCnt)) {		// if we could sync check if sector data is ok
-				blk.start = where();		// where to restart if a problem
-				for (rcnt = 0; rcnt < SECSIZE + SECMETA + SECPOSTAMBLE; rcnt++)
-					if ((dbyte = getFMByte(rcnt, passOptions[pass].adaptRate, passOptions[pass].sesnsitivity)) < 0)
-						break;
-					else
-						data.raw[rcnt] = dbyte;
+	location_t start = where();		// open will have rewound so this is start of stream
 
-				if (dbyte == BAD_FLUX)
-					continue;
-				else if (dbyte == END_FLUX)
+	cntValid = 0;
+	while (resetPLL(150, 10, guard, cbit) && (sval = sync(trk)) != END_FLUX) {
+		if (sval < 0) {
+			if (sval == NOSYNC || !gotSector)
+				start = where();
+			else if (guard < 1000) {
+				guard += 250;
+				seekSector(start);
+			} else {
+				guard = 0;
+				// failed to read so skip the sector
+				start = skip(start.bitPos + (SECTORCELLS) * cellTicks / 1000);
+			}
+			continue;
+		}
+
+		gotSector = true;
+		data.sector = sval;
+		data.track = trk | 0xff00;
+		for (rcnt = 2; rcnt < SECSIZE + SECMETA + SECPOSTAMBLE; rcnt++)
+			if ((dbyte = getByte(rcnt)) >= 0)
+				data.raw[rcnt] = dbyte;
+			else
+				break;
+
+		if (dbyte == END_FLUX)
+			break;
+
+		if (debug >= VERYVERBOSE) dumpSector(&data);
+
+		if (!secValid[sval & 0x1f]) {							// don't need to process if we already have a valid copy
+			if (crcCheck(data.raw, SECSIZE + SECMETA)) {		// data looks good
+				addSector(&data, true);
+				if (secValid[sval & 0x1f]++ == 0 && ++cntValid == NUMSECTOR)
 					break;
-				if (dbyte >= 0) {
-					/* ignore sectors and tracks out of range*/
-					if ((secId = data.sector & 0x7f) >= NUMSECTOR || (data.track & 0xff) != trk)	// start error
-						continue;
-//					printf("track %d sector %d\n", trk, secId);
-					if (crcCheck(data.raw, SECSIZE + SECMETA)) {		// data looks good
-						addSector(&data, true);
-						blk.end = where();
-						addBlock(secId, blk);
-						if (secValid[secId] == 0) {
-							secValid[secId] = pass + 1;
-							if (++cntValid == NUMSECTOR)
-								break;
-						}
-					} else {
-						if ((data.post[0] & 0xff) == 0 || (data.post[1] & 0xff) == 0)			// looks like some level of sync
-							addSector(&data, false);
-						continue;												// try a later resync
-					}
+			} else {
+				if (reasonable(&data, tolerance))		// make sure very bad sectors are ignored
+					addSector(&data, false);
+				/* try decoding again using the following heuristics 
+					toggle training on all vs. clock only transitions - normal is all
+					catch possible sampling errors by allowing 0.25 - 0.75 of a kryoflux clock cycle error
+				*/
+				if (!cbit || guard < 750) {			// cbit toggles all/clock only transitions
+					if (cbit)
+						guard += 250;				// 250 corresponds to 0.25 kryoflux clock cycle
+					cbit = !cbit;
+					seekSector(start);
+					continue;
 				}
 			}
-
-			blk.start = blk.end;
-			blk = nextBlk(blk);
 		}
-//		printf("At end of pass %d: trk=%d\n", pass + 1, trk);
-//		printBlockChain();
-		//		printf("pass %d score %d good %d looked at\n", pass + 1, good, attempt);
+		start = skip(where().bitPos + MINLEADOUT * cellTicks / 1000);
+
+		guard = 0;
+		tolerance = 16;
+		cbit = false;
 	}
-	blkFree();
-	/* now display the results */
-	//	for (int i = 0; i < NUMSECTOR; i++)
-	//		printf("%d", secValid[i]);
+
 	for (int sec = 0; sec < NUMSECTOR; sec++) {
 		secList_t *p = &track[sec];
 		if (!p->flags)
 			printf("%d/%d: No data\n", trk, sec);
 		else if (debug == 0 && p->flags == 2)
-				printf("%d/%d: failed to extract clean sector\n", trk, sec);
+			printf("%d/%d: failed to extract clean sector\n", trk, sec);
 		else
 			displaySector(p, trk, sec);
 		removeSectors(p);

@@ -15,36 +15,13 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="decode.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="flux.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="zdsdsk.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="zip.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="flux.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="miniz.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="zip.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="resource.h">
+    <ClInclude Include="version.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="zdsdsk.rc">
-      <Filter>Resource Files</Filter>
-    </ResourceCompile>
+    <ClCompile Include="any2imd.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

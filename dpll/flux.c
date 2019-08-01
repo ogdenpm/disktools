@@ -15,16 +15,16 @@ static byte* inBuf;
 static size_t inSize;
 static size_t inIdx;
 
-
-unsigned short inline getWord(size_t n)
+unsigned inline getWord(int n)
 {
 	return inBuf[n] + (inBuf[n + 1] << 8);
 }
 
-unsigned long inline getDWord(size_t n)
+unsigned long inline getDWord(int n)
 {
 	return inBuf[n] + (inBuf[n + 1] << 8) + (inBuf[n + 2] << 16) + (inBuf[n + 3] << 24);
 }
+
 
 
 /*
@@ -38,14 +38,18 @@ unsigned long inline getDWord(size_t n)
 static size_t fluxRead;           // total number of flux transitions read
 static size_t fluxPos;            // current flux transition
 static size_t bitPos;		      // current bit position in data
-static size_t inSize;
+static size_t lastFluxPos;
 
 
 // seek to the specified position, setting flux and bit position information
-void seekSector(location_t pos)
+bool seekSector(location_t pos, size_t lastPos)
 {
+
 		fluxPos = pos.fluxPos;
 		bitPos = pos.bitPos;
+		if (lastPos != 0)
+			lastFluxPos = lastPos != ~0 ? lastPos : inSize;
+		return fluxPos < lastFluxPos;
 }
 
 /* utility function to return current position in flux stream */
@@ -153,8 +157,6 @@ void openFluxBuffer(byte* buf, size_t size) {
 	if (!inBuf)
 		return;
 
-	fluxPos = bitPos = 0;			// rewind
-
 	for (size_t i = 0; i < inSize;) {
 		int c = inBuf[i];
 		if (c <= 7)
@@ -183,17 +185,16 @@ int fluxLog(int n)
 {
 	if (debug >= VERYVERBOSE)
 		switch (n) {
-		case END_FLUX: printf("END_FLUX");  break;
+		case END_FLUX: printf("END_FLUX"); break;
 		case END_BLOCK: printf("END_BLOCK"); break;
 		default:
-			printf("%d,", n);
+			printf("%d,", (n + USCLOCK)/(2 * USCLOCK));
 			break;
 		}
-	if (n > 0) {
+	if (n >= 0) {
 		bitPos += n;
-		return n * 1000;		// convert to NS resolution
-	}
-	if (n == END_FLUX)
+		return n * 1000;
+	} else if (n == END_FLUX)
 		fluxPos = bitPos = ~0;
 	return n;
 }
@@ -206,10 +207,10 @@ int getNextFlux() {
     int ovl16 = 0;
 	int val;
 
-	while (fluxPos < inSize) {
+	while (fluxPos < lastFluxPos) {
 		val = inBuf[fluxPos];
 		if (val <= 7) {
-			if (++fluxPos >= inSize)
+			if (++fluxPos >= lastFluxPos)
 				return fluxLog(END_FLUX);
 			return fluxLog(ovl16 + inBuf[fluxPos++]);
 		}
@@ -217,22 +218,22 @@ int getNextFlux() {
 			return fluxLog(ovl16 + inBuf[fluxPos++]);
 		else
 			switch (val) {
-			case 0xa:	if (++fluxPos >= inSize) return fluxLog(END_FLUX);
-			case 0x9:	if (++fluxPos >= inSize) return fluxLog(END_FLUX);
-			case 0x8:	if (++fluxPos >= inSize) return fluxLog(END_FLUX);
+			case 0xa:	if (++fluxPos >= lastFluxPos) return fluxLog(END_FLUX);
+			case 0x9:	if (++fluxPos >= lastFluxPos) return fluxLog(END_FLUX);
+			case 0x8:	if (++fluxPos >= lastFluxPos) return fluxLog(END_FLUX);
 				break;
-			case 0xb:	if (++fluxPos >= inSize) return fluxLog(END_FLUX);
+			case 0xb:	if (++fluxPos >= lastFluxPos) return fluxLog(END_FLUX);
 				ovl16 += 0x10000;
 				break;
-			case 0xc:	if ((fluxPos += 3) >= inSize) return fluxLog(END_FLUX);
+			case 0xc:	if ((fluxPos += 3) >= lastFluxPos) return fluxLog(END_FLUX);
 				return fluxLog(ovl16 + getWord(fluxPos - 2));
 			case 0xd:
-				if (fluxPos + 4 >= inSize) return fluxLog(END_FLUX);
+				if (fluxPos + 4 >= lastFluxPos) return fluxLog(END_FLUX);
 
 				int type = inBuf[fluxPos + 1];
 				int size = getWord(fluxPos + 2);
 				fluxPos += 4;
-				if (type == 0xd || fluxPos + size >= inSize)		// EOF?
+				if (type == 0xd || fluxPos + size >= lastFluxPos)		// EOF?
 					return fluxLog(END_FLUX);
 				fluxPos += size;
 				break;
@@ -241,71 +242,4 @@ int getNextFlux() {
 	return fluxLog(END_FLUX);
 }
 
-void displayHist(int levels)
-{
-    int histogram[HIST_MAX + 1];
-    int cols[HIST_MAX + 1];
-    char line[HIST_MAX + 2];        // allow for 0 at end
-    int val;
-    int blk = 1;
-    int maxHistCnt = 0;
-    int maxHistVal = 0;
-    int outRange = 0;
-    double sck = 24027428.5714285;
-	location_t start = { 0, 0 };
-
-    /* read all of the flux data */
-    memset(histogram, 0, sizeof(histogram));
-
-	seekSector(start);
-	    while ((val = getNextFlux()) != END_FLUX && val != END_BLOCK) {
-        if (val > maxHistVal)
-            maxHistVal = val;
-        if (val > HIST_MAX)
-            outRange++;
-        else if (++histogram[val] > maxHistCnt)
-            maxHistCnt++;
-    }
-
-    if (maxHistCnt == 0) {
-        logger(ALWAYS, "No histogram data\n");
-        return;
-    }
-
-    for (int i = 0; i <= HIST_MAX; i++)
-        cols[i] = (2 * levels * histogram[i] + maxHistCnt / 2) / maxHistCnt;
-
-    int lowVal, highVal;
-    for (lowVal = 0; lowVal < NSCLOCK / 2 && cols[lowVal] == 0; lowVal++)
-        ;
-    for (highVal = HIST_MAX; highVal >= NSCLOCK * 5 + NSCLOCK / 2 && cols[highVal] == 0; highVal--)
-        ;
-
-    printf("max flux value = %.1fus, flux values > %.1fus = %d\n", maxHistVal * 1000.0 / sck, HIST_MAX_D * 1000.0 / sck, outRange);
-    printf("x axis range = %.1fus - %.1fus, y axis range 0 - %d\n", lowVal * 1000.0 / sck, highVal * 1000.0 / sck, maxHistCnt);
-    puts("\nHistogram\n"
-        "---------");
-    int fillch;
-    for (int i = levels * 2; i > 0; i -= 2) {
-        line[highVal + 1] = fillch = 0;
-        for (int j = highVal; j >= lowVal; j--) {
-            if (cols[j] >= i - 1) {
-                line[j] = cols[j] >= i ? '#' : '+';
-                fillch = ' ';
-            }
-            else
-                line[j] = fillch;
-        }
-        puts(line + lowVal);
-    }
-    for (int i = lowVal; i <= highVal; i++)
-        putchar('-');
-    putchar('\n');
-    for (int i = lowVal; i <= (highVal / NSCLOCK) * NSCLOCK; i++)
-        if (i % USCLOCK == 0)
-            i += printf("%dus", i / NSCLOCK) - 1;
-        else
-            putchar(' ');
-    putchar('\n');
-}
 

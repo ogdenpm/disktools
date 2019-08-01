@@ -818,6 +818,7 @@ bool analyseFormat()
     }
        int savDebug = debug;       // supress debug info
        debug = 0;
+
   
     for (curFmt = formats; curFmt->profile; curFmt++) {
         if (curFmt->profile != profile)

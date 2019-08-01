@@ -260,3 +260,9 @@ paket-files/
 __pycache__/
 *.pyc
 /install.bat
+/publish.bat
+/bin2imd/cvt.b2i
+/bin2imd/test.imd
+/Project1/Project1.vcxproj
+/Project1/Project1.vcxproj.filters
+/dpll.c
