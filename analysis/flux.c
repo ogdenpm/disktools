@@ -33,7 +33,8 @@ int firstSector = 31;
 
 /* parsed data from the kinfo blocks*/
 static int hc = 0;			// hard sector count or 0 for soft sector
-double sck = SCK;			// sample clock frequency
+double sck = SCK;			// sample clock frequency scaled
+static double fluxScaler = 1.0e9 / SCK;
 static double ick = ICK;	// index clock frequency
 static char scanDate[11];	// date on which data was scanned
 static char scanTime[9];	// and the time
@@ -60,7 +61,8 @@ typedef struct _physBlock {
 static physBlock_t* indexHead = NULL;			// list start
 static physBlock_t* indexPtr = NULL;			// current item being processed, for load this is the end
 static unsigned blkNumber = 0;					// current block number
-static uint32_t adjust = 0;						// sample offset for first sample
+static uint32_t totalSampleCnt = 0;             // running sample count to remove rouding bias
+static uint64_t prevNsCnt = 0;                  // previous running ns count
 
 static void rewindBlock();
 
@@ -80,15 +82,15 @@ static void startIndex() {
 
 // assumes startIndex has been called
 static void addIndexEntry(uint32_t streamPos, uint32_t sampleCnt, uint32_t indexCnt) {
-	physBlock_t* newIndex = (physBlock_t*)xmalloc(sizeof(physBlock_t));
-	newIndex->start = newIndex->end = streamPos;
-	newIndex->sampleCnt = sampleCnt;
-	newIndex->indexCnt = indexCnt;
-	newIndex->physSector = 0;
-	newIndex->next = NULL;
-	indexPtr->next = newIndex;
-	indexPtr->end = streamPos;
-	indexPtr = newIndex;
+    physBlock_t* newIndex = (physBlock_t*)xmalloc(sizeof(physBlock_t));
+    newIndex->start = newIndex->end = streamPos;
+    newIndex->sampleCnt = sampleCnt;
+    newIndex->indexCnt = indexCnt;
+    newIndex->physSector = 0;
+    newIndex->next = NULL;
+    indexPtr->next = newIndex;
+    indexPtr->end = streamPos;
+    indexPtr = newIndex;
 }
 
 
@@ -134,8 +136,9 @@ static void endIndex(uint32_t streamPos) {
 #if _DEBUG
     for (physBlock_t *p = indexHead; p; p = p->next)
         printf("start %lu, end %lu, sector %d, indexCnt %lu, sampleCnt %lu\n", p->start, p->end, p->physSector, p->indexCnt, p->sampleCnt);
+    printf("scanned: %s at %s, hc: %d, sck: %.7f ick: %.7f\n", scanDate, scanTime, hc, sck, ick);
 #endif
-	rewindBlock();
+    rewindBlock();
 }
 
 
@@ -145,13 +148,13 @@ static void endIndex(uint32_t streamPos) {
 // skip unused blocks
 static void skipUnusedBlocks() {
     while (indexPtr && ((hc && indexPtr->indexCnt == 0) || indexPtr->start == indexPtr->end))
-		indexPtr = indexPtr->next;
+        indexPtr = indexPtr->next;
 }
 
 static void rewindBlock() 	{
-	indexPtr = indexHead;
-	blkNumber = 0;
-	skipUnusedBlocks();
+    indexPtr = indexHead;
+    blkNumber = 0;
+    skipUnusedBlocks();
 }
 
 
@@ -165,19 +168,19 @@ int seekBlock(unsigned num) {
         return -1;
 
 
-	while (num > blkNumber && indexPtr->next) {				// scan the list
-		indexPtr = indexPtr->next;
-		skipUnusedBlocks();
-		if (indexPtr)
-			blkNumber++;
-		else
-			return -1;
-	}
-	
+    while (num > blkNumber && indexPtr->next) {				// scan the list
+        indexPtr = indexPtr->next;
+        skipUnusedBlocks();
+        if (indexPtr)
+            blkNumber++;
+        else
+            return -1;
+    }
+    
     if (num == blkNumber) {					// setup getNextFlux
         inPtr = fluxBuf + indexPtr->start;
         endPtr = fluxBuf + indexPtr->end;
-        adjust = indexPtr->sampleCnt;
+        prevNsCnt = totalSampleCnt = 0;
         return indexPtr->physSector;
     } else
         return -1;
@@ -254,8 +257,10 @@ static size_t oob(size_t fluxPos, size_t size) {
             fluxBuf[fluxPos - 1] = '\0';			// last byte should already 0 but just in case
             if (s = strstr(oobBlk, "hc="))
                 hc = atoi(s + 3);
-            if (s = strstr(oobBlk, "sck="))
+            if (s = strstr(oobBlk, "sck=")) {
                 sck = atof(s + 4);
+                fluxScaler = 1.0e9 / sck;
+            }
             if (s = strstr(oobBlk, "ick="))
                 ick = atof(s + 4);
             if (s = strstr(oobBlk, "host_date="))
@@ -340,9 +345,9 @@ int32_t getNextFlux() {
 
         assert(type != 0xd);
         if (type <= FLUX2 || type == FLUX3|| type >= FLUX1) {
-            if (type >= FLUX2)
+            if (type >= FLUX1)
                 c = type;
-            else if (type <= FLUX1)
+            else if (type <= FLUX2)
                 c = (type << 8) + *inPtr++;
             else {
                 c = *inPtr++ << 8;
@@ -350,15 +355,17 @@ int32_t getNextFlux() {
             }
             c += ovl16;
             ovl16 = 0;
-            c -= adjust;			// correction for first flux value read
-            adjust = 0;
-            return c * 1000;
-
+            // determine current sample position in ns
+            totalSampleCnt += c;
+            uint64_t newNsCnt = (uint64_t)(fluxScaler * totalSampleCnt + 0.5);
+            c = (int32_t)(newNsCnt - prevNsCnt);
+            prevNsCnt = newNsCnt;
+            return c;
 
         } else if (type == 0xb)
             ovl16 += 0x10000;
         else
-            inPtr += (type - FLUX1);		// maps NOP1 - NOP3 to 1 - 3
+            inPtr += (type - NOP1);		// maps NOP1 - NOP3 to 1 - 3
     }
     return -1;
 

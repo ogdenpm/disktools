@@ -21,9 +21,15 @@
     <ClCompile Include="flux.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="dpll.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="flux.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="dpll.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
