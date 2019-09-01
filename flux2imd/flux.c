@@ -8,6 +8,7 @@
 #include <assert.h>
 
 #include "flux.h"
+#include "util.h"
 
 /* flux stream types */
 enum streamType_t {
@@ -22,11 +23,11 @@ enum oob_t {
 
 
 static uint8_t* fluxBuf;		// buffer where flux data / stream data held
-static size_t streamIdx;		// current position of stream data with OOB data removed
+static uint32_t streamIdx;		// current position of stream data with OOB data removed
+
+static location_t location;
 
 
-uint8_t* inPtr;
-uint8_t* endPtr;
 int firstSector = 31;
 
 
@@ -61,8 +62,7 @@ typedef struct _physBlock {
 static physBlock_t* indexHead = NULL;			// list start
 static physBlock_t* indexPtr = NULL;			// current item being processed, for load this is the end
 static unsigned blkNumber = 0;					// current block number
-static uint32_t totalSampleCnt = 0;             // running sample count to remove rouding bias
-static uint64_t prevNsCnt = 0;                  // previous running ns count
+static uint32_t adjust = 0;
 
 static void rewindBlock();
 
@@ -134,9 +134,9 @@ static void endIndex(uint32_t streamPos) {
         }
     }
 #if _DEBUG
+    logFull(MINIMAL, "scanned: %s at %s, hc: %d, sck: %.7f ick: %.7f\n", scanDate, scanTime, hc, sck, ick);
     for (physBlock_t *p = indexHead; p; p = p->next)
-        printf("start %lu, end %lu, sector %d, indexCnt %lu, sampleCnt %lu\n", p->start, p->end, p->physSector, p->indexCnt, p->sampleCnt);
-    printf("scanned: %s at %s, hc: %d, sck: %.7f ick: %.7f\n", scanDate, scanTime, hc, sck, ick);
+        logFull(VERBOSE, "start %lu, end %lu, sector %d, indexCnt %lu, sampleCnt %lu\n", p->start, p->end, p->physSector, p->indexCnt, p->sampleCnt);
 #endif
     rewindBlock();
 }
@@ -158,6 +158,15 @@ static void rewindBlock() 	{
 }
 
 
+
+void getLocation(location_t *p) {
+    *p = location;
+}
+
+void setLocation(location_t *p) {
+    location = *p;
+}
+
 // seek to the specified stream block, setting the bounds for getNextFlux returns physical sector
 // number (0 for soft sector) or -1 if block does not exist
 int seekBlock(unsigned num) {
@@ -178,23 +187,32 @@ int seekBlock(unsigned num) {
     }
     
     if (num == blkNumber) {					// setup getNextFlux
-        inPtr = fluxBuf + indexPtr->start;
-        endPtr = fluxBuf + indexPtr->end;
-        prevNsCnt = totalSampleCnt = 0;
+        location.inPtr = fluxBuf + indexPtr->start;
+        location.endPtr = fluxBuf + indexPtr->end;
+        adjust = indexPtr->sampleCnt;
+        location.prevNsCnt = location.totalSampleCnt = 0;
         return indexPtr->physSector;
     } else
         return -1;
 }
 
 
+double where() {
+    return ((double)location.totalSampleCnt * 1.0e6 / sck);
+}
+
+int cntHardSectors() {
+    return hc;
+}
+
 // the main flux load routines & support functions
 
 
-static unsigned getWord(uint8_t *stream) {
+static uint32_t getWord(uint8_t *stream) {
     return (stream[1] << 8) + stream[0];
 }
 
-static unsigned getDWord(uint8_t *stream) {
+static uint32_t getDWord(uint8_t *stream) {
     return (stream[3] << 24) + (stream[2] << 16) + (stream[1] << 8) + stream[0];
 }
 
@@ -206,17 +224,17 @@ static size_t oob(size_t fluxPos, size_t size) {
     if (fluxPos > size)			// check we have at least the 0xd, type, len info
         return fluxPos;			// will force end and premature end message
 
-    int type = *oobBlk++;
-    if (type == OOB_EOF)
+    int matchType = *oobBlk++;
+    if (matchType == OOB_EOF)
         return size;
-    size_t len = getWord(oobBlk);
+    uint32_t len = getWord(oobBlk);
     oobBlk += 2;					// skip length field
 
     fluxPos += len;
     if (fluxPos <= size) {		// next data is at or before end so we can process here
         unsigned num1, num2, num3;
 
-        switch (type) {
+        switch (matchType) {
         case OOB_INVALID:
         default:
             fprintf(stderr, "invalid OOB block type = %d, len = %d\n", *fluxBuf, len);
@@ -224,7 +242,7 @@ static size_t oob(size_t fluxPos, size_t size) {
         case OOB_STREAMINFO:
         case OOB_STREAMEND:
             if (len != 8)
-                fprintf(stderr, "Incorrect length for OOB Stream %s Block - len = %d vs. 8\n", type == OOB_STREAMINFO ? "Info" : "End", len);
+                fprintf(stderr, "Incorrect length for OOB Stream %s Block - len = %d vs. 8\n", matchType == OOB_STREAMINFO ? "Info" : "End", len);
             else {
                 num1 = getDWord(oobBlk);
                 num2 = getDWord(oobBlk + 4);
@@ -237,7 +255,7 @@ static size_t oob(size_t fluxPos, size_t size) {
                         fprintf(stderr, "Realigned with NOP1 filler\n");
 
                 }
-                if (type == OOB_STREAMEND && num2 != 0)
+                if (matchType == OOB_STREAMEND && num2 != 0)
                     fprintf(stderr, "Steam End Block Error Code = %lu\n", num2);
             }
             break;
@@ -292,8 +310,8 @@ int loadFlux(uint8_t* image, size_t size) {
 
     while (fluxPos < size) {
 
-        int type = fluxBuf[fluxPos];
-        switch (type) {
+        int matchType = fluxBuf[fluxPos];
+        switch (matchType) {
         case OOB:
             fluxPos = oob(fluxPos, size);
             break;
@@ -306,7 +324,7 @@ int loadFlux(uint8_t* image, size_t size) {
                 fluxBuf[streamIdx++] = fluxBuf[fluxPos];
             fluxPos++;
         default:
-            if (type <= FLUX2) {
+            if (matchType <= FLUX2) {
                 if (fluxPos < size)
                     fluxBuf[streamIdx++] = fluxBuf[fluxPos];
                 fluxPos++;
@@ -323,51 +341,66 @@ int loadFlux(uint8_t* image, size_t size) {
 
     if (fluxPos > size)
         fprintf(stderr, "premature EOF\n");
-    
-
-
-    return seekBlock(0);
-
+   
+    seekBlock(0);
+    if (indexHead && indexHead->next)
+        return hc;
+    return -1;
 }
 
-
+void unloadFlux() {
+    if (fluxBuf)                // release any old image;
+        free(fluxBuf);
+    fluxBuf = NULL;
+}
 
 
 int32_t getNextFlux() {
 
-    uint32_t c;
-    uint8_t type;
+    int32_t c;
+    uint8_t matchType;
 
     int ovl16 = 0;
 
-    while (inPtr < endPtr) {
-        type = *inPtr++;
+    while (location.inPtr < location.endPtr) {
+        matchType = *location.inPtr++;
 
-        assert(type != 0xd);
-        if (type <= FLUX2 || type == FLUX3|| type >= FLUX1) {
-            if (type >= FLUX1)
-                c = type;
-            else if (type <= FLUX2)
-                c = (type << 8) + *inPtr++;
+        assert(matchType != 0xd);
+        if (matchType <= FLUX2 || matchType == FLUX3|| matchType >= FLUX1) {
+            if (matchType >= FLUX1)
+                c = matchType;
+            else if (matchType <= FLUX2)
+                c = (matchType << 8) + *location.inPtr++;
             else {
-                c = *inPtr++ << 8;
-                c += *inPtr++;
+                c = *location.inPtr++ << 8;
+                c += *location.inPtr++;
             }
-            c += ovl16;
-            ovl16 = 0;
+            c += ovl16 - adjust;
+            ovl16 = adjust = 0;
             // determine current sample position in ns
-            totalSampleCnt += c;
-            uint64_t newNsCnt = (uint64_t)(fluxScaler * totalSampleCnt + 0.5);
-            c = (int32_t)(newNsCnt - prevNsCnt);
-            prevNsCnt = newNsCnt;
+            location.totalSampleCnt += c;
+ //         uint64_t newNsCnt = (uint64_t)(fluxScaler * location.totalSampleCnt + 0.5);
+ //          c = (int32_t)(newNsCnt - location.prevNsCnt);
+            c = (int32_t)(c * fluxScaler);
+ //           location.prevNsCnt = newNsCnt;
             return c;
 
-        } else if (type == 0xb)
+        } else if (matchType == 0xb)
             ovl16 += 0x10000;
         else
-            inPtr += (type - NOP1);		// maps NOP1 - NOP3 to 1 - 3
+            location.inPtr += (matchType - NOP1);		// maps NOP1 - NOP3 to 1 - 3
     }
     return -1;
 
 
+}
+
+
+int getRPM() {
+    physBlock_t* p = indexPtr->next;
+    while (p && p->indexCnt == 0 && p->physSector != indexPtr->physSector)
+        p = p->next;
+    if (!p)
+        return -1;
+    return (int)(ick / (p->indexCnt - indexPtr->indexCnt) * 60 + 0.5);    // sector length in uS
 }
