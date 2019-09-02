@@ -5,7 +5,7 @@
 #include "bits.h"
 
 #define MAXSECTOR 52
-#define MAXTRACK 80
+#define MAXTRACK 84
 #define EOTGAP  210
 #define POSJITTER   10
 
@@ -28,14 +28,14 @@ enum options {
     O_HP = O_REV + 3
 };
 typedef struct {
-    uint8_t track;
+    uint8_t cylinder;
     uint8_t side;
     uint8_t sectorId;
     uint8_t sSize;
 } idam_t;
 
 typedef struct {
-    uint16_t len;           // of data including CRC & any link data
+    unsigned len;           // of data including CRC & any link data
     uint16_t rawData[0];       // extended as needed 
 } sectorData_t;
 
@@ -47,19 +47,19 @@ typedef struct _sectorDataList {
 
 
 typedef struct _sector {
-    uint8_t status;
-    uint8_t sectorId;
+    unsigned status;
+    int sectorId;
     sectorDataList_t* sectorDataList;
 } sector_t;
 
 typedef struct {
-    char* shortName;
-    uint8_t sSize;      // sector len = 128 << ssize
-    uint8_t firstSectorId;
-    uint8_t spt;
-    uint8_t encoding;
-    uint8_t options;
-    bool (*crcFunc)(uint16_t *data, uint16_t len);
+    char* name;
+    int sSize;      // sector len = 128 << ssize
+    int firstSectorId;
+    int spt;
+    int encoding;
+    unsigned options;
+    bool (*crcFunc)(uint16_t *data, int len);
     pattern_t* patterns;
     uint16_t crcInit;
     int firstIDAM;
@@ -68,13 +68,13 @@ typedef struct {
 } formatInfo_t;
 
 typedef struct {
-    uint16_t status;
-    uint8_t track;
-    uint8_t side;
+    unsigned status;
+    int cylinder;
+    int side;
     formatInfo_t* fmt;
-    uint16_t cntGoodIdam;
-    uint16_t cntGoodData;
-    uint16_t cntAnyData;
+    int cntGoodIdam;
+    int cntGoodData;
+    int cntAnyData;
     uint8_t sectorToSlot[MAXSECTOR];        // index -> sectorId - firstSectorId
     uint8_t slotToSector[MAXSECTOR];
     sector_t sectors[];
@@ -83,22 +83,22 @@ typedef struct {
 
 extern formatInfo_t formatInfo[];
 extern formatInfo_t *curFormat;
-uint8_t slotAt(uint16_t pos, bool isIdam);
-void addIdam(uint16_t pos, idam_t* idam);
-void addSectorData(uint16_t pos, bool isGood, uint16_t len, uint16_t rawData[]);
+unsigned slotAt(unsigned pos, bool isIdam);
+void addIdam(unsigned pos, idam_t* idam);
+void addSectorData(unsigned pos, bool isGood, unsigned len, uint16_t rawData[]);
 
-void initTrack(uint8_t track, uint8_t side);
+void initTrack(unsigned cylinder, unsigned side);
 void updateTrackFmt();
 void finaliseTrack();
 
 
 bool checkTrack();
-track_t* getTrack(uint8_t track, uint8_t side);
+track_t* getTrack(unsigned cylinder, unsigned side);
 void removeSectorData(sectorDataList_t* p);
 
 extern track_t* trackPtr;
 formatInfo_t* lookupFormat(char* fmtName);
-void makeHSPatterns(uint8_t track, uint8_t slot);
+void makeHSPatterns(unsigned cylinder, unsigned slot);
 void setFormat(char* fmtName);
 void removeDisk();
 void resetTracker();

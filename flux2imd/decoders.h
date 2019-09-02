@@ -21,5 +21,5 @@ enum {
     LSI_SECTOR = 0x200, ZDS_SECTOR = 0x300, RETRY = 0xffff};                               // hard sector specials
 
 
-void hsGetTrack(int track);
-void ssGetTrack(uint8_t track, uint8_t side);
+void hsGetTrack(int cylinder);
+void ssGetTrack(int cylinder, int side);

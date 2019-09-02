@@ -13,10 +13,8 @@ typedef struct {
 extern uint64_t pattern;
 
 int getBit();
-int getBitPair();
 int getByte();
-uint32_t matchPattern(int searchLimit);
+int matchPattern(int searchLimit);
 bool setEncoding(char *fmtName);
-void resetByteCnt();
 
-uint32_t getByteCnt();
+unsigned getByteCnt();

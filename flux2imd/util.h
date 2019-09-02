@@ -3,12 +3,18 @@
 #include <stdbool.h>
 #include <stdarg.h>
 #include <string.h>
+
 enum {
-    ALWAYS = 0, MINIMAL = 1, VERBOSE = 3, VERYVERBOSE = 7,
-    DECODER = 8, ADDRESSMARK = 0x10, PATTERN = 0x20, DETECT = 0x40,
-    NOOPTIMISE = 0x80, ECHO = 0x100, TRACKER = 0x200,
+    ALWAYS = 0, ECHO = 1, FLUX = 2, DETECT = 4, PATTERN = 8,
+    ADDRESSMARK = 0x10, DECODER = 0x20,  NOOPTIMISE = 0x40, TRACKER = 0x80,
     WARNING = 0xfffd, ERROR = 0xfffe, FATAL = 0xffff
 };
+
+#if _DEBUG
+#define DBGLOG(x)   logFull##x
+#else
+#define DBGLOG(x)
+#endif
 
 extern int debug;
 

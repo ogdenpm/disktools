@@ -24,8 +24,10 @@ enum oob_t {
 
 static uint8_t* fluxBuf;		// buffer where flux data / stream data held
 static uint32_t streamIdx;		// current position of stream data with OOB data removed
-
-static location_t location;
+uint8_t* inPtr;
+uint8_t* endPtr;
+uint32_t totalSampleCnt;             // running sample count to remove rouding bias
+uint64_t prevNsCnt;                  // previous running ns count
 
 
 int firstSector = 31;
@@ -133,10 +135,11 @@ static void endIndex(uint32_t streamPos) {
                 p->physSector = sectorNum++ % hc;
         }
     }
+    logFull(FLUX, "scanned: %s at %s, hc: %d, sck: %.7f ick: %.7f\n", scanDate, scanTime, hc, sck, ick);
 #if _DEBUG
-    logFull(MINIMAL, "scanned: %s at %s, hc: %d, sck: %.7f ick: %.7f\n", scanDate, scanTime, hc, sck, ick);
     for (physBlock_t *p = indexHead; p; p = p->next)
-        logFull(VERBOSE, "start %lu, end %lu, sector %d, indexCnt %lu, sampleCnt %lu\n", p->start, p->end, p->physSector, p->indexCnt, p->sampleCnt);
+        logFull(FLUX, "start %lu, end %lu, sector %d, indexCnt %lu, sampleCnt %lu\n",
+                p->start, p->end, p->physSector, p->indexCnt, p->sampleCnt);
 #endif
     rewindBlock();
 }
@@ -155,16 +158,6 @@ static void rewindBlock() 	{
     indexPtr = indexHead;
     blkNumber = 0;
     skipUnusedBlocks();
-}
-
-
-
-void getLocation(location_t *p) {
-    *p = location;
-}
-
-void setLocation(location_t *p) {
-    location = *p;
 }
 
 // seek to the specified stream block, setting the bounds for getNextFlux returns physical sector
@@ -187,10 +180,10 @@ int seekBlock(unsigned num) {
     }
     
     if (num == blkNumber) {					// setup getNextFlux
-        location.inPtr = fluxBuf + indexPtr->start;
-        location.endPtr = fluxBuf + indexPtr->end;
+        inPtr = fluxBuf + indexPtr->start;
+        endPtr = fluxBuf + indexPtr->end;
         adjust = indexPtr->sampleCnt;
-        location.prevNsCnt = location.totalSampleCnt = 0;
+        prevNsCnt = totalSampleCnt = 0;
         return indexPtr->physSector;
     } else
         return -1;
@@ -198,7 +191,7 @@ int seekBlock(unsigned num) {
 
 
 double where() {
-    return ((double)location.totalSampleCnt * 1.0e6 / sck);
+    return ((double)totalSampleCnt * 1.0e6 / sck);
 }
 
 int cntHardSectors() {
@@ -355,52 +348,53 @@ void unloadFlux() {
 }
 
 
-int32_t getNextFlux() {
+int getNextFlux() {
 
-    int32_t c;
-    uint8_t matchType;
-
+    int c;
+    int matchType;
     int ovl16 = 0;
 
-    while (location.inPtr < location.endPtr) {
-        matchType = *location.inPtr++;
+    while (inPtr < endPtr) {
+        matchType = *inPtr++;
 
         assert(matchType != 0xd);
         if (matchType <= FLUX2 || matchType == FLUX3|| matchType >= FLUX1) {
             if (matchType >= FLUX1)
                 c = matchType;
             else if (matchType <= FLUX2)
-                c = (matchType << 8) + *location.inPtr++;
+                c = (matchType << 8) + *inPtr++;
             else {
-                c = *location.inPtr++ << 8;
-                c += *location.inPtr++;
+                c = *inPtr++ << 8;
+                c += *inPtr++;
             }
             c += ovl16 - adjust;
             ovl16 = adjust = 0;
-            // determine current sample position in ns
-            location.totalSampleCnt += c;
- //         uint64_t newNsCnt = (uint64_t)(fluxScaler * location.totalSampleCnt + 0.5);
- //          c = (int32_t)(newNsCnt - location.prevNsCnt);
-            c = (int32_t)(c * fluxScaler);
- //           location.prevNsCnt = newNsCnt;
+            totalSampleCnt += c;
+            c = (int)(c * fluxScaler);
             return c;
 
         } else if (matchType == 0xb)
             ovl16 += 0x10000;
         else
-            location.inPtr += (matchType - NOP1);		// maps NOP1 - NOP3 to 1 - 3
+            inPtr += (matchType - NOP1);		// maps NOP1 - NOP3 to 1 - 3
     }
     return -1;
-
-
 }
 
 
 int getRPM() {
-    physBlock_t* p = indexPtr->next;
-    while (p && p->indexCnt == 0 && p->physSector != indexPtr->physSector)
-        p = p->next;
-    if (!p)
-        return -1;
-    return (int)(ick / (p->indexCnt - indexPtr->indexCnt) * 60 + 0.5);    // sector length in uS
+    if (hc != 0)                                // hard sectors assumed to be 8 inch
+        return 360;
+
+    uint32_t startIndex = 0, endIndex = 0;
+
+    if (seekBlock(1) >= 0)                  // use the standard routines to locate the first and second full sectors
+        startIndex = indexPtr->indexCnt;
+   if (seekBlock(2) >= 0)                   // callers of seekBlock maintain the blkNum so will self recover
+            endIndex = indexPtr->indexCnt;
+
+    if (endIndex != 0)
+        return (int)(ick / (endIndex - startIndex) * 60 + 0.5);
+    return -1;
+
 }

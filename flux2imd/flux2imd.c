@@ -29,36 +29,40 @@ int debug = 0;
 int options;
 bool isZDS = false;
 #define pOpt    1
-#define aOpt    2
+#define gOpt    2
+#define bOpt    4
 
 
 FILE* logFp;
 
-void hsFlux2Track(int track, int side) {
+void hsFlux2Track(int cylinder, int side) {
     if (side != 0) {
-        logFull(ALWAYS, "%d/%d hard Sector disk only supports single side\n", track, side);
+        logFull(ALWAYS, "%d/%d hard Sector disk only supports single side\n", cylinder, side);
         return;
     }
     int hardSectors = cntHardSectors();
     int sectorToSlot[32] = { 0 };
-    hsGetTrack(track);
+    hsGetTrack(cylinder);
     if (trackPtr->fmt->options & O_ZDS)
         isZDS = true;
 
 
 }
 
-void flux2Track(int track, int side) {
+void flux2Track(int cylinder, int side, unsigned options) {
     char *fmt = NULL;
     int maxSlot = 0;
-    if (cntHardSectors() > 0)
-        hsFlux2Track(track, side);
+    if (cntHardSectors() > 0) {
+        hsFlux2Track(cylinder, side);
+        displayTrack(cylinder, side, options | (isZDS ? gOpt: 0));
+
+    }
     else if (!setEncoding(NULL)) {
         logFull(WARNING, "could not determine encoding\n");
         return;
     } else {
-        ssGetTrack(track, side);
-        displayTrack(track, side, options);
+        ssGetTrack(cylinder, side);
+        displayTrack(cylinder, side, options);
     }
 }
 
@@ -131,7 +135,7 @@ void openLogFile(char* name) {
     strcpy(strrchr(logFile, '.'), ".log");
     if (logFp && logFp != stdout)
         fclose(logFp);
-    else if ((logFp = fopen(logFile, "wt")) == NULL) {
+    if ((logFp = fopen(logFile, "wt")) == NULL) {
         logFp = stdout;
         logFull(ERROR, "could not create %s; using stdout\n", fileName(logFile));
     }
@@ -141,6 +145,7 @@ void openLogFile(char* name) {
 void decodeFile(char* name) {
     int cylHead;
     strcpy(curFile, fileName(name));
+    isZDS = false;
 
     if (extMatch(name, ".raw")) {
         openLogFile(name);
@@ -151,13 +156,11 @@ void decodeFile(char* name) {
             displayHist(histLevels);
         cylHead = getCylinder(curFile);
 
-        flux2Track(cylHead & 0xff, cylHead >> 16);
+        flux2Track(cylHead & 0xff, cylHead >> 16, options | gOpt);
         unloadFlux();
-        displayTrack(cylHead & 0xff, cylHead >> 16, options | aOpt);
         removeDisk();
     } else if (extMatch(name, ".zip")) {
         struct zip_t* zip;
-        isZDS = false;
         openLogFile(name);
         if ((zip = zip_open(name, 0, 'r')) == NULL)
             logFull(ERROR, "Can't open %s\n", name);
@@ -172,8 +175,8 @@ void decodeFile(char* name) {
                         displayHist(histLevels);
                     cylHead = getCylinder(curFile);
 
-                    flux2Track(cylHead & 0xff, cylHead >> 16);
-                    displayTrack(cylHead & 0xff, cylHead >> 16, options | (isZDS ? aOpt : 0));
+                    flux2Track(cylHead & 0xff, cylHead >> 16, options);
+
                 }
                 zip_entry_close(zip);
                 unloadFlux();
@@ -188,7 +191,7 @@ void decodeFile(char* name) {
         logFull(ERROR, "file %s does not have .raw or .zip extension\n", name);
         usage();
     }
-    if (logFp && logFp != stderr && logFp != stdout) {
+    if (logFp && logFp != stdout) {
         fclose(logFp);
         logFp = NULL;
     }
@@ -201,12 +204,14 @@ void decodeFile(char* name) {
 
 _declspec(noreturn) void usage() {
     fprintf(stderr,
-        "usage: analysis [-a] [-d[n]] [-h[n]] [-p] [zipfile|rawfile]+\n"
-        "-a will force all sectors to be dumped in the log files not just corrupt ones\n"
-        "-d sets debug. n is optional level 0,1,2. Note n is hex and > 2 are special\n"
+        "usage: analysis [-b] [-d[n]] [-g] [-h[n]] [-p] [zipfile|rawfile]+\n"
+        "options can be in any order before the first file name\n"
+        "-b will write bad (idam or data) sectors to the log file\n"
+        "-d sets debug flags to n (n is in hex) default is 1 which echos log to console\n"
+        "-g will write good (idam and data) sectors to the log file\n"
         "-h displays flux histogram. n is optional number of levels\n"
         "-p ignores parity bit in sector dump ascii display\n"
-        "Note ZDS disks and rawfiles force -a as image files are not created\n"
+        "Note ZDS disks and rawfiles force -g as image files are not created\n"
     );
     exit(1);
 }
@@ -220,13 +225,14 @@ int main(int argc, char** argv) {
 
     for (arg = 1; arg < argc && sscanf(argv[arg], "-%c", &optCh); arg++) {
         switch (tolower(optCh)) {
-        case 'a':
-            options |= aOpt;
+        case 'g':
+            options |= gOpt;
+            break;
+        case 'b':
+            options |= bOpt;
             break;
         case 'd':
-            debug = sscanf(argv[arg] + 2, "%x", &optVal) ? optVal : MINIMAL;
-            if (debug == 2)     // map debug 2 -> VERBOSE
-                debug = VERBOSE;
+            debug = sscanf(argv[arg] + 2, "%x", &optVal) ? optVal : ECHO;
             break;
         case 'h':
             histLevels = sscanf(argv[arg] +2, "%d", &optVal) && optVal > 5 ? optVal : 10;

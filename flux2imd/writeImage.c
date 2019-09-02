@@ -31,9 +31,8 @@ void WriteIMDHdr(FILE* fp, char* fname) {
 
     time(&curTime);
     dateTime = localtime(&curTime);
-    fprintf(fp, "IMD 1.18 %02d/%02d/%04d %02d:%02d:%02d\r\n", dateTime->tm_mday, dateTime->tm_mon, dateTime->tm_year + 1900,
+    fprintf(fp, "IMD 1.18 %02d/%02d/%04d %02d:%02d:%02d\r\n", dateTime->tm_mday, dateTime->tm_mon + 1, dateTime->tm_year + 1900,
     dateTime->tm_hour, dateTime->tm_min, dateTime->tm_sec);
-
     fprintf(fp, "Created from %s by flux2imd\r\n\x1a", fileName(fname));
 }
 
@@ -60,15 +59,18 @@ uint8_t *sectorToBytes(track_t* trackPtr, uint8_t slot) {
 // E_FM5, E_FM8, E_FM8H, E_MFM5, E_MFM8, E_M2FM8
 static uint8_t imdModes[] = { 2, 0, 0, 5, 3, 3 };
 
-void writeImdFile(char* fname) {
-    FILE* fp;
-    track_t* trackPtr;
+void writeImdFile(char *fname) {
+    FILE *fp;
+    track_t *trackPtr;
     char imdFile[_MAX_PATH + 1];
     strcpy(imdFile, fname);
     strcpy(strrchr(imdFile, '.'), ".imd");
 
-    if ((fp = fopen(imdFile, "wb")) == NULL)
+    if ((fp = fopen(imdFile, "wb")) == NULL) {
         logFull(ERROR, "cannot create %s\n", fname);
+        return;
+    }
+    logFull(ALWAYS, "IMD file %s created\n", fileName(imdFile));
 
     WriteIMDHdr(fp, fname);
     for (int cyl = 0; cyl < MAXTRACK; cyl++)
@@ -76,6 +78,10 @@ void writeImdFile(char* fname) {
             trackPtr = getTrack(cyl, head);
             if (!trackPtr || trackPtr->status & TS_BADID)
                 continue;
+            if (trackPtr->cylinder != cyl || trackPtr->side != head) {
+                logFull(ERROR, "Non-standard cylinder/side mapping not implemented, skipping track %d/%d\n", cyl, head);
+                continue;
+            }
 
             putc(imdModes[trackPtr->fmt->encoding], fp);           // mode
             putc(cyl, fp);                      // cylinder
@@ -84,9 +90,10 @@ void writeImdFile(char* fname) {
             putc(trackPtr->fmt->sSize, fp);     // sector size
             fwrite(trackPtr->slotToSector, 1, trackPtr->fmt->spt, fp);    // sector numbering map
 
+
             for (int slot = 0; slot < trackPtr->fmt->spt; slot++) {
                 if (trackPtr->sectors[slot].status & SS_DATAGOOD) {
-                    uint8_t* pSec = sectorToBytes(trackPtr, slot);
+                    uint8_t *pSec = sectorToBytes(trackPtr, slot);
                     if (SameCh(pSec, 128 << trackPtr->fmt->sSize)) {
                         putc(2, fp);
                         putc(pSec[0], fp);
@@ -96,6 +103,8 @@ void writeImdFile(char* fname) {
                     }
                 } else
                     putc(0, fp);            // data not available
+                
+
             }
         }
 

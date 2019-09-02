@@ -8,33 +8,30 @@
 #include "util.h"
 #include "bits.h"
 #include "sectorManager.h"
-
-
-#define FM500_NS 2000                // cell width in nS for FM 500bps
+#include "decoders.h"
 
 
 static uint8_t phaseAdjust[3][16] = {		// C1/C2, C3
-  //  8  9   A   B   C    D   E   F   0   1   2   3   4   5   6  7 
-//    {120, 130, 135, 140, 145, 150, 155, 160, 160, 165, 170, 175, 180, 185, 190, 200},
-    {120, 130, 130, 140, 140, 150, 150, 160, 160, 170, 170, 180, 180, 190, 190, 200},
+  //  8    9   A     B    C    D    E    F    0    1    2    3    4    5    6    7 
+    {120, 130, 135, 140, 145, 150, 155, 160, 160, 165, 170, 175, 180, 185, 190, 200},
+    //    {120, 130, 130, 140, 140, 150, 150, 160, 160, 170, 170, 180, 180, 190, 190, 200},
     {130, 140, 145, 150, 155, 158, 160, 160, 160, 160, 162, 165, 170, 175, 180, 190}
 
-//    {130, 140, 140, 150, 150, 160, 160, 160, 160, 160, 160, 170, 170, 180, 180, 190}
-
+    //    {130, 140, 140, 150, 150, 160, 160, 160, 160, 160, 160, 170, 170, 180, 180, 190}
 };
-static uint32_t ctime, etime;
-static uint32_t cellSize = FM500_NS;
-static int fCnt, aifCnt, adfCnt, pcCnt;
-static bool up = false;
-static uint32_t maxCell = FM500_NS + FM500_NS / 1000;
-static uint32_t minCell = FM500_NS - FM500_NS / 1000;
+static uint32_t ctime, etime;       // clock time and end of cell time
+static uint32_t cellSize;           // width of a cell
+static int fCnt, aifCnt, adfCnt, pcCnt; // dpll paramaters
+static bool up; 
+static uint32_t maxCell;            //  bounds on cell width
+static uint32_t minCell;
 
-static uint32_t cellDelta = FM500_NS / 100;
+static uint32_t cellDelta;
 
-//     FM5, FM8, FM8H, MFM5, MFM8, M2FM,
-int cellSizes[] = {
-    4000, 2000, 2000, 2000, 1000, 1000
-};
+uint64_t pattern;
+unsigned bitCnt;
+
+
 
 
 
@@ -49,27 +46,24 @@ struct {
     float slowTolerance;
 
 } adaptConfig[] = {
-//   {100, 32, 8.0, 400, 32, 4.0, 600, 0.25},
-//  {100, 16, 8.0, 200, 32, 4.0, 200, 0.25},
-//  {100, 21, 4.0, 400, 18, 1.0, 600, 0.5},     // FM hard sector default as no gap pre sync bytes also short blocks
-  {100, 32, 10.0, 200, 32, 4.0, 200, 2.0},   
-//  {100, 32, 8.0, 150, 32, 3.0, 200, 2.0}
+       {100, 32, 8.0, 400, 32, 4.0, 600, 0.25},
+    //  {100, 16, 8.0, 200, 32, 4.0, 200, 0.25},
+    //  {100, 21, 4.0, 400, 18, 1.0, 600, 0.5},     // FM hard sector default as no gap pre sync bytes also short blocks
+    //{100, 32, 10.0, 200, 32, 4.0, 200, 2.0},
+    //  {100, 32, 8.0, 150, 32, 3.0, 200, 2.0}
 };
 
 static uint32_t adaptCnt;
 static uint32_t adaptBitCnt;
-static int adaptState;
 static int adaptProfile;
 
-
-
-enum {
+static enum {
     INIT, FAST, MEDIUM, SLOW
-};
+} adaptState;
 
 
 
-static void adaptDpll()     {
+static void adaptDpll() {
     uint32_t deltaDivisor;
     uint32_t limit;
 
@@ -98,32 +92,45 @@ static void adaptDpll()     {
     minCell = cellSize - limit;
 }
 
-static int bitCnt = 0;
 
 void retrain(int profile) {
-    assert(curFormat->encoding < sizeof(cellSizes) / sizeof(cellSizes[0]));
+    switch (curFormat->encoding) {
+    case E_FM5:
+        cellSize = 4000;
+        break;
+    case E_FM8: case E_FM8H: case E_MFM5:
+        cellSize = 2000;
+        break;
+    case E_MFM8: case E_M2FM8:
+        cellSize = 1000;
+        break;
+    default:
+        logFull(FATAL, "For %s unknown encoding %d\n", curFormat->name, curFormat->encoding);
+    }
 
-    cellSize = cellSizes[curFormat->encoding];
-    pattern = 0;
-    fCnt = aifCnt = adfCnt = pcCnt = 0;
+    pattern = 0;                        // reset pattern stream
+    bitCnt = 0;
+    fCnt = aifCnt = adfCnt = pcCnt = 0; // reset the dpll
     up = false;
 
-    int flux = getNextFlux();
+    int flux = getNextFlux();           // prime dpll with firstr sample
 
-    ctime = flux > 0 ? flux : 0;          // prime with first sample
-    etime = ctime + cellSize / 2;
+    ctime = flux > 0 ? flux : 0;
+    etime = ctime + cellSize / 2;       // assume its the middle of a cel
 
-    adaptProfile = profile;
+    adaptProfile = profile;             // rest the adapt model
     adaptState = INIT;
-    adaptDpll();
-    bitCnt = 0;
+    adaptDpll();                        // trigger adapt start
 }
 
-
+/* this is the key dpll model largely based on US patent 4808884  */
 int getBit() {
     int fluxVal;
     int slot;
     int cstate = 1;			// default is IPC
+
+    pattern <<= 1;
+    bitCnt++;
 
     while (ctime < etime) {					// get next transition in a cell
         if ((fluxVal = getNextFlux()) < 0)
@@ -156,10 +163,13 @@ int getBit() {
     if (++adaptBitCnt == adaptCnt) {
         adaptDpll();
     }
+    pattern++;
     return 1;
 }
 
-
+unsigned getByteCnt() {
+    return bitCnt / 16;
+}
 
 
 

@@ -7,7 +7,9 @@
 #include "util.h"
 
 #define pOpt    1
-#define aOpt    2
+#define gOpt    2
+#define bOpt    4
+
 static int charMask = 0xff;
 static bool all = false;
 
@@ -41,8 +43,8 @@ static void cleanUpSuspect(sectorDataList_t* pList) {
         }
 }
 
-void displayDataLine(uint16_t* p) {
-    for (int j = 0; j < 16; j++)
+void displayDataLine(uint16_t* p, int len) {
+    for (int j = 0; j < len; j++)
         logBasic("%02X%c ", p[j] & 0xff, (p[j] & SUSPECT) ? '*' : ' ');
 
     for (int j = 0; j < 16; j++) {
@@ -69,143 +71,132 @@ void displayExtraLine(uint16_t* p, int len) {       // len: 2 just CRC, 4 just f
         break;
     }
 }
-void displayExtra(track_t* pTrack, uint8_t slot) {
-    sector_t* pSector = &pTrack->sectors[slot];
-    int cntExtra = pTrack->fmt->options != O_ZDS ? 2 : (pSector->status & SS_DATAGOOD) ? 4 : 8;
-    int offset = 128 << pTrack->fmt->sSize;
 
-    sectorDataList_t* p;
 
+// to minimse the noise in the dump. If there is a row copy without suspect tags
+// choose to display only it any any other non duplicate copys of the row that also have no suspect tags
+
+void displayLine(sector_t *pSector, int offset, int len, void (*displayFunc)(uint16_t *, int)) {
     char *marker = (pSector->status & SS_DATAGOOD) ? NULL : " ";
     bool cleanOnly = false;
-    for (p = pSector->sectorDataList; p && rowSuspectCnt(&p->sectorData.rawData[offset], cntExtra); p = p->next)    // find row with no tags
+    sectorDataList_t *p;
+    // see if we have a line with no suspect bytes
+    for (p = pSector->sectorDataList; p && rowSuspectCnt(&p->sectorData.rawData[offset], len); p = p->next)    // find row with no tags
         ;
-    if (p)                  // got one
-        cleanOnly = true;
-    else                    // none exists so full dump
+    if (p)
+        cleanOnly = true;       // got one so only clean bytes for this line
+    else
         p = pSector->sectorDataList;
 
     for (; p; p = p->next) {        // go through each of the sectors
-        if (cleanOnly && rowSuspectCnt(&p->sectorData.rawData[offset], cntExtra))     // if clean only skip bad rows
+        if (cleanOnly && rowSuspectCnt(&p->sectorData.rawData[offset], len))     // if clean only skip bad rows
             continue;
         bool duplicate = false;                                 // check if a duplicate
-        for (sectorDataList_t* q = pSector->sectorDataList; q != p && !duplicate; q = q->next)
-            if (memcmp(&p->sectorData.rawData[offset], &q->sectorData.rawData[offset], cntExtra * sizeof(uint16_t)) == 0)
+        for (sectorDataList_t *q = pSector->sectorDataList; q != p && !duplicate; q = q->next)
+            if (memcmp(&p->sectorData.rawData[offset], &q->sectorData.rawData[offset], len * sizeof(uint16_t)) == 0)
                 duplicate = true;
         if (!duplicate) {                                       // no its new
             if (marker)
                 logBasic(marker);
-            displayExtraLine(&p->sectorData.rawData[offset], cntExtra);
+            displayFunc(&p->sectorData.rawData[offset], len);
             marker = "+";                                       // make sure any more have + marker
         }
     }
 }
 
+
+
+
 static char* sectorToString(track_t* pTrack, uint8_t slot) {
     static char s[9];
     if (pTrack->sectors[slot].status & SS_IDAMGOOD)
-        sprintf(s, "%02d/%d/%02d", pTrack->track, pTrack->side, pTrack->sectors[slot].sectorId);
+        sprintf(s, "%02d/%d/%02d", pTrack->cylinder, pTrack->side, pTrack->sectors[slot].sectorId);
     else if (pTrack->sectors[slot].status & SS_FIXED)
-        sprintf(s, "%02d/%d/%02d*", pTrack->track, pTrack->side, pTrack->sectors[slot].sectorId);
+        sprintf(s, "%02d/%d/%02d*", pTrack->cylinder, pTrack->side, pTrack->sectors[slot].sectorId);
     else
-        sprintf(s, "%02d/%d/??", pTrack->track, pTrack->side);
+        sprintf(s, "%02d/%d/??", pTrack->cylinder, pTrack->side);
     return s;
 }
 
-// to minimse the noise in the dump. If there is a row copy without suspect tags
-// choose to display only it any any other non duplicate copys of the row that also have no suspect tags
-void displayData(track_t* pTrack, uint8_t slot) {
-    sectorDataList_t* p;
-    sector_t* pSector = &pTrack->sectors[slot];
 
-    int len = 128 << pTrack->fmt->sSize;
 
-    for (int i = 0; i < len; i += 16) {
-        char *marker = (pSector->status & SS_DATAGOOD) ? NULL : " ";
-        bool cleanOnly = false;
 
-        for (p = pSector->sectorDataList; p && rowSuspectCnt(&p->sectorData.rawData[i], 16); p = p->next)    // find row with no tags
-            ;
-        if (p)                  // got one
-            cleanOnly = true;
-        else                    // none exists so full dump
-            p = pSector->sectorDataList;
+void displaySector(track_t *pTrack, uint8_t slot, unsigned options) {
+    sector_t *pSector = &pTrack->sectors[slot];
 
-        for (; p; p = p->next) {        // go through each of the sectors
-            if (cleanOnly && rowSuspectCnt(&p->sectorData.rawData[i], 16))     // if clean only skip bad rows
-                continue;
-            bool duplicate = false;                                 // check if a duplicate
-            for (sectorDataList_t* q = pSector->sectorDataList; q != p && !duplicate; q = q->next) {
-                if (memcmp(&p->sectorData.rawData[i], &q->sectorData.rawData[i], 16 * sizeof(uint16_t)) == 0)
-                    duplicate = true;
-            }
-            if (!duplicate) {                                       // no its new
-                if (marker)
-                    logBasic(marker);
-                displayDataLine(&p->sectorData.rawData[i]);
-                marker = "+";                                       // make sure any more have + marker
-            }
-        }
-    }
-}
-
-void displaySector(track_t* pTrack, uint8_t slot, bool all) {
-    sector_t* pSector = &pTrack->sectors[slot];
     int size = 128 << pTrack->fmt->sSize;
 
-    if (!all && (pSector->status & SS_GOOD) == SS_GOOD)
-        return;
-
     if (!pSector->sectorDataList) {
-        logBasic("%s: No data\n", sectorToString(pTrack, slot));
         return;
     }
+    if (pSector->status & SS_DATAGOOD) {
+        if (!(options & gOpt))
+            return;
+    } else if (!(options & bOpt))
+        return;
+
+
     bool isGood = (pSector->status & SS_DATAGOOD);
     if (!isGood)
         cleanUpSuspect(pSector->sectorDataList);
-        logBasic("\n%s:%s\n", sectorToString(pTrack, slot), isGood ? "" : " ---- Corrupt Sector ----");
 
-    displayData(pTrack, slot);
-    if (!isGood || pTrack->fmt->options == O_ZDS)
-        displayExtra(pTrack, slot);
+    logBasic("\n%s:%s\n", sectorToString(pTrack, slot), isGood ? "" : " ---- Corrupt Sector ----");
 
+    for (int i = 0; i < size; i += 16)
+        displayLine(pSector, i, 16, displayDataLine);
+
+    if (!isGood || pTrack->fmt->options == O_ZDS) {
+        int cntExtra = pTrack->fmt->options != O_ZDS ? 2 : (pSector->status & SS_DATAGOOD) ? 4 : 8;
+
+        displayLine(pSector, size, cntExtra, displayExtraLine);
+    }
     if (!isGood)
         logBasic("       ---- End Corrupt Sector ----\n");
 }
 
-void displayTrack(int track, int side, int options) {
-    track_t* pTrack = getTrack(track, side);
-
+void displayTrack(int cylinder, int side, unsigned options) {
+    track_t* pTrack = getTrack(cylinder, side);
+          
+    if (pTrack == NULL || pTrack->cntAnyData == 0) {
+        logFull(ALWAYS, "Track %02d/%d no data\n", cylinder, side);
+        return;
+    }
+    cylinder = pTrack->cylinder;        // just in case they have been mapped
+    side = pTrack->side;
 
     charMask = options & pOpt ? 0x7f : 0xff;
-    all = (options & aOpt) || curFormat->options == O_ZDS;
-    
-    if (pTrack == NULL || pTrack->cntAnyData == 0) {
-        logFull(ALWAYS, "No data\n");
-        return;
-    }
-    // if all data is good and only reporting errors then all done
-    if (!all && trackPtr->cntGoodIdam == trackPtr->fmt->spt && trackPtr->cntGoodData == trackPtr->fmt->spt)
+    int spt = pTrack->fmt->spt;
+
+    if (!(options & gOpt) && pTrack->cntGoodData == spt && pTrack->cntGoodIdam == spt)
         return;
 
-    logFull(ALWAYS, "Encoding %s\n", pTrack->fmt->shortName);
+    if (pTrack->cntGoodIdam != spt || pTrack->cntGoodData != spt || (options & (bOpt|gOpt)))
+        logFull(ALWAYS, "Track %02d/%d encoding %s\n", cylinder, side, pTrack->fmt->name);
 
-    if (!(pTrack->status & TS_BADID)) {
-        if (pTrack->sectorToSlot[0] != pTrack->fmt->firstSectorId || pTrack->sectorToSlot[1] != pTrack->fmt->firstSectorId + 1) {
-            logBasic("%02d/%d: *** Physical sector order on track ***\n", track, side);
-            for (int i = 0; i < pTrack->fmt->spt; i++) {
+    if (pTrack->status & TS_BADID)
+        logFull(WARNING, "Track %02d/%d unable to reconstruct sector order\n", cylinder, side);
+    else if (pTrack->status & TS_FIXEDID) {
+        logBasic("  Reconstructed sector order:");
+        for (int i = 0; i < spt; i++) {
                 logBasic(" %2d%c", pTrack->sectors[i].sectorId, pTrack->sectors[i].status & SS_IDAMGOOD ? ' ' : '*');
-                if (i % 16 == 15)
+                if (i == 20)
                     logBasic("\n");
             }
-            if (pTrack->fmt->spt % 16)
-                logBasic("\n");
-        }
-        for (int i = 0; i < pTrack->fmt->spt; i++)
-            displaySector(pTrack, pTrack->sectorToSlot[i], all);
-    } else {
-        logFull(WARNING, "Interleave fixup failed, using physical order\n");
-        for (int i = 0; i < pTrack->fmt->spt; i++)
-            displaySector(pTrack, i, all);
+            logBasic("\n");
     }
+    if (pTrack->cntGoodData != spt) {
+        logBasic("  data missing (#) / corrupt (?) for sectors:");
+        for (int i = 0; i < trackPtr->fmt->spt; i++)
+            if (!(trackPtr->sectors[trackPtr->sectorToSlot[i]].status & SS_DATAGOOD))
+                logBasic("%3d%c", i + trackPtr->fmt->firstSectorId, trackPtr->sectors[trackPtr->sectorToSlot[i]].sectorDataList ? '?' : '#');
+        logBasic("\n");
+    }
+
+    if (!(pTrack->status & TS_BADID))
+        for (int i = 0; i < spt; i++)
+            displaySector(pTrack, pTrack->sectorToSlot[i], options);
+    else
+        for (int i = 0; i < spt; i++)
+            displaySector(pTrack, i, options);
+    logBasic("\n");
 }

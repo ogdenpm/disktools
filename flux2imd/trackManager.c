@@ -8,8 +8,8 @@
 
 formatInfo_t *lookupFormat(char* fmtName) {
     formatInfo_t* p;
-    for (p = formatInfo; p->shortName; p++) {
-        if (_stricmp(p->shortName, fmtName) == 0)
+    for (p = formatInfo; p->name; p++) {
+        if (_stricmp(p->name, fmtName) == 0)
             return p;
     }
     return NULL;
@@ -24,22 +24,25 @@ track_t* trackPtr = NULL;
 
 
 
-track_t* getTrack(uint8_t track, uint8_t side) {
-    if (track >= MAXTRACK || side > 1)
+track_t* getTrack(unsigned cylinder, unsigned side) {
+    if (cylinder >= MAXTRACK || side > 1)
         return NULL;
-    return disk[track][side];
+    return disk[cylinder][side];
 }
 
 
-void initTrack(uint8_t track, uint8_t side) {
-    removeTrack(disk[track][side]);     // clean out any pre-existing track data
+void initTrack(unsigned cylinder, unsigned side) {
+    if (cylinder >= MAXTRACK || side > 1)
+        logFull(FATAL, "Track %02u/%u exceeds program limits\n", cylinder, side);
+
+    removeTrack(disk[cylinder][side]);     // clean out any pre-existing track data
     
 
-    trackPtr = disk[track][side] = (track_t*)xmalloc(sizeof(track_t) + sizeof(sector_t) * curFormat->spt);
+    trackPtr = disk[cylinder][side] = (track_t*)xmalloc(sizeof(track_t) + sizeof(sector_t) * curFormat->spt);
     memset(trackPtr, 0, sizeof(*trackPtr) + sizeof(sector_t) * curFormat->spt);
     memset(trackPtr->slotToSector, 0xff, curFormat->spt);
     memset(trackPtr->sectorToSlot, 0xff, curFormat->spt);
-    trackPtr->track = track;
+    trackPtr->cylinder = cylinder;
     trackPtr->side = side;
     trackPtr->fmt = curFormat;
 }
@@ -96,15 +99,16 @@ void finaliseTrack() {
         return;                                         // have a full set of sectorIds
 
     fixSectorMap();
-  
-    // update the missing sector Ids
-    for (int i = 0; i < trackPtr->fmt->spt; i++)
-        if (!(trackPtr->sectors[sectorToSlot[i]].status & SS_IDAMGOOD)) {
-            slotToSector[sectorToSlot[i]] =
-                trackPtr->sectors[sectorToSlot[i]].sectorId = i + trackPtr->fmt->firstSectorId;
-            trackPtr->sectors[sectorToSlot[i]].status |= SS_FIXED;
-            
-        }
+    if (trackPtr->status & TS_FIXEDID) {
+        // update the missing sector Ids
+        for (int i = 0; i < trackPtr->fmt->spt; i++)
+            if (!(trackPtr->sectors[sectorToSlot[i]].status & SS_IDAMGOOD)) {
+                slotToSector[sectorToSlot[i]] =
+                    trackPtr->sectors[sectorToSlot[i]].sectorId = i + trackPtr->fmt->firstSectorId;
+                trackPtr->sectors[sectorToSlot[i]].status |= SS_FIXED;
+
+            }
+    }
 }
 
 
@@ -156,12 +160,6 @@ void fixSectorMap() {
         trackPtr->status |= TS_FIXEDID;
     } else {                                                    // can't fit interleave
         logFull(WARNING, "Cannot find suitable interleave. Allocating unused slots sequentially\n");
-        for (int i = 0, j = 0; i < spt; i++)
-            if (sectorToSlot[i] == 0xff) {
-                while (slotToSector[j] != 0xff)
-                    j++;
-                sectorToSlot[i] = j++;
-            }
         trackPtr->status |= TS_BADID;
     }
 }

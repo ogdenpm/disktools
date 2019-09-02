@@ -12,44 +12,6 @@
 #define HIST_SLOTS   (HIST_MAX_US * HIST_SLOTS_PER_US)
 
 
-extern char curFile[];
-#define MAXUS   10
-uint16_t determineBitRate() {
-    uint32_t cntTotal = 0;
-    uint32_t uSCnts[MAXUS] = { 0 };
-    uint32_t outOfRange = 0;
-
-    int val;
-
-    // load the histogram data
-    for (int i = 1; seekBlock(i) >= 0 && cntTotal < 25000; i++) {
-        while ((val = getNextFlux()) >= 0) {
-            val = (val + 500) / 1000;       // convert to uS (rounded)
-            if (val < MAXUS)
-                uSCnts[val]++;
-            else
-                outOfRange++;
-            cntTotal++;
-        }
-    }
-    if (debug & MINIMAL) {
-        logFull(ALWAYS, "Cell distribution\n");
-        logFull(ALWAYS, "");
-        for (int i = 0; i < MAXUS; i++)
-            logBasic("%3duS  ", i);
-        logBasic("%2d+uS\n", MAXUS);
-        logFull(ALWAYS, "");
-        for (int i = 0; i < MAXUS; i++)
-            logBasic("%5.2f%% ", 100.0 * uSCnts[i] / cntTotal);
-        logBasic("%.2f%%\n", 100.0 * outOfRange / cntTotal);
-    }
-    if (uSCnts[2] > cntTotal / 5)        // >20% are 2uS
-        return 500;
-    else if (uSCnts[4] > cntTotal / 5)
-        return uSCnts[2] > uSCnts[8] ? 500 : 250;
-    logFull(ALWAYS, "Failed to determine bit rate\n");
-    return 0;
-}
 
 void displayHist(int levels)
 {
@@ -123,5 +85,5 @@ void displayHist(int levels)
             i += logBasic("%dus", i / HIST_SLOTS_PER_US) - 1;
         else
             logBasic(" ");
-    logBasic(" ");
+    logBasic("\n");
 }

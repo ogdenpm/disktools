@@ -13,7 +13,7 @@ pattern_t dd5Patterns[] = {
     { 0xffffffff, 0x52245552, INDEXAM},            // IBM std
     { 0xffffffff, 0x44895554, IDAM},               // IBM std
     { 0xffffffff, 0x44895545, DATAAM},
-    { 0xffffffff, 0x4489554A, DELETEDAM},
+//    { 0xffffffff, 0x4489554A, DELETEDAM},
     {0}
 };
 
@@ -62,7 +62,7 @@ pattern_t ddMFMPatterns[] = {
     { 0xffffffff, 0x52245552, INDEXAM},            // IBM std
     { 0xffffffff, 0x44895554, IDAM},               // IBM std
     { 0xffffffff, 0x44895545, DATAAM},
-    { 0xffffffff, 0x4489554A, DELETEDAM},
+//    { 0xffffffff, 0x4489554A, DELETEDAM},
     {0}
 };
 
@@ -98,10 +98,10 @@ pattern_t sdFMPatterns[] = {
 
 
 
-static bool lsiCrc(uint16_t* data, uint16_t len);
-static bool zdsCrc(uint16_t* data, uint16_t len);
-static bool revCrc(uint16_t* data, uint16_t len);
-static bool stdCrc(uint16_t* data, uint16_t len);
+static bool lsiCrc(uint16_t* data, int len);
+static bool zdsCrc(uint16_t* data, int len);
+static bool revCrc(uint16_t* data, int len);
+static bool stdCrc(uint16_t* data, int len);
 /*
     some notes on the ordering of this table
     each group should start with one of SDx DDx which are used to detect the disk format
@@ -147,7 +147,7 @@ formatInfo_t formatInfo[] = {
 };
 formatInfo_t *curFormat;
 
-static bool lsiCrc(uint16_t* data, uint16_t len) {
+static bool lsiCrc(uint16_t* data, int len) {
     uint16_t crc = curFormat->crcInit;
     for (int i = 0; i < len - 2; i++)
         crc += data[i] & 0xff;
@@ -155,7 +155,7 @@ static bool lsiCrc(uint16_t* data, uint16_t len) {
 
 }
 
-static bool zdsCrc(uint16_t* data, uint16_t len) {
+static bool zdsCrc(uint16_t* data, int len) {
 #define CRC16 0x8005
     uint16_t crc = curFormat->crcInit;
     len -= 2;               // exclude postamble
@@ -165,7 +165,7 @@ static bool zdsCrc(uint16_t* data, uint16_t len) {
     return crc == 0;
 }
 
-static bool revCrc(uint16_t* data, uint16_t len) {
+static bool revCrc(uint16_t* data, int len) {
     uint8_t x;
     uint16_t crc = curFormat->crcInit;
 
@@ -177,7 +177,7 @@ static bool revCrc(uint16_t* data, uint16_t len) {
     return crc == 0;
 }
 
-static bool stdCrc(uint16_t* buf, uint16_t len) {
+static bool stdCrc(uint16_t* buf, int len) {
     uint8_t x;
     uint16_t crc = curFormat->crcInit;
 
@@ -198,9 +198,9 @@ uint64_t encodeFM(uint32_t val) {
 }
 
 
-void makeHSPatterns(uint8_t track, uint8_t slot)     {
-    hsPatterns[0].match = encodeFM(flip((track ? track : 32) * 2 + 1));            // set LSI match pattern
-    hsPatterns[1].match = encodeFM(((slot + 0x80) << 8) + track); // set ZDS match pattern
+void makeHSPatterns(unsigned cylinder, unsigned slot)     {
+    hsPatterns[0].match = encodeFM(flip((cylinder ? cylinder : 32) * 2 + 1));            // set LSI match pattern
+    hsPatterns[1].match = encodeFM(((slot + 0x80) << 8) + cylinder); // set ZDS match pattern
 
 }
 
@@ -209,4 +209,26 @@ void setFormat(char* fmtName) {
     if (!curFormat)
         logFull(FATAL, "Attempt to select unknown format %s\n", fmtName);
 
+}
+
+char* getName(int am) {
+    switch (am) {
+    case GAP: return "GAP";
+    case SYNC: return "SYNC";
+    case IBM_GAP: return "IBM_GAP";
+    case INDEXAM: return "INDEXAM";
+    case IDAM: return "IDAM";
+    case DATAAM: return "DATAAM";
+    case DELETEDAM: return "DELETEDAM";
+    case M2FM_INDEXAM: return "M2FM_INDEXAM";
+    case M2FM_IDAM: return "M2FM_IDAM";
+    case M2FM_DATAAM: return "M2FM_DATAAM";
+    case M2FM_DELETEDAM: return "M2FM_DELETEDAM";
+    case HP_IDAM: return "HP_IDAM";
+    case HP_DATAAM: return "HP_DATAAM";
+    case HP_DELETEDAM: return "HP_DELETEDAM";
+    case LSI_SECTOR: return "LSI_SECTOR";
+    case ZDS_SECTOR: return "ZDS_SECTOR";
+    }
+    return "NO MATCH\n";
 }
