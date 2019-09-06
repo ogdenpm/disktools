@@ -17,7 +17,7 @@ typedef unsigned short word;
 enum {
     END_BLOCK = -1,		// no longer used
     END_FLUX = -2,
-	BAD_FLUX = -3		// no longer used
+    BAD_FLUX = -3		// no longer used
 };
 
 #define NUMCYLINDER		77
@@ -27,26 +27,26 @@ enum {
 #define SECPOSTAMBLE	2	// should be 0, 0
 #pragma pack(push, 2)
 typedef union {
-	uint16_t raw[SECMETA + SECSIZE + SECPOSTAMBLE];
-	struct {
-		uint16_t sector;
-		uint16_t track;
-		uint16_t data[SECSIZE];
-		uint16_t bsector, btrack, fsector, ftrack;
-		uint16_t crc1, crc2;
-		uint16_t post[2];
-	};
+    uint16_t raw[SECMETA + SECSIZE + SECPOSTAMBLE];
+    struct {
+        uint16_t sector;
+        uint16_t track;
+        uint16_t data[SECSIZE];
+        uint16_t bsector, btrack, fsector, ftrack;
+        uint16_t crc1, crc2;
+        uint16_t post[2];
+    };
 } sector_t;
 #pragma pack(pop)
 typedef struct _secList {
-	struct _secList* next;
-	uint16_t	flags;
-	sector_t secData;
+    struct _secList* next;
+    uint16_t	flags;
+    sector_t secData;
 } secList_t;
 
 typedef struct {
-	size_t fluxPos;
-	size_t bitPos;
+    size_t fluxPos;
+    size_t bitPos;
 } location_t;
 
 #define MINSAMPLE    40000
