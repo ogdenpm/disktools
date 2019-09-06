@@ -266,3 +266,7 @@ __pycache__/
 /Project1/Project1.vcxproj
 /Project1/Project1.vcxproj.filters
 /dpll.c
+
+flux2imd/am.pl
+
+flux2imd/fm.pl
