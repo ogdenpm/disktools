@@ -2,23 +2,12 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <assert.h>
-#include "analysis.h"
 #include "dpll.h"
-#include  "flux.h"
+#include "flux.h"
 #include "util.h"
-#include "bits.h"
-#include "sectorManager.h"
-#include "decoders.h"
+#include "trackManager.h"
 
 
-static uint8_t phaseAdjust[3][16] = {		// C1/C2, C3
-  //  8    9   A     B    C    D    E    F    0    1    2    3    4    5    6    7 
-    {120, 130, 135, 140, 145, 150, 155, 160, 160, 165, 170, 175, 180, 185, 190, 200},
-    //    {120, 130, 130, 140, 140, 150, 150, 160, 160, 170, 170, 180, 180, 190, 190, 200},
-    {130, 140, 145, 150, 155, 158, 160, 160, 160, 160, 162, 165, 170, 175, 180, 190}
-
-    //    {130, 140, 140, 150, 150, 160, 160, 160, 160, 160, 160, 170, 170, 180, 180, 190}
-};
 static uint32_t ctime, etime;       // clock time and end of cell time
 static uint32_t cellSize;           // width of a cell
 static int fCnt, aifCnt, adfCnt, pcCnt; // dpll paramaters
@@ -29,13 +18,11 @@ static uint32_t minCell;
 static uint32_t cellDelta;
 
 uint64_t pattern;
-unsigned bitCnt;
+static unsigned bitCnt;
 
 
-
-
-
-struct {
+// profile information 
+static struct {
     int fastDivisor;
     int fastCnt;                                // note 18 1 bits allows up to 6 clock changes
     float fastTolerance;
@@ -46,9 +33,9 @@ struct {
     float slowTolerance;
 
 } adaptConfig[] = {
-       {100, 32, 8.0, 400, 32, 4.0, 600, 0.25},
+      {100, 21, 8.0, 400, 32, 4.0, 600, 0.25},    // FM hard sector default as no gap pre sync bytes also short blocks
     //  {100, 16, 8.0, 200, 32, 4.0, 200, 0.25},
-    //  {100, 21, 4.0, 400, 18, 1.0, 600, 0.5},     // FM hard sector default as no gap pre sync bytes also short blocks
+   //   {100, 21, 4.0, 400, 18, 1.0, 600, 0.5}, 
     //{100, 32, 10.0, 200, 32, 4.0, 200, 2.0},
     //  {100, 32, 8.0, 150, 32, 3.0, 200, 2.0}
 };
@@ -62,7 +49,7 @@ static enum {
 } adaptState;
 
 
-
+// extension to narrow frequency adaption rate once in the right ball park
 static void adaptDpll() {
     uint32_t deltaDivisor;
     uint32_t limit;
@@ -93,37 +80,13 @@ static void adaptDpll() {
 }
 
 
-void retrain(int profile) {
-    switch (curFormat->encoding) {
-    case E_FM5:
-        cellSize = 4000;
-        break;
-    case E_FM8: case E_FM8H: case E_MFM5:
-        cellSize = 2000;
-        break;
-    case E_MFM8: case E_M2FM8:
-        cellSize = 1000;
-        break;
-    default:
-        logFull(FATAL, "For %s unknown encoding %d\n", curFormat->name, curFormat->encoding);
-    }
-
-    pattern = 0;                        // reset pattern stream
-    bitCnt = 0;
-    fCnt = aifCnt = adfCnt = pcCnt = 0; // reset the dpll
-    up = false;
-
-    int flux = getNextFlux();           // prime dpll with firstr sample
-
-    ctime = flux > 0 ? flux : 0;
-    etime = ctime + cellSize / 2;       // assume its the middle of a cel
-
-    adaptProfile = profile;             // rest the adapt model
-    adaptState = INIT;
-    adaptDpll();                        // trigger adapt start
-}
 
 /* this is the key dpll model largely based on US patent 4808884  */
+static uint8_t phaseAdjust[2][16] = {		// C1/C2, C3
+    //  8   9   A   B   C   D   E   F   0   1   2   3   4   5   6   7
+      {12, 13, 13, 14, 14, 15, 15, 16, 16, 17, 17, 18, 18, 19, 19, 20},
+      {13, 14, 14, 15, 15, 16, 16, 16, 16, 16, 16, 17, 17, 18, 18, 19}
+};
 int getBit() {
     int fluxVal;
     int slot;
@@ -158,7 +121,14 @@ int getBit() {
         } else if (++pcCnt >= 2)
             cstate = pcCnt = 0;
     }
-    etime += phaseAdjust[cstate][slot] * cellSize / 160;
+#if CALCULATE
+	if (cstate == 0)
+		etime += ((ctime - etime) * 5059 + cellSize * 7629) / 10000;
+	else
+		etime += ((ctime - etime) * 3206 + cellSize * 8497) / 10000;
+#else
+    etime += phaseAdjust[cstate][slot] * cellSize / 16;
+#endif
 
     if (++adaptBitCnt == adaptCnt) {
         adaptDpll();
@@ -167,10 +137,43 @@ int getBit() {
     return 1;
 }
 
+unsigned getBitCnt() {
+    return bitCnt;
+}
+
 unsigned getByteCnt() {
     return bitCnt / 16;
 }
 
+void retrain(int profile) {
+    switch (curFormat->encoding) {
+    case E_FM5:
+        cellSize = 4000;
+        break;
+    case E_FM8: case E_FM8H: case E_MFM5:
+        cellSize = 2000;
+        break;
+    case E_MFM8: case E_M2FM8:
+        cellSize = 1000;
+        break;
+    default:
+        logFull(D_FATAL, "For %s unknown encoding %d\n", curFormat->name, curFormat->encoding);
+    }
+
+    pattern = 0;                        // reset pattern stream
+    bitCnt = 0;
+    fCnt = aifCnt = adfCnt = pcCnt = 0; // reset the dpll
+    up = false;
+
+    int flux = getNextFlux();           // prime dpll with firstr sample
+
+    ctime = flux > 0 ? flux : 0;
+    etime = ctime + cellSize / 2;       // assume its the middle of a cel
+
+    adaptProfile = profile;             // rest the adapt model
+    adaptState = INIT;
+    adaptDpll();                        // trigger adapt start
+}
 
 
 

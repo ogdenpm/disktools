@@ -1,6 +1,9 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "sectorManager.h"
+#include "dpll.h"
+#include "formats.h"
+#include "flux.h"
 #include "util.h"
 
 // initial patterns for DD disks
@@ -98,10 +101,10 @@ pattern_t sdFMPatterns[] = {
 
 
 
-static bool lsiCrc(uint16_t* data, int len);
-static bool zdsCrc(uint16_t* data, int len);
-static bool revCrc(uint16_t* data, int len);
-static bool stdCrc(uint16_t* data, int len);
+static bool crcLSI(uint16_t* data, int len);
+static bool crcZDS(uint16_t* data, int len);
+static bool crcRev(uint16_t* data, int len);
+static bool crcStd(uint16_t* data, int len);
 /*
     some notes on the ordering of this table
     each group should start with one of SDx DDx which are used to detect the disk format
@@ -123,31 +126,34 @@ static bool stdCrc(uint16_t* data, int len);
 */
 formatInfo_t formatInfo[] = {
  //   name        siz 1st spt    enc     opt   crc         pattern      crcinit   idam data spc
-    {"SD5"        , 0, 1, 16,   E_FM5,      0, stdCrc,     sdPatterns, 0xffff,     77,  99, 188}, 
-    {"FM5"        , 0, 1, 16,   E_FM5,  O_SPC, stdCrc,   sdFMPatterns, 0xffff,     77,  99, 192},
-    {"FM5-16x128" , 0, 1, 16,   E_FM5,      0, stdCrc,   sdFMPatterns, 0xffff,     77,  99, 188},
-    {"FM5-15x128" , 0, 1, 15,   E_FM5,      0, stdCrc,   sdFMPatterns, 0xffff,     82, 106, 196},
+    {"SD5"        , 0, 1, 16,   E_FM5,      0, crcStd,     sdPatterns, 0xffff,     77,  99, 188}, 
+    {"FM5"        , 0, 1, 16,   E_FM5,  O_SPC, crcStd,   sdFMPatterns, 0xffff,     77,  99, 192},
+    {"FM5-16x128" , 0, 1, 16,   E_FM5,      0, crcStd,   sdFMPatterns, 0xffff,     77,  99, 188},
+    {"FM5-15x128" , 0, 1, 15,   E_FM5,      0, crcStd,   sdFMPatterns, 0xffff,     82, 106, 196},
 
-    {"SD8"        , 0, 1, 26,   E_FM8,      0, stdCrc,     sdPatterns, 0xffff,     90, 115, 194},
-    {"FM8-26x128" , 0, 1, 26,   E_FM8,      0, stdCrc,   sdFMPatterns, 0xffff,     39, 64, 191},    // manually adjusted 
+    {"SD8"        , 0, 1, 26,   E_FM8,      0, crcStd,     sdPatterns, 0xffff,     90, 115, 194},
+    {"FM8-26x128" , 0, 1, 26,   E_FM8,      0, crcStd,   sdFMPatterns, 0xffff,     39, 64, 191},    // manually adjusted 
 
-    {"FM8H"       , 0, 0, 32,  E_FM8H,      0, zdsCrc,     hsPatterns,      0, HSIDAM,   8, 168},
-    {"FM8H-ZDS"   , 0, 0, 32,  E_FM8H,  O_ZDS, zdsCrc, &hsPatterns[1],      0, HSIDAM,  18, 168},
-    {"FM8H-LSI"   , 0, 0, 32,  E_FM8H,  O_LSI, lsiCrc,     hsPatterns,      0, HSIDAM,   8, 168}, 
+    {"FM8H"       , 0, 0, 32,  E_FM8H,      0, crcZDS,     hsPatterns,      0, HSIDAM,   8, 168},
+    {"FM8H-ZDS"   , 0, 0, 32,  E_FM8H,  O_ZDS, crcZDS, &hsPatterns[1],      0, HSIDAM,  18, 168},
+    {"FM8H-LSI"   , 0, 0, 32,  E_FM8H,  O_LSI, crcLSI,     hsPatterns,      0, HSIDAM,   8, 168}, 
 
-    {"DD5"        , 1, 1, 16,  E_MFM5,      0, stdCrc,    dd5Patterns, 0xcdb4,    155, 200, 368},
-    {"MFM5"       , 1, 1, 16,  E_MFM5, O_SIZE, stdCrc,  ddMFMPatterns, 0xcdb4,    155, 200, 368},
-    {"MFM5-16x256", 1, 1, 16,  E_MFM5,      0, stdCrc,  ddMFMPatterns, 0xcdb4,    155, 200, 375},   // 375 works for both seen variants
-    {"MFM5-8x512" , 2, 1,  8,  E_MFM5,      0, stdCrc,  ddMFMPatterns, 0xcdb4,    166, 210, 686}, 
+    {"DD5"        , 1, 1, 16,  E_MFM5,      0, crcStd,    dd5Patterns, 0xcdb4,    155, 200, 368},
+    {"MFM5"       , 1, 1, 16,  E_MFM5, O_SIZE, crcStd,  ddMFMPatterns, 0xcdb4,    155, 200, 368},
+    {"MFM5-16x256", 1, 1, 16,  E_MFM5,      0, crcStd,  ddMFMPatterns, 0xcdb4,    155, 200, 375},   // 375 works for both seen variants
+    {"MFM5-8x512" , 2, 1,  8,  E_MFM5,      0, crcStd,  ddMFMPatterns, 0xcdb4,    166, 210, 686}, 
 
-    {"DD8"        , 0, 0 , 0,  E_MFM8,      0, stdCrc,    dd8Patterns,      0,      0,   0,   0},
-    {"M2FM8-INTEL", 0, 1, 52, E_M2FM8,      0, stdCrc, ddM2FMPatterns,      0,     70, 106, 194},
-    {"M2FM8-HP"   , 1, 0, 30, E_M2FM8,   O_HP, revCrc,   ddHPPatterns, 0xffff,     91, 122, 332},
+    {"DD8"        , 0, 0 , 0,  E_MFM8,      0, crcStd,    dd8Patterns,      0,      0,   0,   0},
+    {"M2FM8-INTEL", 0, 1, 52, E_M2FM8,      0, crcStd, ddM2FMPatterns,      0,     70, 106, 194},
+    {"M2FM8-HP"   , 1, 0, 30, E_M2FM8,   O_HP, crcRev,   ddHPPatterns, 0xffff,     91, 122, 332},
     {0}
 };
+
 formatInfo_t *curFormat;
 
-static bool lsiCrc(uint16_t* data, int len) {
+
+
+static bool crcLSI(uint16_t* data, int len) {
     uint16_t crc = curFormat->crcInit;
     for (int i = 0; i < len - 2; i++)
         crc += data[i] & 0xff;
@@ -155,7 +161,7 @@ static bool lsiCrc(uint16_t* data, int len) {
 
 }
 
-static bool zdsCrc(uint16_t* data, int len) {
+static bool crcZDS(uint16_t* data, int len) {
 #define CRC16 0x8005
     uint16_t crc = curFormat->crcInit;
     len -= 2;               // exclude postamble
@@ -165,7 +171,7 @@ static bool zdsCrc(uint16_t* data, int len) {
     return crc == 0;
 }
 
-static bool revCrc(uint16_t* data, int len) {
+static bool crcRev(uint16_t* data, int len) {
     uint8_t x;
     uint16_t crc = curFormat->crcInit;
 
@@ -177,7 +183,7 @@ static bool revCrc(uint16_t* data, int len) {
     return crc == 0;
 }
 
-static bool stdCrc(uint16_t* buf, int len) {
+static bool crcStd(uint16_t* buf, int len) {
     uint8_t x;
     uint16_t crc = curFormat->crcInit;
 
@@ -189,6 +195,44 @@ static bool stdCrc(uint16_t* buf, int len) {
     return crc == 0;
 }
 
+static formatInfo_t *lookupFormat(char* fmtName) {
+    formatInfo_t* p;
+    for (p = formatInfo; p->name; p++) {
+        if (_stricmp(p->name, fmtName) == 0)
+            return p;
+    }
+    return NULL;
+}
+
+static char *probe() {
+    int matchType;
+    retrain(0);
+    do {
+        // 1200 byte search from previous pattern should be enough to find at least one more pattern
+        matchType = matchPattern(1200);
+        switch (matchType) {
+        case IDAM:
+        case INDEXAM:
+        case DATAAM:
+            if (curFormat->encoding == (curFormat + 1)->encoding)
+                return (curFormat + 1)->name;
+            else
+                return NULL;
+        case M2FM_IDAM:                 // skip IDAM bytes (ok even for HP as it will just skip 2 GAP bytes)
+            for (int i = 0; i < 6; i++)
+                getByte();
+            break;
+        case M2FM_INDEXAM:
+        case M2FM_DATAAM:
+        case M2FM_DELETEDAM:
+            return "M2FM8-INTEL";
+        case HP_DATAAM:
+        case HP_DELETEDAM:
+            return "M2FM8-HP";
+        }
+    } while (matchType > 0);
+    return NULL;
+}
 
 uint64_t encodeFM(uint32_t val) {
     uint64_t fmVal = 0;
@@ -197,18 +241,27 @@ uint64_t encodeFM(uint32_t val) {
     return fmVal;
 }
 
-
-void makeHSPatterns(unsigned cylinder, unsigned slot)     {
-    hsPatterns[0].match = encodeFM(flip((cylinder ? cylinder : 32) * 2 + 1));            // set LSI match pattern
-    hsPatterns[1].match = encodeFM(((slot + 0x80) << 8) + cylinder); // set ZDS match pattern
-
-}
-
-void setFormat(char* fmtName) {
-    curFormat = lookupFormat(fmtName);
-    if (!curFormat)
-        logFull(FATAL, "Attempt to select unknown format %s\n", fmtName);
-
+int getByte() {
+    int val = 0;
+    int bit;
+    bool suspect = false;
+    for (int i = 0; i < 8; i++) {
+        if (getBit() < 0 || (bit = getBit()) < 0)
+            return -1;
+        switch (curFormat->encoding) {
+        case E_FM5: case E_FM8: case E_FM8H:
+            suspect |= !(pattern & 2); break;
+        case E_MFM5: case E_MFM8:
+            suspect |= (pattern & 2) && (pattern & 5); break;
+        case E_M2FM8:
+            suspect |= (pattern & 2) && (pattern & 0xd); break;
+        }
+        if (curFormat->options & O_REV)
+            val = (val >> 1) + (bit ? 0x80 : 0);
+        else
+            val = (val << 1) + bit;
+    }
+    return val + (suspect ? SUSPECT : 0);
 }
 
 char* getName(int am) {
@@ -232,3 +285,76 @@ char* getName(int am) {
     }
     return "NO MATCH\n";
 }
+
+void makeHSPatterns(unsigned cylinder, unsigned slot)     {
+    hsPatterns[0].match = encodeFM(flip((cylinder ? cylinder : 32) * 2 + 1));            // set LSI match pattern
+    hsPatterns[1].match = encodeFM(((slot + 0x80) << 8) + cylinder); // set ZDS match pattern
+
+}
+
+int matchPattern(int searchLimit) {
+    pattern_t* p;
+    int addedBits = 0;
+    // scale searchLimit to bits to check 
+    for (searchLimit *= 16; searchLimit > 0 && getBit() >= 0; searchLimit--) {
+        // speed optimisation, don't consider pattern until at least a byte seen (16 data/clock)
+        if (++addedBits >= 16) {
+            if (debug & D_PATTERN) {      // pattern could potentially generate a lot of data
+                char binStr[64];        // so reduce the overhead by building binary string before output
+                uint64_t val = pattern;
+                for (int j = 63; j >= 0; val >>= 1, j--)
+                    binStr[j] = '0' + (val & 1);
+                logBasic("%6u: %.64s  %llX\n", getBitCnt(), binStr, pattern);
+            }
+            // if we have a pattern match
+            for (p = curFormat->patterns; p->mask; p++) {
+                if (((pattern ^ p->match) & p->mask) == 0) {
+                    DBGLOG(D_ADDRESSMARK, "%u: %llX %llX %llX %s\n", getBitCnt(), pattern, p->match, p->mask, getName(p->am));
+                    return p->am;
+                }
+            }
+        }
+    }
+    return 0;
+}
+
+
+void setFormat(char* fmtName) {
+    curFormat = lookupFormat(fmtName);
+    if (!curFormat)
+        logFull(D_FATAL, "Attempt to select unknown format %s\n", fmtName);
+
+}
+
+bool setInitialFormat(char *fmtName) {
+    if (!fmtName || !lookupFormat(fmtName)) {
+        if (cntHardSectors() > 0)
+            fmtName = "FM8H";
+        else {
+            int diskSize = getRPM() < 320 ? 5 : 8;
+            if (seekBlock(1) >= 0) {
+                fmtName = diskSize == 5 ? "DD5" : "DD8";
+                DBGLOG(D_DETECT, "Trying %s\n", fmtName);
+                setFormat(fmtName);
+                if (!(fmtName = probe())) {
+                    seekBlock(1);
+                    fmtName = diskSize == 5 ? "SD5" : "SD8";
+                    DBGLOG(D_DETECT, "Trying %s\n", fmtName);
+                    setFormat(fmtName);
+                    fmtName = probe();
+                }
+            }
+        }
+    }
+    if (fmtName) {
+        DBGLOG(D_DETECT, "Detected %s\n", fmtName);
+        setFormat(fmtName);
+        return true;
+    }
+    DBGLOG(D_DETECT, "Could not detect encoding\n");
+    return false;
+}
+
+
+
+

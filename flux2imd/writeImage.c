@@ -16,16 +16,28 @@ MODIFICATION HISTORY
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
-#include "sectorManager.h"
+#include "flux2imd.h"
+#include "trackManager.h"
 #include "util.h"
 
-#define RECOVERED    0x80        // flag for recovered sector id
+static bool SameCh(uint8_t *pData, int size) {      // valid sectors have the SUSPECT tag cleared so simple compare
 
-int cylMax = 0, headMax = 0;
+    for (int i = 1; i < size; i++)
+        if (pData[0] != pData[i])
+            return false;
+    return true;
+}
 
+static uint8_t *sectorToUint8(track_t* trackPtr, uint8_t slot) {
+    static uint8_t sectorBytes[1024];
+    uint16_t* sectorRawData = trackPtr->sectors[slot].sectorDataList->sectorData.rawData;
 
+    for (int i = 0; i < 128 << trackPtr->fmt->sSize; i++)
+        sectorBytes[i] = (uint8_t)sectorRawData[i];
+    return sectorBytes;
+}
 
-void WriteIMDHdr(FILE* fp, char* fname) {
+static void WriteIMDHdr(FILE* fp, char* fname) {
     struct tm* dateTime;
     time_t curTime;
 
@@ -36,25 +48,6 @@ void WriteIMDHdr(FILE* fp, char* fname) {
     fprintf(fp, "Created from %s by flux2imd\r\n\x1a", fileName(fname));
 }
 
-bool SameCh(uint8_t *pData, int size) {      // valid sectors have the SUSPECT tag cleared so simple compare
-
-    for (int i = 1; i < size; i++)
-        if (pData[0] != pData[i])
-            return false;
-    return true;
-}
-
-
-uint8_t *sectorToBytes(track_t* trackPtr, uint8_t slot) {
-    static uint8_t sectorBytes[1024];
-    uint16_t* sectorRawData = trackPtr->sectors[slot].sectorDataList->sectorData.rawData;
-
-    for (int i = 0; i < 128 << trackPtr->fmt->sSize; i++)
-        sectorBytes[i] = (uint8_t)sectorRawData[i];
-    return sectorBytes;
-}
-
-
 
 // E_FM5, E_FM8, E_FM8H, E_MFM5, E_MFM8, E_M2FM8
 static uint8_t imdModes[] = { 2, 0, 0, 5, 3, 3 };
@@ -63,23 +56,28 @@ void writeImdFile(char *fname) {
     FILE *fp;
     track_t *trackPtr;
     char imdFile[_MAX_PATH + 1];
+
+
+    if (maxCylinder < 0)
+        return;
+
     strcpy(imdFile, fname);
     strcpy(strrchr(imdFile, '.'), ".imd");
 
     if ((fp = fopen(imdFile, "wb")) == NULL) {
-        logFull(ERROR, "cannot create %s\n", fname);
+        logFull(D_ERROR, "cannot create %s\n", fname);
         return;
     }
     logFull(ALWAYS, "IMD file %s created\n", fileName(imdFile));
 
     WriteIMDHdr(fp, fname);
-    for (int cyl = 0; cyl < MAXTRACK; cyl++)
-        for (int head = 0; head < 2; head++) {
+    for (int cyl = 0; cyl <= maxCylinder; cyl++)
+        for (int head = 0; head <= maxHead; head++) {
             trackPtr = getTrack(cyl, head);
-            if (!trackPtr || trackPtr->status & TS_BADID)
+            if (!trackPtr || trackPtr->status & TS_BADID || !hasTrack(cyl, head))
                 continue;
             if (trackPtr->cylinder != cyl || trackPtr->side != head) {
-                logFull(ERROR, "Non-standard cylinder/side mapping not implemented, skipping track %d/%d\n", cyl, head);
+                logFull(D_ERROR, "Non-standard cylinder/side mapping not implemented, skipping track %d/%d\n", cyl, head);
                 continue;
             }
 
@@ -93,7 +91,7 @@ void writeImdFile(char *fname) {
 
             for (int slot = 0; slot < trackPtr->fmt->spt; slot++) {
                 if (trackPtr->sectors[slot].status & SS_DATAGOOD) {
-                    uint8_t *pSec = sectorToBytes(trackPtr, slot);
+                    uint8_t *pSec = sectorToUint8(trackPtr, slot);
                     if (SameCh(pSec, 128 << trackPtr->fmt->sSize)) {
                         putc(2, fp);
                         putc(pSec[0], fp);

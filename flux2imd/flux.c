@@ -10,6 +10,15 @@
 #include "flux.h"
 #include "util.h"
 
+// default smample & index clocks
+#define SCK 24027428.5714285            // sampling clock frequency
+#define ICK 3003428.5714285625          // index sampling clock frequency
+
+#define HS8NSECTOR      32
+#define HS8ICK	        (ick / 6 / hc)  // sector index cnt for HS 8" (assumes 360 rpm i.e. 6 rps)
+#define HS5ICK          (ick / 5 / hc)  // sector index cnt for HS 5" (assumes 300 rpm i.e  5 rps)
+
+
 /* flux stream types */
 enum streamType_t {
     FLUX2 = 7, 		// 0-7
@@ -26,8 +35,6 @@ static uint8_t* fluxBuf;		// buffer where flux data / stream data held
 static uint32_t streamIdx;		// current position of stream data with OOB data removed
 uint8_t* inPtr;
 uint8_t* endPtr;
-uint32_t totalSampleCnt;             // running sample count to remove rouding bias
-uint64_t prevNsCnt;                  // previous running ns count
 
 
 int firstSector = 31;
@@ -56,6 +63,7 @@ typedef struct _physBlock {
     uint32_t end;						// sample count of last sample, usually start of next block
     uint32_t sampleCnt;					// offset in first sample of index hole start
     uint32_t indexCnt;					// and index clock of the marker, 0 for first soft sector
+    uint32_t indexDelta;                // delta to next index hole (ick based)
     uint8_t physSector;					// physical sector number always 0 for soft sector
 } physBlock_t;
 
@@ -64,84 +72,86 @@ typedef struct _physBlock {
 static physBlock_t* indexHead = NULL;			// list start
 static physBlock_t* indexPtr = NULL;			// current item being processed, for load this is the end
 static unsigned blkNumber = 0;					// current block number
-static uint32_t adjust = 0;
 
-static void rewindBlock();
 
-static void startIndex() {
-    for (physBlock_t* q, *p = indexHead; p; p = q) {
+static clearIndex() {
+    for (physBlock_t *q, *p = indexHead; p; p = q) {    // free any previous index chain
         q = p->next;
         free(p);
     }
+    indexPtr = indexHead = NULL;
     blkNumber = 0;
-    indexHead = indexPtr = (physBlock_t*)xmalloc(sizeof(physBlock_t));
-    indexPtr->start = indexPtr->end = indexPtr->sampleCnt = indexPtr->indexCnt = indexPtr->physSector = 0;
-    indexPtr->next = NULL;
 }
 
-
-
-
-// assumes startIndex has been called
 static void addIndexEntry(uint32_t streamPos, uint32_t sampleCnt, uint32_t indexCnt) {
     physBlock_t* newIndex = (physBlock_t*)xmalloc(sizeof(physBlock_t));
     newIndex->start = newIndex->end = streamPos;
     newIndex->sampleCnt = sampleCnt;
     newIndex->indexCnt = indexCnt;
     newIndex->physSector = 0;
+    newIndex->indexDelta = 0;
     newIndex->next = NULL;
-    indexPtr->next = newIndex;
-    indexPtr->end = streamPos;
-    indexPtr = newIndex;
+    if (!indexPtr)
+        indexHead = indexPtr = newIndex;
+    else {
+        indexPtr->next = newIndex;
+        indexPtr->end = streamPos;
+        indexPtr->indexDelta = indexCnt - indexPtr->indexCnt;
+        indexPtr = newIndex;
+    }
 }
 
 
 // assumes start head has been called and possibly several addIndexEntry calls
 static void endIndex(uint32_t streamPos) {
-
+    if (!indexPtr)      // no blocks
+        return;
     indexPtr->end = streamPos;
-    if (hc) {						// for hard sectors merge blocks split by track index mark
-                                // set indexCnt to 0 for track index mark, leadin and trailing data blocks
-        // calculate nominal sector length  in index clock cycles and assume full sector is > 0.75 * nominal
-        unsigned minSectorIck = (unsigned)(((hc == HS8INCH) ? (ick / RPS8INCH / hc) : (ick / RPS5INCH / hc)) * 0.75);
-        bool seenTrackIndex = false;
-        int preTrackIndexSecCnt = 0;
-        physBlock_t* p;
 
-        for (p = indexHead; p && p->next; p = p->next) {
-            if (p->indexCnt && p->next->indexCnt - p->indexCnt < minSectorIck) {
-                if (!p->next->next)			// missing final index marker for next sector
-                    p->indexCnt = 0;		// set to ignore
-                else if (p->next->next->indexCnt - p->next->indexCnt < minSectorIck) {
-                    /* merge split block */
-                    p->end = p->next->end;
-                    p->next->indexCnt = 0;	// this is a complete sector with track marker split
-                    if (!seenTrackIndex) {
-                        preTrackIndexSecCnt++;
-                        seenTrackIndex = true;
-                    }
-                } else {					// track marker is  first marker
-                    p->indexCnt = 0;		// set to ignore
-                    seenTrackIndex = true;
-                }
-            } else if (!seenTrackIndex && p->indexCnt)
-                preTrackIndexSecCnt++;
-        }
-        if (p)
-            p->indexCnt = 0;
-        int sectorNum = hc - preTrackIndexSecCnt;
-        for (p = indexHead; p && p->next; p = p->next) {
-            if (p->indexCnt)
-                p->physSector = sectorNum++ % hc;
-        }
-    }
-    logFull(FLUX, "scanned: %s at %s, hc: %d, sck: %.7f ick: %.7f\n", scanDate, scanTime, hc, sck, ick);
+    logFull(D_FLUX, "scanned: %s at %s, hc: %d, sck: %.7f ick: %.7f\n", scanDate, scanTime, hc, sck, ick);
 #if _DEBUG
     for (physBlock_t *p = indexHead; p; p = p->next)
-        logFull(FLUX, "start %lu, end %lu, sector %d, indexCnt %lu, sampleCnt %lu\n",
+        logFull(D_FLUX, "start %lu, end %lu, sector %d, indexCnt %lu, sampleCnt %lu\n",
                 p->start, p->end, p->physSector, p->indexCnt, p->sampleCnt);
 #endif
-    rewindBlock();
+    // for hard sectors merge blocks split by track index mark
+    if (hc) {  
+        // calculate nominal sector length  in index clock cycles and assume full sector is > 0.75 * nominal
+        unsigned minSectorIck = (unsigned)(((hc == HS8NSECTOR) ? HS8ICK : HS5ICK) * 0.75);
+        int sectorId = -1;
+        int firstSectorId = hc - 1;
+        physBlock_t* p;
+
+
+        for (p = indexHead; p && p->next; p = p->next) {
+            if (p->indexDelta < minSectorIck) {             // indexDelta only 0 for last sector
+                if (p->next->indexDelta < minSectorIck) {   // indexDelta may be 0 for last sector but merge anyway
+                    p->end = p->next->end;                  // merge blocks
+                    p->indexDelta += p->next->indexDelta;
+                    physBlock_t *tmp = p->next;
+                    p->next = p->next->next;
+                    free(tmp);
+                    if (sectorId < 0) {         // first sector 0 we have seen
+                        sectorId = hc - 1;      // id of this sector
+                        for (physBlock_t *q = indexHead; firstSectorId < sectorId; q = q->next)    // fix up sector ids so far
+                            q->physSector = firstSectorId++;
+                    }
+                }
+            }
+            if (sectorId >= 0)
+                p->physSector = sectorId++ % hc;
+            else
+                firstSectorId--;
+
+        }
+        if (indexHead->indexDelta < minSectorIck) {         // first sector was actually split so junk it
+            p = indexHead->next;
+            free(indexHead);
+            indexHead = p;
+        }
+    }
+
+    seekBlock(0);
 }
 
 
@@ -154,17 +164,14 @@ static void skipUnusedBlocks() {
         indexPtr = indexPtr->next;
 }
 
-static void rewindBlock() 	{
-    indexPtr = indexHead;
-    blkNumber = 0;
-    skipUnusedBlocks();
-}
 
 // seek to the specified stream block, setting the bounds for getNextFlux returns physical sector
 // number (0 for soft sector) or -1 if block does not exist
 int seekBlock(unsigned num) {
-    if (num < blkNumber)					// need to start from beginning?
-        rewindBlock();
+    if (num == 0 || num < blkNumber) {					// need to start from beginning?
+        indexPtr = indexHead;
+        blkNumber = 0;
+    }
 
     if (!indexPtr)							// no blocks!!!
         return -1;
@@ -172,27 +179,21 @@ int seekBlock(unsigned num) {
 
     while (num > blkNumber && indexPtr->next) {				// scan the list
         indexPtr = indexPtr->next;
-        skipUnusedBlocks();
         if (indexPtr)
             blkNumber++;
         else
             return -1;
     }
     
-    if (num == blkNumber) {					// setup getNextFlux
+    if (num == blkNumber && indexPtr->end - indexPtr->start > 128) {					// setup getNextFlux
         inPtr = fluxBuf + indexPtr->start;
         endPtr = fluxBuf + indexPtr->end;
-        adjust = indexPtr->sampleCnt;
-        prevNsCnt = totalSampleCnt = 0;
         return indexPtr->physSector;
     } else
         return -1;
 }
 
 
-double where() {
-    return ((double)totalSampleCnt * 1.0e6 / sck);
-}
 
 int cntHardSectors() {
     return hc;
@@ -230,31 +231,31 @@ static size_t oob(size_t fluxPos, size_t size) {
         switch (matchType) {
         case OOB_INVALID:
         default:
-            fprintf(stderr, "invalid OOB block type = %d, len = %d\n", *fluxBuf, len);
+            logFull(D_ERROR, "invalid OOB block type = %d, len = %d\n", *fluxBuf, len);
             break;
         case OOB_STREAMINFO:
         case OOB_STREAMEND:
             if (len != 8)
-                fprintf(stderr, "Incorrect length for OOB Stream %s Block - len = %d vs. 8\n", matchType == OOB_STREAMINFO ? "Info" : "End", len);
+                logFull(D_ERROR, "Incorrect length for OOB Stream %s Block - len = %d vs. 8\n", matchType == OOB_STREAMINFO ? "Info" : "End", len);
             else {
                 num1 = getDWord(oobBlk);
                 num2 = getDWord(oobBlk + 4);
 
                 if (num1 != streamIdx) {
-                    fprintf(stderr, "Stream Position error: expected %lu actual is %lu\n", num1, streamIdx);
+                    logFull(D_ERROR, "Stream Position error: expected %lu actual is %lu\n", num1, streamIdx);
                     while (streamIdx < num1 && streamIdx < fluxPos)
                         fluxBuf[(streamIdx)++] = NOP1;
                     if (streamIdx == num1)
-                        fprintf(stderr, "Realigned with NOP1 filler\n");
+                        logFull(D_ERROR, "Realigned with NOP1 filler\n");
 
                 }
                 if (matchType == OOB_STREAMEND && num2 != 0)
-                    fprintf(stderr, "Steam End Block Error Code = %lu\n", num2);
+                    logFull(D_ERROR, "Steam End Block Error Code = %lu\n", num2);
             }
             break;
         case OOB_INDEX:
             if (len != 12)
-                fprintf(stderr, "Incorrect length for OOB Index Block - len = %d vs. 12\n", len);
+                logFull(D_ERROR, "Incorrect length for OOB Index Block - len = %d vs. 12\n", len);
             if (len >= 12) {		// try to process if enough bytes
                 num1 = getDWord(oobBlk);
                 num2 = getDWord(oobBlk + 4);
@@ -290,7 +291,7 @@ static size_t oob(size_t fluxPos, size_t size) {
     Open the flux stream and extract the oob data to locate stream & index info
 */
 int loadFlux(uint8_t* image, size_t size) {
-    startIndex();		// mark start of leading data block
+    clearIndex();		// clean up any old index list
 
     size_t fluxPos = 0;			// location in the flux data
     streamIdx = 0;				// location in the stream (i.e. excluding OOB data
@@ -333,7 +334,7 @@ int loadFlux(uint8_t* image, size_t size) {
 
 
     if (fluxPos > size)
-        fprintf(stderr, "premature EOF\n");
+        logFull(D_ERROR, "premature EOF\n");
    
     seekBlock(0);
     if (indexHead && indexHead->next)
@@ -367,9 +368,8 @@ int getNextFlux() {
                 c = *inPtr++ << 8;
                 c += *inPtr++;
             }
-            c += ovl16 - adjust;
-            ovl16 = adjust = 0;
-            totalSampleCnt += c;
+            c += ovl16;
+            ovl16 = 0;
             c = (int)(c * fluxScaler);
             return c;
 

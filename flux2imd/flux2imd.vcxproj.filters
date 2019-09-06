@@ -33,9 +33,6 @@
     <ClCompile Include="zip.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="bits.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="display.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -48,10 +45,10 @@
     <ClCompile Include="writeImage.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="analysis.c">
+    <ClCompile Include="flux2imd.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="flux2imd.c">
+    <ClCompile Include="histogram.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -65,9 +62,6 @@
     <ClInclude Include="util.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="decoders.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="sectorManager.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -77,13 +71,13 @@
     <ClInclude Include="miniz.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="bits.h">
+    <ClInclude Include="formats.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="display.h">
+    <ClInclude Include="trackManager.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="analysis.h">
+    <ClInclude Include="flux2imd.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

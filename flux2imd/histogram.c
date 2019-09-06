@@ -1,9 +1,8 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <memory.h>
-#include "analysis.h"
+#include "flux2imd.h"
 #include "flux.h"
-#include "dpll.h"
 #include "util.h"
 
 
@@ -15,14 +14,12 @@
 
 void displayHist(int levels)
 {
-    uint32_t histogram[HIST_MAX_US * HIST_SLOTS_PER_US + 1];
+    uint32_t histogram[HIST_MAX_US * HIST_SLOTS_PER_US + 1] = { 0 };
     uint32_t maxHistCnt = 0;
     int maxHistVal = 0;
     uint32_t outRange = 0;
     int val;
 
-        // reset data
-    memset(histogram, 0, sizeof(histogram));
 
     
     // load the histogram data
@@ -75,7 +72,7 @@ void displayHist(int levels)
             else
                 line[j] = fillch;
         }
-        puts(line + lowVal);
+        logBasic("%s\n", line + lowVal);
     }
     for (int i = lowVal; i <= highVal; i++)
         logBasic("-");

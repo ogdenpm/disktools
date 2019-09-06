@@ -3,36 +3,33 @@
 #include <stdint.h>
 #include <memory.h>
 #include <assert.h>
-#include "decoders.h"
 #include "dpll.h"
-#include "util.h"
-#include "bits.h"
-#include "sectorManager.h"
+#include "flux2imd.h"
+#include "formats.h"
+#include "trackManager.h"
 #include "flux.h"
-
-void chkSptChange();
-
-
-void removeSectorData(sectorDataList_t *p)
-{
-    sectorDataList_t *q;
-    for (; p; p = q) {
-        q = p->next;
-        free(p);
-    }
-}
-
+#include "util.h"
 
 static int prevSlot = -1;
 static unsigned curSpacing;
 static unsigned minSpacing;
 static unsigned maxSpacing;
 
-void resetTracker() {
-    prevSlot = -1;
+static void chkSptChange() {
+    for (formatInfo_t* p = curFormat + 1; p->encoding == curFormat->encoding && p->sSize == curFormat->sSize; p++) {
+        if (abs(p->spacing - curSpacing) < 3) {
+            DBGLOG(D_DECODER, "Updated format to %s\n", p->name);
+            curFormat = p;
+            minSpacing = (uint16_t)(curFormat->spacing * 0.97);
+            maxSpacing = (uint16_t)(curFormat->spacing * 1.03);
+            updateTrackFmt();
+            return;
+        }
+    }
+    DBGLOG(D_DECODER, "WARNING could not determine SPT\n");
 }
 
-unsigned slotAt(unsigned pos, bool isIdam) {
+static unsigned slotAt(unsigned pos, bool isIdam) {
     static unsigned prevIdamPos;
     static unsigned prevDataPos;
 
@@ -59,10 +56,10 @@ unsigned slotAt(unsigned pos, bool isIdam) {
         }
         // see if we get different sectors numbers depending on min/max spacing
         if ((pos - adjust) / minSpacing != (pos - adjust) / maxSpacing)
-            logFull(WARNING, "Too many missing sectors, slot calculation may be wrong\n");
+            logFull(D_WARNING, "Too many missing sectors, slot calculation may be wrong\n");
     }
     // calculate change in slot, allow for some JITTER
-    unsigned slotDelta = (pos - (isIdam ? prevIdamPos : prevDataPos) + 4 * POSJITTER) / curSpacing;
+    unsigned slotDelta = (pos - (isIdam ? prevIdamPos : prevDataPos) + POSJITTER) / curSpacing;
     if (slotDelta == 0) {
         if (!isIdam)                    // already  have IDAM so put in real data pos
             prevDataPos = pos;
@@ -74,7 +71,7 @@ unsigned slotAt(unsigned pos, bool isIdam) {
         newSpacing = newSpacing > maxSpacing ? maxSpacing : newSpacing < minSpacing ? minSpacing : newSpacing;
 
         if (newSpacing != curSpacing)
-            DBGLOG((TRACKER, "Spacing changed from %d to %d\n", curSpacing, newSpacing));
+            DBGLOG(D_TRACKER, "Spacing changed from %d to %d\n", curSpacing, newSpacing);
 
         curSpacing = newSpacing;
 
@@ -91,25 +88,10 @@ unsigned slotAt(unsigned pos, bool isIdam) {
     }
 
     if (prevSlot >= curFormat->spt) {
-        logFull(ERROR, "Sector slot calculated as (%d) >= spt (%d) - setting to max\n", prevSlot, curFormat->spt);
+        logFull(D_ERROR, "Sector slot calculated as (%d) >= spt (%d) - setting to max\n", prevSlot, curFormat->spt);
         prevSlot = curFormat->spt - 1;
     }
     return prevSlot;
-}
-
-
-void chkSptChange() {
-    for (formatInfo_t* p = curFormat + 1; p->encoding == curFormat->encoding && p->sSize == curFormat->sSize; p++) {
-        if (abs(p->spacing - curSpacing) < 3) {
-            DBGLOG((DECODER, "Updated format to %s\n", p->name));
-            curFormat = p;
-            minSpacing = (uint16_t)(curFormat->spacing * 0.97);
-            maxSpacing = (uint16_t)(curFormat->spacing * 1.03);
-            updateTrackFmt();
-            return;
-        }
-    }
-    DBGLOG((DECODER, "WARNING could not determine SPT\n"));
 }
 
 
@@ -119,14 +101,14 @@ void addIdam(unsigned pos, idam_t* idam) {
     sector_t* p = &trackPtr->sectors[slot];
 
     if (idam->cylinder != trackPtr->cylinder || idam->side != trackPtr->side) {
-        logFull(WARNING, "Unexpected cylinder/side %d/%d - expected %d/%d @ slot %d\n",
+        logFull(D_WARNING, "Unexpected cylinder/side %d/%d - expected %d/%d @ slot %d\n",
                 idam->cylinder, idam->side, trackPtr->cylinder, trackPtr->side, slot);
         trackPtr->cylinder = idam->cylinder;
         trackPtr->side = idam->side;
     }
 
     if (idam->sectorId < curFormat->firstSectorId ||  idam->sectorId - curFormat->firstSectorId >= curFormat->spt)
-        logFull(FATAL, "@slot %d sector Id %d out of range\n", slot, idam->sectorId);
+        logFull(D_FATAL, "@slot %d sector Id %d out of range\n", slot, idam->sectorId);
 
     if (p->status & SS_IDAMGOOD) {
         if (idam->sectorId != p->sectorId)
@@ -170,3 +152,16 @@ void addSectorData(unsigned pos, bool isGood, unsigned len, uint16_t rawData[]) 
 }
 
 
+void removeSectorData(sectorDataList_t *p)
+{
+    sectorDataList_t *q;
+    for (; p; p = q) {
+        q = p->next;
+        free(p);
+    }
+}
+
+
+void resetTracker() {
+    prevSlot = -1;
+}

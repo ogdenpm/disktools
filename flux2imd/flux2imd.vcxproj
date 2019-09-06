@@ -131,14 +131,13 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="bits.c" />
     <ClCompile Include="decoders.c" />
     <ClCompile Include="display.c" />
     <ClCompile Include="formats.c" />
     <ClCompile Include="flux2imd.c" />
     <ClCompile Include="dpll.c" />
     <ClCompile Include="flux.c" />
-    <ClCompile Include="analysis.c" />
+    <ClCompile Include="histogram.c" />
     <ClCompile Include="sectorManager.c" />
     <ClCompile Include="trackManager.c" />
     <ClCompile Include="util.c" />
@@ -146,14 +145,13 @@
     <ClCompile Include="zip.c" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="bits.h" />
-    <ClInclude Include="decoders.h" />
-    <ClInclude Include="display.h" />
+    <ClInclude Include="formats.h" />
+    <ClInclude Include="flux2imd.h" />
     <ClInclude Include="dpll.h" />
     <ClInclude Include="flux.h" />
-    <ClInclude Include="analysis.h" />
     <ClInclude Include="miniz.h" />
     <ClInclude Include="sectorManager.h" />
+    <ClInclude Include="trackManager.h" />
     <ClInclude Include="util.h" />
     <ClInclude Include="zip.h" />
   </ItemGroup>

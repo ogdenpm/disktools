@@ -2,8 +2,8 @@
 #include <stdio.h>
 #include <memory.h>
 #include <string.h>
-#include "display.h"
-#include "sectorManager.h"
+#include "flux2Imd.h"
+#include "trackManager.h"
 #include "util.h"
 
 #define pOpt    1
@@ -11,16 +11,10 @@
 #define bOpt    4
 
 static int charMask = 0xff;
-static bool all = false;
 
-extern char curFile[];
-
-int rowSuspectCnt(uint16_t* s, int len) {
-    int cnt = 0;
-    for (int i = 0; i < len; i++, s++)
-        cnt += *s >> 8;
-    return cnt;
-}
+// forward references
+static int rowSuspectCnt(uint16_t *s, int len);
+static char *sectorToString(track_t *pTrack, uint8_t slot);
 
 // only called when there is data for the sector
 // cleans up suspect flag if same byte without suspect has been seen
@@ -43,7 +37,7 @@ static void cleanUpSuspect(sectorDataList_t* pList) {
         }
 }
 
-void displayDataLine(uint16_t* p, int len) {
+static void displayDataLine(uint16_t* p, int len) {
     for (int j = 0; j < len; j++)
         logBasic("%02X%c ", p[j] & 0xff, (p[j] & SUSPECT) ? '*' : ' ');
 
@@ -54,7 +48,7 @@ void displayDataLine(uint16_t* p, int len) {
     logBasic("\n");
 }
 
-void displayExtraLine(uint16_t* p, int len) {       // len: 2 just CRC, 4 just fwd/bwd len, 8 fwd/bwd/crc & postamble
+static void displayExtraLine(uint16_t* p, int len) {       // len: 2 just CRC, 4 just fwd/bwd len, 8 fwd/bwd/crc & postamble
     switch (len) {
     case 2: // simple CRC for bad sector
         logBasic("crc %02X%s %02X%s\n", p[0] & 0xff, (p[0] & SUSPECT) ? "*" : "", p[1] & 0xff, (p[1] & SUSPECT) ? "*" : "");
@@ -76,7 +70,7 @@ void displayExtraLine(uint16_t* p, int len) {       // len: 2 just CRC, 4 just f
 // to minimse the noise in the dump. If there is a row copy without suspect tags
 // choose to display only it any any other non duplicate copys of the row that also have no suspect tags
 
-void displayLine(sector_t *pSector, int offset, int len, void (*displayFunc)(uint16_t *, int)) {
+static void displayLine(sector_t *pSector, int offset, int len, void (*displayFunc)(uint16_t *, int)) {
     char *marker = (pSector->status & SS_DATAGOOD) ? NULL : " ";
     bool cleanOnly = false;
     sectorDataList_t *p;
@@ -105,23 +99,7 @@ void displayLine(sector_t *pSector, int offset, int len, void (*displayFunc)(uin
 }
 
 
-
-
-static char* sectorToString(track_t* pTrack, uint8_t slot) {
-    static char s[9];
-    if (pTrack->sectors[slot].status & SS_IDAMGOOD)
-        sprintf(s, "%02d/%d/%02d", pTrack->cylinder, pTrack->side, pTrack->sectors[slot].sectorId);
-    else if (pTrack->sectors[slot].status & SS_FIXED)
-        sprintf(s, "%02d/%d/%02d*", pTrack->cylinder, pTrack->side, pTrack->sectors[slot].sectorId);
-    else
-        sprintf(s, "%02d/%d/??", pTrack->cylinder, pTrack->side);
-    return s;
-}
-
-
-
-
-void displaySector(track_t *pTrack, uint8_t slot, unsigned options) {
+static void displaySector(track_t *pTrack, uint8_t slot, unsigned options) {
     sector_t *pSector = &pTrack->sectors[slot];
 
     int size = 128 << pTrack->fmt->sSize;
@@ -154,6 +132,77 @@ void displaySector(track_t *pTrack, uint8_t slot, unsigned options) {
         logBasic("       ---- End Corrupt Sector ----\n");
 }
 
+static int rowSuspectCnt(uint16_t* s, int len) {
+    int cnt = 0;
+    for (int i = 0; i < len; i++, s++)
+        cnt += *s >> 8;
+    return cnt;
+}
+
+static char* sectorToString(track_t* pTrack, uint8_t slot) {
+    static char s[9];
+    if (pTrack->sectors[slot].status & SS_IDAMGOOD)
+        sprintf(s, "%02d/%d/%02d", pTrack->cylinder, pTrack->side, pTrack->sectors[slot].sectorId);
+    else if (pTrack->sectors[slot].status & SS_FIXED)
+        sprintf(s, "%02d/%d/%02d*", pTrack->cylinder, pTrack->side, pTrack->sectors[slot].sectorId);
+    else
+        sprintf(s, "%02d/%d/??", pTrack->cylinder, pTrack->side);
+    return s;
+}
+
+void displayDefectMap() {
+    bool badTrack[2] = { false };
+    bool hasSomeSectors[2] = { false };
+
+    track_t *pTrack;
+    // check whether we have any track on a side and whether there are any bad tracks on each side
+    for (int head = 0; head <= maxHead; head++)
+        for (int cyl = 0; cyl <= maxCylinder; cyl++)
+            if (hasTrack(cyl, head)) {
+               hasSomeSectors[head] = true;
+               if (!(pTrack = getTrack(cyl, head)) || pTrack->cntGoodIdam != pTrack->fmt->spt || pTrack->cntGoodData != pTrack->fmt->spt) {
+                   badTrack[head] = true;
+                   break;
+               }
+            }
+
+    for (int head = 0; head <= maxHead; head++) {
+        if (!hasSomeSectors[head])
+            continue;
+        if (!badTrack[head])
+            logFull(ALWAYS, "Side %d - all data processed successfully\n", head);
+        else {
+            logBasic("\n");
+            logFull(ALWAYS, "Side %d - defect map - (x) bad sector, (.) bad idam only\n", head);
+            int spt = -1;
+            for (int cyl = 0; cyl <= maxCylinder; cyl++) {
+                if (hasTrack(cyl, head)) {
+                    if (!(pTrack = getTrack(cyl, head)))
+                        logBasic("%02d     data unusable\n", cyl, head);
+                    else if (pTrack->cntGoodData != pTrack->fmt->spt || pTrack->cntGoodIdam != pTrack->fmt->spt) {
+                        if (spt != pTrack->fmt->spt) {
+                            spt = pTrack->fmt->spt;
+                            logBasic("   %.*s\n", spt, "0123456789 123456789 123456789 123456789 123456789 1");
+                        }
+                        char defects[MAXSECTOR + 1];
+                        int fillCh = 0;
+                        defects[spt] = 0;
+                        for (int i = spt - 1; i >= 0; i--)
+                            if ((pTrack->sectors[i].status & SS_GOOD) != SS_GOOD) {
+                                defects[i] = !(pTrack->sectors[i].status & SS_DATAGOOD) ? 'x' : '.';
+                                fillCh = ' ';
+                            } else
+                                defects[i] = fillCh;
+                            logBasic("%02d %s\n", cyl, defects);
+                    }
+                }
+
+            }
+        }
+    }
+}
+
+
 void displayTrack(int cylinder, int side, unsigned options) {
     track_t* pTrack = getTrack(cylinder, side);
           
@@ -173,24 +222,38 @@ void displayTrack(int cylinder, int side, unsigned options) {
     if (pTrack->cntGoodIdam != spt || pTrack->cntGoodData != spt || (options & (bOpt|gOpt)))
         logFull(ALWAYS, "Track %02d/%d encoding %s\n", cylinder, side, pTrack->fmt->name);
 
-    if (pTrack->status & TS_BADID)
-        logFull(WARNING, "Track %02d/%d unable to reconstruct sector order\n", cylinder, side);
-    else if (pTrack->status & TS_FIXEDID) {
+    if (pTrack->status & TS_BADID) {
+        logFull(D_WARNING, "Track %02d/%d unable to reconstruct sector order\n", cylinder, side);
+        logBasic("  Missing sector Ids:");
+        for (int i = 0; i < spt; i++)
+            if (pTrack->sectorToSlot[i] == 0xff)
+                logBasic(" %02d", i + pTrack->fmt->firstSectorId);
+        logBasic("\n");
+    } else if (pTrack->status & TS_FIXEDID) {
         logBasic("  Reconstructed sector order:");
         for (int i = 0; i < spt; i++) {
-                logBasic(" %2d%c", pTrack->sectors[i].sectorId, pTrack->sectors[i].status & SS_IDAMGOOD ? ' ' : '*');
-                if (i == 20)
-                    logBasic("\n");
-            }
-            logBasic("\n");
-    }
-    if (pTrack->cntGoodData != spt) {
-        logBasic("  data missing (#) / corrupt (?) for sectors:");
-        for (int i = 0; i < trackPtr->fmt->spt; i++)
-            if (!(trackPtr->sectors[trackPtr->sectorToSlot[i]].status & SS_DATAGOOD))
-                logBasic("%3d%c", i + trackPtr->fmt->firstSectorId, trackPtr->sectors[trackPtr->sectorToSlot[i]].sectorDataList ? '?' : '#');
+            logBasic(" %2d%c", pTrack->sectors[i].sectorId, pTrack->sectors[i].status & SS_IDAMGOOD ? ' ' : '*');
+            if (spt == 52 && i == 26)
+                logBasic("\n");
+        }
         logBasic("\n");
     }
+    if (pTrack->cntGoodData != spt) {
+        if (pTrack->status & TS_BADID) {
+            logBasic("  Missing(#)/Corrupt(?) slots:");
+            for (int i = 0; i < spt; i++)
+                if (!(trackPtr->sectors[i].status & SS_DATAGOOD))
+                    logBasic("%3d%c", i + trackPtr->fmt->firstSectorId, trackPtr->sectors[i].sectorDataList ? '?' : '#');
+            logBasic("\n");
+        } else {
+            logBasic("  Missing(#)/Corrupt(?) sectors:");
+            for (int i = 0; i < spt; i++)
+                if (!(trackPtr->sectors[trackPtr->sectorToSlot[i]].status & SS_DATAGOOD))
+                    logBasic("%3d%c", i + trackPtr->fmt->firstSectorId, trackPtr->sectors[trackPtr->sectorToSlot[i]].sectorDataList ? '?' : '#');
+            logBasic("\n");
+        }
+    }
+    
 
     if (!(pTrack->status & TS_BADID))
         for (int i = 0; i < spt; i++)

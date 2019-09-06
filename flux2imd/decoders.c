@@ -4,29 +4,32 @@
 #include <stdbool.h>
 #include <memory.h>
 #include "dpll.h"
-#include "util.h"
 #include "flux.h"
-#include "decoders.h"
-#include "bits.h"
-#include "sectorManager.h"
+#include "flux2imd.h"
+#include "formats.h"
+#include "trackManager.h"
+#include "util.h"
 
 
+static int zdsDisk = 0;     // to track if any track since last reset is in ZDS format
+
+// support for sector size option in list of possible formats (O_SIZE)
 static bool chkSizeChange(unsigned sSize) {
     unsigned curSSize = curFormat->sSize;
 
     if (curFormat->options & O_SIZE) {
         for (formatInfo_t* p = curFormat + 1; p->encoding == curFormat->encoding; p++) {
             if (p->sSize == sSize) {
-                logFull(DECODER, "Updated format to %s\n", p->name);
+                logFull(D_DECODER, "Updated format to %s\n", p->name);
                 curFormat = p;
                 updateTrackFmt();
                 return sSize != curSSize;       // true if sSize is different from trial sSize
             }
         }
-        logFull(FATAL, "%s sector size %d not currently supported\n", curFormat->name, 128 << sSize);
+        logFull(D_FATAL, "%s sector size %d not currently supported\n", curFormat->name, 128 << sSize);
     }
     if (sSize != curSSize)
-        logFull(FATAL, "Multiple sector sizes per track not supported\n");
+        logFull(D_FATAL, "Multiple sector sizes per track not supported\n");
     return false;
 }
 
@@ -81,35 +84,29 @@ static uint16_t hsSync(unsigned cylinder, unsigned slot) {
 
 }
 
-void hsGetTrack(int cylinder) {
+static void hsGetTrack(int cylinder, int side) {
     int slot;
     uint8_t sectorStatus[32] = { 0 };
-    char *fmt = "FM8H";
-    char *savedFmt;
+    int savedOptions;
     unsigned dataPos;
     unsigned dataTrackPos;
     int matchType;
 
-    setEncoding(fmt);
+
+    setInitialFormat("FM8H");
     initTrack(cylinder, 0);
     resetTracker();
 
     int cntSlot = cntHardSectors();
-    if (cntSlot != 32) {
-        logFull(FATAL, "Disk has %d Hard Sectors - only 32 sectors supported currently\n", cntSlot);
-        return;
-    }
-
 
     // create the IDAM info
-    for (int i = 0; i < cntSlot; i++) {
-        idam_t idam = { cylinder, 0, i, 0 };
-        addIdam(i * curFormat->spacing + HSIDAM, &idam);
+    for (int slot = 0; slot < cntSlot; slot++) {
+        idam_t idam = { cylinder, 0, slot, 0 };
+        addIdam(slot * curFormat->spacing + HSIDAM, &idam);
     }
 
     for (int i = 0; (slot = seekBlock(i)) >= 0; i++) {
-        // skip if already have good copy
-        if (sectorStatus[slot])
+        if (sectorStatus[slot] && !(debug & D_NOOPTIMISE))        // skip known good sectors unless D_NOOPTIMISE specified
             continue;
 
         uint16_t rawData[138];      // sector + cylinder + 128 bytes + 4 links + 2 CRC + 2 postamble
@@ -120,53 +117,56 @@ void hsGetTrack(int cylinder) {
         if (matchType = hsSync(cylinder, slot)) {
             dataPos = getByteCnt();
             if (curFormat->options == O_LSI && matchType == ZDS_SECTOR) {    // LSI & ZDS on same track assume all ZDS
-                    DBGLOG((DECODER, "@%d ZDS sector after LSI sector, rescan assuming ZDS\n", dataTrackPos));
-                    curFormat = lookupFormat("FM8H-ZDS");
+                    DBGLOG(D_DECODER, "@%d ZDS sector after LSI sector, rescan assuming ZDS\n", dataTrackPos);
+                    setFormat("FM8H-ZDS");
                     initTrack(cylinder, 0);    // clear any data collected so far assume all ZDS
-                    i = -1;                 // restart the whole rescan
+                    i = -1;                    // restart for a whole rescan
                     continue;
 
             }
-            savedFmt = fmt;
-            setFormat(fmt = matchType == LSI_SECTOR ? "FM8H-LSI" : "FM8H-ZDS");
-            updateTrackFmt();
+            if (!(savedOptions = curFormat->options)) {     // note LSI->ZDS detected above, ZDS->LSI cannot happen
+                setFormat(matchType == LSI_SECTOR ? "FM8H-LSI" : "FM8H-ZDS");
+                updateTrackFmt();
+            }
             dataTrackPos = dataPos + curFormat->spacing * slot;       // adjust to track position
 
             if (matchType == LSI_SECTOR) {
                 if ((result = getData(slot, rawData, 131)) < 0) {
-                    logFull(DECODER, "@%d LSI sector %d premature end\n", dataPos, slot);
+                    logFull(D_DECODER, "@%d LSI sector %d premature end\n", dataPos, slot);
                     continue;
                 }
                 addSectorData(dataTrackPos, result, 130, rawData + 1);
             } else {
                 if ((result = getData((cylinder << 8) + slot + 0x80, rawData, 138)) < 0) {
-                    logFull(DECODER, "@%d ZDS sector %d premature end\n", dataPos, slot);
+                    logFull(D_DECODER, "@%d ZDS sector %d premature end\n", dataPos, slot);
                     continue;
                 }
                 addSectorData(dataTrackPos, result, 136, rawData + 2);
             }
-            if (result != 1 && strcmp(fmt, savedFmt)) {             // restore previous format which may be the same
-                setFormat(fmt = savedFmt);
+            if (result != 1 && !savedOptions) {     // restore previous format if different
+                setFormat("FM8H");
                 updateTrackFmt();
             }
-            DBGLOG((DECODER, "@%d-%d %s sector %d%s\n", dataPos, getByteCnt(), matchType == LSI_SECTOR ? "LSI" : "ZDS",
-                slot, result == 1 ? "" : " bad crc"));
+            DBGLOG(D_DECODER, "@%d-%d %s sector %d%s\n", dataPos, getByteCnt(), matchType == LSI_SECTOR ? "LSI" : "ZDS",
+                slot, result == 1 ? "" : " bad crc");
             sectorStatus[slot] |= result;
         } else
-            logFull(DECODER, "cannot find start of sector %d\n", slot);
+            logFull(D_DECODER, "cannot find start of sector %d\n", slot);
 
-        if (debug & DECODER) {
+        if (debug & D_DECODER) {
             int val;
             while ((val = getByte()) >= 0)
-                printf(" %02X", val);
-            DBGLOG((DECODER, "@%d end of sector %d\n", getByteCnt()));
+                DBGLOG(D_DECODER, " %02X", val);
+            DBGLOG(D_DECODER, "@%d end of sector %d\n", getByteCnt());
         }
 
     }
+    zdsDisk |= curFormat->options & O_ZDS;
+
     finaliseTrack();
 }
 
-void ssGetTrack(int cylinder, int side) {
+static void ssGetTrack(int cylinder, int side) {
 
     unsigned matchType;
     int result;
@@ -197,7 +197,7 @@ void ssGetTrack(int cylinder, int side) {
             case M2FM_INDEXAM:
             case INDEXAM:           // to note start of track
                 indexPos = getByteCnt();
-                DBGLOG((DECODER, "@%d index\n", indexPos));
+                DBGLOG(D_DECODER, "@%d index\n", indexPos);
                 break;
             case IDAM:
             case M2FM_IDAM:
@@ -216,16 +216,16 @@ void ssGetTrack(int cylinder, int side) {
                         sSize = idam.sSize = (uint8_t)rawData[4] & 0xf;
                     }
                     if (chkSizeChange(sSize) && savedData) {    // new size but we already saved data!!
-                        DBGLOG((DECODER, "@%d restarted with new size\n", idamPos));
+                        DBGLOG(D_DECODER, "@%d restarted with new size\n", idamPos);
                         restart = true;
                         break;
                     }
                     //chkSptChange(idamPos, true);
 
-                    DBGLOG((DECODER, "@%d-%d idam %d/%d/%d sSize %d\n", idamPos, getByteCnt(), idam.cylinder, idam.side, idam.sectorId, sSize));
+                    DBGLOG(D_DECODER, "@%d-%d idam %d/%d/%d sSize %d\n", idamPos, getByteCnt(), idam.cylinder, idam.side, idam.sectorId, sSize);
                     addIdam(idamPos, &idam);
                 } else
-                    logFull(DECODER, "@%d idam %s\n", idamPos, result < 0 ? "premature end\n" : "bad crc\n");
+                    logFull(D_DECODER, "@%d idam %s\n", idamPos, result < 0 ? "premature end\n" : "bad crc\n");
                 break;
             case DATAAM:
             case M2FM_DATAAM:
@@ -239,9 +239,9 @@ void ssGetTrack(int cylinder, int side) {
                 if (result >= 0) {
                     addSectorData(dataPos, result, sectorLen + 2, rawData + 1);     // add data after address mark
                     savedData = true;
-                    DBGLOG((DECODER, "@%d-%d data len %d%s\n", dataPos, getByteCnt(), sectorLen, result == 1 ? "" : " bad crc"));
+                    DBGLOG(D_DECODER, "@%d-%d data len %d%s\n", dataPos, getByteCnt(), sectorLen, result == 1 ? "" : " bad crc");
                 } else
-                    logFull(DECODER, "@%d premature end of sector\n", dataPos);
+                    logFull(D_DECODER, "@%d premature end of sector\n", dataPos);
                 break;
             case DELETEDAM:
             case M2FM_DELETEDAM:
@@ -257,14 +257,40 @@ void ssGetTrack(int cylinder, int side) {
             savedData = false;
             i = 0;
         } else {
-            DBGLOG((DECODER, "@%d end of track\n", getByteCnt()));
+            DBGLOG(D_DECODER, "@%d end of track\n", getByteCnt());
             done = checkTrack();
         }
     }
     finaliseTrack();
 }
 
+void clearZDS() {
+    zdsDisk = 0;
+}
+
+bool flux2Track(int cylinder, int head) {
+    char *fmt = NULL;
+    int maxSlot = 0;
+    int hs;
+    logCylHead(cylinder, head);
+    if ((hs = cntHardSectors()) > 0) {
+        if (head != 0 || hs != 32) {
+            logFull(D_ERROR, "%d/%d Hard Sector disk only supports single side\n", cylinder, head);
+            return false;
+        } else if (hs != 32) {
+            logFull(D_ERROR, "Disk has %d Hard Sectors - only 32 sectors currently supported\n", hs);
+            return false;
+        }
+        hsGetTrack(cylinder, head);
+    } else if (!setInitialFormat(NULL)) {
+        logFull(D_ERROR, "Could not determine encoding\n");
+        return false;
+    } else
+        ssGetTrack(cylinder, head);
+    return true;
+}
 
 
-
-
+bool isZDS() {
+    return zdsDisk;
+}
