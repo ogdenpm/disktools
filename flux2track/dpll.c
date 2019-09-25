@@ -34,11 +34,10 @@ static struct {
 
 } adaptConfig[] = {
       {100, 21, 8.0, 400, 32, 4.0, 600, 0.25},    // FM hard sector default as no gap pre sync bytes also short blocks
-  //     {100, 16, 8.0, 200, 32, 4.0, 400, 0.25},
-     {100, 21, 4.0, 400, 18, 1.0, 600, 0.5}, 
-    {100, 32, 10.0, 200, 32, 4.0, 200, 2.0},
-    {100, 32, 8.0, 150, 32, 3.0, 200, 2.0},
-    {200, 8000, 6.0, 200, 64, 3.0, 400, 1.5}
+    //  {100, 16, 8.0, 200, 32, 4.0, 200, 0.25},
+   //   {100, 21, 4.0, 400, 18, 1.0, 600, 0.5}, 
+    //{100, 32, 10.0, 200, 32, 4.0, 200, 2.0},
+    //  {100, 32, 8.0, 150, 32, 3.0, 200, 2.0}
 };
 
 static uint32_t adaptCnt;
@@ -122,7 +121,7 @@ int getBit() {
         } else if (++pcCnt >= 2)
             cstate = pcCnt = 0;
     }
-#ifdef CALCULATE
+#if CALCULATE
     if (cstate == 0)
         etime += ((ctime - etime) * 5059 + cellSize * 7629) / 10000;
     else
@@ -151,7 +150,7 @@ void retrain(int profile) {
     case E_FM5:
         cellSize = 4000;
         break;
-    case E_FM8: case E_FM8H: case E_MFM5: case E_M2FM5:
+    case E_FM8: case E_FM8H: case E_MFM5:
         cellSize = 2000;
         break;
     case E_MFM8: case E_M2FM8:
@@ -167,8 +166,6 @@ void retrain(int profile) {
     up = false;
 
     int flux = getNextFlux();           // prime dpll with firstr sample
-    double rpm = getRPM();
-    cellSize = (uint32_t)(cellSize * (rpm < 320.0 ? 300.0 : 360.0) / rpm);
 
     ctime = flux > 0 ? flux : 0;
     etime = ctime + cellSize / 2;       // assume its the middle of a cel

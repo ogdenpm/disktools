@@ -14,18 +14,16 @@ enum {
 
 
 enum encodings {
-    E_FM5, E_FM8, E_FM8H, E_MFM5, E_MFM8, E_M2FM8, E_M2FM5  // raw encodings supported although MFM8 is currently used for M2FM8 detection
+    E_FM5, E_FM8, E_FM8H, E_MFM5, E_MFM8, E_M2FM8,   // raw encodings supported although MFM8 is currently used for M2FM8 detection
 };
 enum options {
-	O_NOIMD = 0x200,
-	O_INV = 0x100,                      // bit to indicate bits inverted
-	O_REV = 0x80,                       // bit to indicate reversed bytes
-	O_SIZE = 0x40,                      // bit to indicate auto size detection
-	O_SPC = 0x20,                       // bit to indicate auto spacing detection
-	O_ZDS = 1 + O_NOIMD,                // encodings for special formats
-	O_LSI = O_REV + 2,
-	O_HP = O_REV + 3,
-	O_MTECH = O_NOIMD + 4
+
+    O_REV = 0x80,                       // bit to indicate reversed bytes
+    O_SIZE = 0x40,                      // bit to indicate auto size detection
+    O_SPC = 0x20,                       // bit to indicate auto spacing detection
+    O_ZDS = 1,                          // encodings for special formats
+    O_LSI = O_REV + 2,
+    O_HP = O_REV + 3
 };
 
 
@@ -61,4 +59,4 @@ void makeHSPatterns(unsigned cylinder, unsigned slot);
 int matchPattern(int searchLimit);
 void setFormat(char *fmtName);
 bool setInitialFormat(char *fmtName);
-bool crc8(uint16_t* data, int len);
+uint16_t decodeFM();

@@ -3,9 +3,9 @@
 #include "trackManager.h"
 
 // decoders.c
-void assumeIMD();
+void clearZDS();
 bool flux2Track(int cylinder, int side);
-bool noIMD();
+bool isZDS();
 
 // display.c
 void displayDefectMap();

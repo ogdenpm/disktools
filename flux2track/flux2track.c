@@ -9,7 +9,7 @@
 #include <string.h>
 #include <ctype.h>
 #include "flux.h"
-#include "flux2imd.h"
+#include "flux2track.h"
 #include "trackManager.h"
 #include "util.h"
 #include "zip.h"
@@ -37,53 +37,14 @@ static void decodeFile(char* name) {
         if (!loadFile(name))
             return;
 
-        if (histLevels)
-            displayHist(histLevels);
-
-        if (getCylinder(name, &cyl, &head)) {
-            if (flux2Track(cyl, head)) {
-                displayTrack(cyl, head, options | gOpt);
-                displayDefectMap();
-            }
-        } else
+        if (getCylinder(name, &cyl, &head))
+			flux2Track(cyl, head);
+        else
             logFull(ALWAYS, "Skipping decode - cannot determine cylinder & head from file name\n");
 
         unloadFlux();
-        removeDisk();
-
-    } else if (extMatch(name, ".zip")) {
-
-        struct zip_t* zip;
-        if ((zip = zip_open(name, 0, 'r')) == NULL)
-            logFull(D_ERROR, "Can't open %s\n", name);
-        else {
-            int n = zip_total_entries(zip);
-            removeDisk();
-            for (int i = 0; i < n; i++) {
-                zip_entry_openbyindex(zip, i);
-                sprintf(curFile, "%s[%s]", fileName(name), fileName(zip_entry_name(zip)));
-                if (loadZipFile(zip)) {
-                    if (histLevels)
-                        displayHist(histLevels);
-                    if (getCylinder(zip_entry_name(zip), &cyl, &head)) {
-                        if (flux2Track(cyl, head))
-                            displayTrack(cyl, head, options | (noIMD() ? gOpt : 0));
-                    }
-                    else
-                        logFull(ALWAYS, "Skipping decode - cannot determine cylinder & head from file name\n");
-                }
-                zip_entry_close(zip);
-                unloadFlux();
-            }
-            zip_close(zip);
-            strcpy(curFile, fileName(name));        // revert logging to original file name
-            displayDefectMap();
-            if (!noIMD())
-                writeImdFile(name);
-            removeDisk();
-        }
     } else {
-        logFull(D_ERROR, "file %s does not have .raw or .zip extension\n", name);
+        logFull(D_ERROR, "file %s does not have .raw extension\n", name);
         usage();
     }
     createLogFile(NULL);
@@ -164,6 +125,7 @@ static _declspec(noreturn) void usage() {
 
 int main(int argc, char** argv) {
     int arg;
+    int optVal;
     char optCh;
 
     createLogFile(NULL);
@@ -177,24 +139,10 @@ int main(int argc, char** argv) {
             options |= bOpt;
             break;
         case 'd':
-            if (argv[arg][2]) {
-                if (sscanf(argv[arg] + 2, "%x", &debug) != 1)
-                    debug = D_ECHO;
-            } else if (arg + 1 < argc && sscanf(argv[arg + 1], "%x%c", &debug, &optCh) == 1)
-                arg++;
-             else
-                 debug = D_ECHO;;
+            debug = sscanf(argv[arg] + 2, "%x", &optVal) == 1 ? optVal : D_ECHO;
             break;
         case 'h':
-            if (argv[arg][2]) {
-                if (sscanf(argv[arg] + 2, "%d", &histLevels) != 1)
-                    histLevels = 10;
-            } else if (arg + 1 < argc && sscanf(argv[arg + 1], "%d%c", &histLevels, &optCh) == 1)
-                arg++;
-            else
-                histLevels = 10;
-            if (histLevels <= 5)
-                histLevels = 10;
+            histLevels = sscanf(argv[arg] +2, "%d", &optVal) == 1 && optVal > 5 ? optVal : 10;
             break;
         case 'p':
             options |= pOpt;

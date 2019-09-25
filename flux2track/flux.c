@@ -35,7 +35,7 @@ static uint8_t* fluxBuf;		// buffer where flux data / stream data held
 static uint32_t streamIdx;		// current position of stream data with OOB data removed
 uint8_t* inPtr;
 uint8_t* endPtr;
-static double rpm;
+
 
 int firstSector = 31;
 
@@ -81,7 +81,6 @@ static clearIndex() {
     }
     indexPtr = indexHead = NULL;
     blkNumber = 0;
-    rpm = 360.0;                                // safe value 8" disk
 }
 
 static void addIndexEntry(uint32_t streamPos, uint32_t sampleCnt, uint32_t indexCnt) {
@@ -152,19 +151,6 @@ static void endIndex(uint32_t streamPos) {
         }
     }
 
-    // work out rpm
-    uint32_t startIndex = 0, endIndex = 0;
-    for (physBlock_t *p = indexHead; p; p = p->next) {
-        if (p->physSector == 0)
-            if (startIndex) {
-                endIndex = p->indexCnt;
-                break;
-            } else
-                startIndex = p->indexCnt;
-    }
-    if (endIndex)
-        rpm = ick / (endIndex - startIndex) * 60;
-
     seekBlock(0);
 }
 
@@ -207,7 +193,25 @@ int seekBlock(unsigned num) {
         return -1;
 }
 
+void extendToEOT() {
+	if (!indexPtr)
+		return;
+	while (indexPtr->next && indexPtr->next->physSector != 0) {
+		indexPtr = indexPtr->next;
+		blkNumber++;
+	}
+	endPtr = fluxBuf + indexPtr->end;
+}
 
+
+void extendNext() {
+	if (indexPtr && indexPtr->next) {
+		indexPtr = indexPtr->next;
+		blkNumber++;
+		endPtr = fluxBuf + indexPtr->end;
+
+	}
+}
 
 int cntHardSectors() {
     return hc;
@@ -396,10 +400,19 @@ int getNextFlux() {
 }
 
 
-double getRPM() {
-    if (hc == 0)
-        return rpm;
-    else
-        return ick / (indexPtr->indexDelta * hc) * 60;
+int getRPM() {
+    if (hc != 0)                                // hard sectors assumed to be 8 inch
+        return 360;
+
+    uint32_t startIndex = 0, endIndex = 0;
+
+    if (seekBlock(1) >= 0)                  // use the standard routines to locate the first and second full sectors
+        startIndex = indexPtr->indexCnt;
+   if (seekBlock(2) >= 0)                   // callers of seekBlock maintain the blkNum so will self recover
+            endIndex = indexPtr->indexCnt;
+
+    if (endIndex != 0)
+        return (int)(ick / (endIndex - startIndex) * 60 + 0.5);
+    return -1;
 
 }

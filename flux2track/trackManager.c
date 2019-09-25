@@ -66,10 +66,8 @@ static void fixSectorMap() {
 
 static void removeTrack(track_t* p) {
     if (p) {
-		for (int i = 0; i < p->fmt->spt; i++) {
-			removeSectorData(p->sectors[i].sectorDataList);
-			p->sectors[i].sectorDataList = NULL;
-		}
+        for (int i = 0; i < p->fmt->spt; i++)
+            removeSectorData(p->sectors[i].sectorDataList);
         if (p == trackPtr)
             trackPtr = NULL;
         free(p);

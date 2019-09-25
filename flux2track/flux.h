@@ -3,9 +3,11 @@
 
 int cntHardSectors();
 int getNextFlux();
-double getRPM();
+int getRPM();
 int loadFlux(uint8_t* image, size_t size);
 int seekBlock(unsigned num);
+void extendToEOT();
+void extendNext();
 void unloadFlux();
 
 

@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <memory.h>
 #include <string.h>
-#include "flux2Imd.h"
+#include "flux2track.h"
 #include "trackManager.h"
 #include "util.h"
 
@@ -102,11 +102,9 @@ static void displayLine(sector_t *pSector, int offset, int len, void (*displayFu
 static void displaySector(track_t *pTrack, uint8_t slot, unsigned options) {
     sector_t *pSector = &pTrack->sectors[slot];
 
-	int size = 128 << pTrack->fmt->sSize;
+    int size = 128 << pTrack->fmt->sSize;
 
     if (!pSector->sectorDataList) {
-        if (options & bOpt)
-            logBasic("%s: No data\n", sectorToString(pTrack, slot));
         return;
     }
     if (pSector->status & SS_DATAGOOD) {
@@ -123,15 +121,10 @@ static void displaySector(track_t *pTrack, uint8_t slot, unsigned options) {
     logBasic("\n%s:%s\n", sectorToString(pTrack, slot), isGood ? "" : " ---- Corrupt Sector ----");
 
     for (int i = 0; i < size; i += 16)
-        displayLine(pSector, i, size - i >= 16 ? 16 : size - i, displayDataLine);
+        displayLine(pSector, i, 16, displayDataLine);
 
     if (!isGood || pTrack->fmt->options == O_ZDS) {
-		int cntExtra;
-		switch (pTrack->fmt->options) {
-		case O_MTECH: cntExtra = 1; break;
-		case O_ZDS: cntExtra = (pSector->status & SS_DATAGOOD) ? 4 : 8; break;
-		default: cntExtra = 2;
-		}
+        int cntExtra = pTrack->fmt->options != O_ZDS ? 2 : (pSector->status & SS_DATAGOOD) ? 4 : 8;
 
         displayLine(pSector, size, cntExtra, displayExtraLine);
     }

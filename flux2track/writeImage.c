@@ -16,7 +16,7 @@ MODIFICATION HISTORY
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
-#include "flux2imd.h"
+#include "flux2track.h"
 #include "trackManager.h"
 #include "util.h"
 
@@ -76,12 +76,14 @@ void writeImdFile(char *fname) {
             trackPtr = getTrack(cyl, head);
             if (!trackPtr || trackPtr->status & TS_BADID || !hasTrack(cyl, head))
                 continue;
-            if (trackPtr->cylinder != cyl || trackPtr->side != head)
-                logFull(D_WARNING, "cylinder/side mismatch %d/%d expecting %d/%d\n", trackPtr->cylinder, trackPtr->side, cyl, head);
+            if (trackPtr->cylinder != cyl || trackPtr->side != head) {
+                logFull(D_ERROR, "Non-standard cylinder/side mapping not implemented, skipping track %d/%d\n", cyl, head);
+                continue;
+            }
 
             putc(imdModes[trackPtr->fmt->encoding], fp);           // mode
-            putc(trackPtr->cylinder, fp);                      // cylinder
-            putc(trackPtr->side, fp);                     // head
+            putc(cyl, fp);                      // cylinder
+            putc(head, fp);                     // head
             putc(trackPtr->fmt->spt, fp);       // sectors in track
             putc(trackPtr->fmt->sSize, fp);     // sector size
             fwrite(trackPtr->slotToSector, 1, trackPtr->fmt->spt, fp);    // sector numbering map

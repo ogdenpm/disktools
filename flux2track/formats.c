@@ -51,15 +51,11 @@ pattern_t sdPatterns[] = {
 };
 
 static pattern_t hsPatterns[] = {
-    { 0xffffffff,     0, LSI_SECTOR },
-    { 0xffffffffffff, 0, ZDS_SECTOR },
+   { 0xffff, 0xAAAA, SYNC },
+   { 0xfffffaaa, 0xAAAAEAAA, LSI_SECTOR },
     { 0 }
 };
 
-static pattern_t lsiPatterns[] = {
-    { 0xffffffff,     0, LSI_SECTOR },
-    { 0 }
-};
 
 
 
@@ -83,15 +79,6 @@ pattern_t ddM2FMPatterns[] = {
 
     {0}
 };
-
-
-pattern_t hs5Patterns[] = {
-      { 0xffff, 0xAAAA, GAP},
-      { 0xffffff ,0xAA5555, SYNC},
-
-    {0}
-};
-
 
 pattern_t ddHPPatterns[] = {
     { 0xffff, 0x8888, GAP},
@@ -118,7 +105,6 @@ static bool crcLSI(uint16_t* data, int len);
 static bool crcZDS(uint16_t* data, int len);
 static bool crcRev(uint16_t* data, int len);
 static bool crcStd(uint16_t* data, int len);
-bool crc8(uint16_t* data, int len);
 /*
     some notes on the ordering of this table
     each group should start with one of SDx DDx which are used to detect the disk format
@@ -148,11 +134,9 @@ formatInfo_t formatInfo[] = {
     {"SD8"        , 0, 1, 26,   E_FM8,      0, crcStd,     sdPatterns, 0xffff,     90, 115, 194},
     {"FM8-26x128" , 0, 1, 26,   E_FM8,      0, crcStd,   sdFMPatterns, 0xffff,     39, 64, 191},    // manually adjusted 
 
-    {"MFM5H"      , 1, 0, 16,  E_MFM5,O_MTECH, crc8,   hs5Patterns, 0xffff,		   40,  42, 350},
     {"FM8H"       , 0, 0, 32,  E_FM8H,      0, crcZDS,     hsPatterns,      0, HSIDAM,   8, 168},
     {"FM8H-ZDS"   , 0, 0, 32,  E_FM8H,  O_ZDS, crcZDS, &hsPatterns[1],      0, HSIDAM,  18, 168},
     {"FM8H-LSI"   , 0, 0, 32,  E_FM8H,  O_LSI, crcLSI,     hsPatterns,      0, HSIDAM,   8, 168}, 
-    {"LSI"        , 0, 0, 32,  E_FM8H,  O_LSI, crcLSI,    lsiPatterns,      0, HSIDAM,   8, 168}, 
 
     {"DD5"        , 1, 1, 16,  E_MFM5,      0, crcStd,    dd5Patterns, 0xcdb4,    155, 200, 368},
     {"MFM5"       , 1, 1, 16,  E_MFM5, O_SIZE, crcStd,  ddMFMPatterns, 0xcdb4,    155, 200, 368},
@@ -197,13 +181,6 @@ static bool crcRev(uint16_t* data, int len) {
         crc = (crc << 8) ^ (x << 12) ^ (x << 5) ^ x;
     }
     return crc == 0;
-}
-
-bool crc8(uint16_t* data, int len) {
-	uint16_t crc = 0;
-	for (int i = 0; i < len - 1; i++)
-		crc = (crc & 0xff) + (data[i] & 0xff) + ((crc & 0x100) ? 1 : 0);
-	return (crc & 0xff) == (data[len - 1] & 0xff);
 }
 
 static bool crcStd(uint16_t* buf, int len) {
@@ -276,7 +253,7 @@ int getByte() {
             suspect |= !(pattern & 2); break;
         case E_MFM5: case E_MFM8:
             suspect |= (pattern & 2) && (pattern & 5); break;
-        case E_M2FM8: case E_M2FM5:
+        case E_M2FM8:
             suspect |= (pattern & 2) && (pattern & 0xd); break;
         }
         if (curFormat->options & O_REV)
@@ -284,8 +261,6 @@ int getByte() {
         else
             val = (val << 1) + bit;
     }
-    if (curFormat->options & O_INV)
-        val ^= 0xff;
     return val + (suspect ? SUSPECT : 0);
 }
 
@@ -312,7 +287,7 @@ char* getName(int am) {
 }
 
 void makeHSPatterns(unsigned cylinder, unsigned slot)     {
-    lsiPatterns[0].match = hsPatterns[0].match = encodeFM(flip((cylinder ? cylinder : 32) * 2 + 1));            // set LSI match pattern
+    hsPatterns[0].match = encodeFM(flip((cylinder ? cylinder : 32) * 2 + 1));            // set LSI match pattern
     hsPatterns[1].match = encodeFM(((slot + 0x80) << 8) + cylinder); // set ZDS match pattern
 
 }
@@ -356,7 +331,7 @@ bool setInitialFormat(char *fmtName) {
         if (cntHardSectors() > 0)
             fmtName = "FM8H";
         else {
-            int diskSize = getRPM() < 320.0 ? 5 : 8;
+            int diskSize = getRPM() < 320 ? 5 : 8;
             if (seekBlock(1) >= 0) {
                 fmtName = diskSize == 5 ? "DD5" : "DD8";
                 DBGLOG(D_DETECT, "Trying %s\n", fmtName);
@@ -382,4 +357,13 @@ bool setInitialFormat(char *fmtName) {
 
 
 
+uint16_t decodeFM() {
+    uint16_t val = 0;
+    for (uint32_t mask = 0x40000000; mask; mask >>= 2)
+        if (curFormat->options & O_REV)
+            val = (val >> 1) + ((pattern & mask) ? 0x80 : 0);
+        else
+            val = (val << 1) + ((pattern & mask) ? 1 : 0);
+    return val + ((pattern & 0xAAAA) != 0xAAAA ? SUSPECT : 0);
 
+}
