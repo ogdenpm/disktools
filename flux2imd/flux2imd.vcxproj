@@ -114,7 +114,8 @@
       <OptimizeReferences>true</OptimizeReferences>
     </Link>
     <PostBuildEvent>
-      <Command>copy /y $(TargetPath) d:\bin</Command>
+      <Command>copy /b /y $(TargetPath) $(SolutionDir)\prebuilt
+if exist d:\bin copy /b /y $(TargetPath) D:\bin</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
