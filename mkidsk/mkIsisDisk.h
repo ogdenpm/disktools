@@ -14,6 +14,7 @@ MODIFICATION HISTORY
 #include <stdlib.h>
 #include <memory.h>
 #include <string.h>
+#include <stdint.h>
 #include <stdbool.h>
 #include <ctype.h>
 
@@ -28,12 +29,19 @@ typedef unsigned short word;
 
 // names for magic numbers
 // disk types
-enum { UNKNOWN = 0, ISIS_SD, ISIS_DD, ISIS_III, ISIS_IV };
+enum { UNKNOWN = 0, ISIS_SD, ISIS_DD, ISIS_PDS, ISIS_IV };
 
 #define SDSECTORS   26  // sectors on a SD disk
 #define DDSECTORS   52  // sectors on a DD disk
-#define TRACKS      77  // number of tracks used
+#define I3SECTORS   32  // sectors per cylinder ISIS III disk
+#define I2TRACKS      77  // number of tracks used
+#define I3TRACKS    80  // tracks on ISIS III disk
 #define SECTORSIZE  128 // bytes per sector
+#define I3SECTORSIZE 256
+
+#define MAXSECTOR   52
+
+
 #define FMTBYTE     0xc7    // default byte used by isis for newly formatted data sectors
 #define ALT_FMTBYTE 0xe5
 
@@ -41,21 +49,32 @@ enum { UNKNOWN = 0, ISIS_SD, ISIS_DD, ISIS_III, ISIS_IV };
 #define SDBINHDR    0x204
 #define DDBINHDR    0x206
 #define CNTDIRSECTORS   25
+#define CNTI3DIRSECTORS 15
+#define RMXLAB_LOC   4
+#define ISOLAB_LOC   7
+
 #define ISIST0_HDR  0x18
 #define ISIST0_DAT  1
 #define ISIST0_SIZE 23
+
+#define ISIS3T0_HDR 0x11
+#define ISIS3T0_SIZE 15
+
 #define ISISLAB_HDR 0x19
-#define ISISLAB_DAT 0x1A
 #define ISISLAB_DATA 0x11B      // location of isis.lab additional blocks
 #define ISISLAB_SDSIZE  1
 #define ISISLAB_DDSIZE  27
 #define ISISLAB_DDSIZEA 26
-#define ISISDIR_HDR 0x101
-#define ISISDIR_DAT 0x102
+
+#define ISIS3LAB_HDR 0x101
+#define ISIS3LAB_SIZE   3
+
+#define ISISDIR_HDR     0x101
+#define ISIS3DIR_HDR    0x2701
+
 #define ISISMAP_HDR 0x201
-#define ISISMAP_DAT 0x202
-#define SDBITMAP_SIZE   2
-#define DDBITMAP_SIZE   4
+#define ISISFRE_HDR 0x2711
+#define ISISFRE_LEN 80
 
 //activity values
 
@@ -100,17 +119,40 @@ extern byte diskType;
 extern label_t label;
 extern bool hasSystem;
 
-extern int spt;
-extern byte *disk;
-extern unsigned diskSize;
-extern int sectorSize;
-extern bool interTrackInterleave;
-extern byte formatCh;
+typedef struct {
+    char *name;
+    int len;
+    uint8_t attrib;
+    uint16_t hdr_blk;
+    uint16_t data_blk;
+} sfile_t;
 
-void WriteImgFile(char *fname, char *skews, char *comment);
+typedef struct {
+    uint8_t nCyl;
+    uint8_t nHead;
+    uint8_t nSector;
+    uint8_t skew;
+    int allocSSize;         // space allocated per sector
+    char *modeSize;         // encoded as per tInterleave, 2 chars 1st mode, 2nd size
+    char *tInterLeave;
+    uint8_t bitMapSize;
+} format_t;
+
+
+extern format_t formats[4];
+
+extern int sPerCyl;
+extern byte *disk;
+extern int sectorSize;
+extern bool interTrackSkew;
+extern int formatCh;
+
+void WriteImgFile(char *fname, int diskType, char *interleaves, bool useSkew, char *comment);
 void InitFmtTable(byte t0Interleave, byte t1Interleave, byte interleave);
 void CopyFile(char *isisName, char *srcName, int attrib);
-void FormatDisk(int type);
-void WriteDirectory();
+void FormatDisk(int type, int formatCh);
+void WriteVolLabels();
+void WriteI2Directory();
+void WriteI3Directory();
 void WriteLabel();
 byte *GetSectorLoc(word trkSec);

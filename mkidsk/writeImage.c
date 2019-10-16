@@ -8,54 +8,32 @@ DESCRIPTION
 MODIFICATION HISTORY
     17 Aug 2018 -- original release as mkidsk onto github
     18 Aug 2018 -- added copyright info
+    14 Oct 2019 -- revised to support ISIS II & ISIS III disks
 
 */
 #include "mkIsisDisk.h"
 #include <time.h>
+#include <stdint.h>
 
 enum {
     IMG, IMD
 };
-byte smap[TRACKS][DDSECTORS];
 
-void BuildSMap(char *skews) {
-    word curSkew = 0;
-    word curSec = 0;
-    byte sectors;
-    byte i, interTrackSkew;
+int BuildSMap(byte *smap, int nSector, int interleave, int bias)
+{
+    int slot = bias;
+    memset(smap, 0, nSector * sizeof(byte));
+    for (int i = 1; i <= nSector; i++) {
+        slot = (slot + interleave) % nSector;
+        while (smap[slot])
+            slot = ++slot % nSector;
+        smap[slot] = i;
 
-    if (diskType == ISIS_DD) {	/* DD */
-        sectors = 52;
-        interTrackSkew = 7;
     }
-    else {
-        sectors = 26;
-        interTrackSkew = 4;
-    }
-
-    for (int curTrack = 0; curTrack < TRACKS; curTrack++) {
-        if (!skews) {
-            for (i = 1; i <= sectors; i++)
-                smap[curTrack][i - 1] = i;      // no sector mapping
-        }
-        else {
-            if (curTrack < 3) {                 // track 0, 1 and 2 restart skew and intertrack skew
-                curSkew = *skews++ - '0';
-                curSec = 0;
-            }
-            for (i = 1; i <= sectors; i++) {
-                curSec = (curSec + curSkew) % sectors;
-                while (smap[curTrack][curSec] != 0)
-                    curSec = ++curSec % sectors;
-                smap[curTrack][curSec] = i;
-            }
-            if (interTrackInterleave)
-                curSec += interTrackSkew;
-            else
-                curSec = 0;
-        }
-    }
+    return slot;        // return last slot assigned.
 }
+
+
 
 void WriteIMDHdr(FILE *fp, char *comment) {
     struct tm *dateTime;
@@ -75,52 +53,90 @@ void WriteIMDHdr(FILE *fp, char *comment) {
     putc(0x1A, fp);
 }
 
-bool SameCh(byte *sec) {
-    for (int i = 1; i < SECTORSIZE; i++)
+bool SameCh(byte *sec, int len) {
+    for (int i = 1; i < len; i++)
         if (sec[0] != sec[i])
             return false;
     return true;
 }
 
-void WriteImgFile(char *fname, char *skews, char *comment) {
+
+// interleaves points to disk interleave format as per standard ISIS.LAB format i.e. '0' biased
+// if interleaves == "" then use default
+// if inteleaves == NULL then no interleave
+
+void WriteImgFile(char *fname, int diskType, char *interleaves, bool useSkew, char *comment) {
     FILE *fp;
     char *fmtExt;
     int fmt;
-    byte *sector;
 
     if ((fp = fopen(fname, "wb")) == NULL) {
         fprintf(stderr, "cannot create %s\n", fname);
         exit(1);
     }
-    BuildSMap(skews);
+    
+    int bias = diskType == ISIS_SD || diskType == ISIS_DD ? 0 : -1;
+    int skew = useSkew ? formats[diskType].skew : 0;
+    char *modeSize = formats[diskType].modeSize;
+    int interleave = 1;
+    int mode = 0;
+    int sSize = 0;
+
+    if (interleaves == NULL) {
+        bias = -1;
+        skew = 0;
+        interleaves = "1";
+    } else if (!*interleaves)
+        interleaves = formats[diskType].tInterLeave;
+
+ //   BuildSMap(interleaves);
     fmtExt = strrchr(fname, '.');
     fmt = _stricmp(fmtExt, ".img") == 0 ? IMG : IMD;
 
     if (fmt == IMD)
         WriteIMDHdr(fp, comment);
-    for (int track = 0; track < TRACKS; track++) {
-        if (fmt == IMD) {
-            putc(0, fp);        // mode
-            putc(track, fp);    // cylinder
-            putc(0, fp);        // head
-            putc(spt, fp);      // sectors in track
-            putc(0, fp);        // sector size - 128
-            fwrite(smap[track], 1, spt, fp);    // sector numbering map
-        }
-        for (int secNum = 0; secNum < spt; secNum++) {
-            sector = GetSectorLoc(BLOCK(track, smap[track][secNum]));
-            if (fmt == IMD) {
-                if (SameCh(sector)) {
-                    putc(2, fp);
-                    putc(*sector, fp);
-                }
-                else {
-                    putc(1, fp);
-                    fwrite(sector, 1, SECTORSIZE, fp);
-                }
+
+    for (int cyl = 0; cyl < formats[diskType].nCyl; cyl++) {
+        for (int head = 0; head < formats[diskType].nHead; head++) {
+            int spt = formats[diskType].nSector;
+
+            if (*modeSize) {
+                mode = *modeSize++ - '0';
+                sSize = *modeSize++ - '0';
             }
-            else
-                fwrite(sector, 1, SECTORSIZE, fp);
+            if (*interleaves) {
+                interleave = *interleaves++ - '0';
+                if (bias < 0)
+                    bias = -interleave;
+            }  else
+                bias += skew;
+
+            byte smap[MAXSECTOR];
+            BuildSMap(smap, spt, interleave, bias);
+
+            if (fmt == IMD) {
+                putc(mode, fp);        // mode
+                putc(cyl, fp);    // cylinder
+                putc(head, fp);        // head
+                putc(spt, fp);      // sectors in track
+                putc(sSize, fp);        // sector size
+                fwrite(smap, 1, spt, fp);    // sector numbering map
+            }
+            for (int secNum = 0; secNum < spt; secNum++) {
+                byte *sector = GetSectorLoc(BLOCK(cyl, smap[secNum] + head * spt));
+                if (fmt == IMD) {
+                    if (SameCh(sector, 128 << sSize)) {
+                        putc(2, fp);
+                        putc(*sector, fp);
+                    }
+                    else {
+                        putc(1, fp);
+                        fwrite(sector, 1, 128 << sSize, fp);
+                    }
+                }
+                else
+                    fwrite(sector, 1, 128 << sSize, fp);
+            }
         }
     }
 

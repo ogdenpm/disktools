@@ -17,6 +17,8 @@ MODIFICATION HISTORY
     20 Aug 2019 -- Updated to use SHA1 checksum, removing the len field
     21 Aug 2019 -- correted handling of a directory path before the recipe file
     13 Sep 2018 -- renamed skew to interleave to align with normal terminology
+    15 Oct 2019 -- added support to allow fill of junk values for ISIS III version and
+                   crlf values in ISIS.LAB - see undisk
 
 
 LIMITATIONS
@@ -59,11 +61,12 @@ initial comment lines
 information lines which can occur in any order, although the order below is the default
 and can be separated with multiple comment lines starting with #. These comments are ignored
     label: name[.|-]ext     Used in ISIS.LAB name has max 6 chars, ext has max 3 chars
-    version: nn             Up to 2 chars used in ISIS.LAB
+    version: nn             Up to 2 chars used in ISIS.LAB (extended to allow char as #xx hex value)
     format: diskFormat      ISIS II SD, ISIS II DD or ISIS III
     interleave:  interleaveInfo     optional non standard interleave info taken from ISIS.LAB. Rarely needed
     skew: skewInfo                  inter track skew - not currently used
     os: operatingSystem     operating system on disk. NONE or ISIS ver, PDS ver, OSIRIS ver
+    crlf:                   Up to 2 chars used in ISIS.LAB allows char as #xx hex value
 marker for start of files
     Files:
 List of files to add to the image in ISIS.DIR order. Comment lines starting with # are ignored
@@ -91,8 +94,8 @@ byte diskType = ISIS_DD;
 label_t label;
 bool hasSystem = false;
 bool interleave = false;
-bool interTrackInterleave = false;
-byte formatCh = FMTBYTE;                     // default format character -e overrides
+bool interTrackSkew = false;
+int formatCh = -1;                     // format character -e sets, otherwise defaults to 0xc7 for ISIS_II and 0xe5 for ISIS_PDS
 char *forcedSkew = NULL;
 
 char *special[] = { "AUTO", "DIR", "ZERO", "ZEROHDR", NULL };
@@ -100,12 +103,11 @@ char *special[] = { "AUTO", "DIR", "ZERO", "ZEROHDR", NULL };
 void InitFmtTable(byte t0Interleave, byte t1Interleave, byte interleave) {
     label.fmtTable[0] = t0Interleave + '0';
     label.fmtTable[1] = t1Interleave + '0';
-    for (int i = 2; i < TRACKS; i++)
+    for (int i = 2; i < I2TRACKS; i++)
         label.fmtTable[i] = interleave + '0';
 }
 
-int Match(char *s, char *ref) {
-    char *start = s;
+char* Match(char *s, char *ref) {
     while (*ref && toupper(*s) == toupper(*ref)) {
         if (isblank(*ref))
             while (isblank(*++s))
@@ -115,10 +117,10 @@ int Match(char *s, char *ref) {
         ref++;
     }
     if (*ref || (*s && !isblank(*s)))
-        return 0;
+        return NULL;
     while (isblank(*s))
         s++;
-    return (int)(s - start);
+    return s;
 }
 
 bool checkSkew(char *s) {    // check skew is valid
@@ -128,10 +130,26 @@ bool checkSkew(char *s) {    // check skew is valid
     return true;
 }
 
+
+void decodePair(char *dest, char *src) {
+    for (int i = 0; i < 2 && (isalnum(*src) || *src == '.' || *src == '#'); i++) {
+        if (*src == '#') {
+            ++src;
+            if (isxdigit(src[0]) && isxdigit(src[1])) {
+                *dest = (isdigit(*src) ? *src++ - '0' : toupper(*src++) - 'A' + 10) << 4;
+                *dest++ += (isdigit(*src) ? *src++ - '0' : toupper(*src++) - 'A' + 10);
+            } else {
+                fprintf(stderr, "warning invalid hex number #%.2s\n", src);
+                break;
+            }
+        } else
+            *dest++ = toupper(*src++);
+    }
+}
+
 void ParseRecipeHeader(FILE *fp) {
     char line[MAXLINE];
     char *s;
-    int cnt;
     int c;
     bool pastComment = false;
 
@@ -163,8 +181,7 @@ void ParseRecipeHeader(FILE *fp) {
             return;
         if (Match(line, "#"))
             continue;
-        if ((cnt = Match(line, "label:"))) {
-            s = line + cnt;
+        if (s = Match(line, "label:")) {
             for (int i = 0; i < 6; i++)
                 if (isalnum(*s))
                     label.name[i] = toupper(*s++);
@@ -174,35 +191,32 @@ void ParseRecipeHeader(FILE *fp) {
                 if (isalnum(*s))
                     label.name[i] = toupper(*s++);
         }
-        else if ((cnt = Match(line, "version:"))) {
-            s = line + cnt;
-            for (int i = 0; i < 2; i++)
-                if (isalnum(*s) || *s == '.')
-                    label.version[i] = toupper(*s++);
-        }
-        else if ((cnt = Match(line, "format:"))) {
-            s = line + cnt;
+        else if (s = Match(line, "version:"))
+            decodePair(label.version, s);
+        else if (s = Match(line, "format:")) {
             if ((Match(s, "ISIS II SD")))
                 diskType = ISIS_SD;
             else if ((Match(s, "ISIS II DD")))
                 diskType = ISIS_DD;
+            else if (Match(s, "ISIS PDS") || Match(s, "PDS"))
+                diskType = ISIS_PDS;
             else {
                 fprintf(stderr, "Unsupported disk format %s\n", s);
                 exit(1);
             }
         }
-        else if ((cnt = Match(line, "interleave:"))) {      // we have non standard interleave
-            s = line + cnt;
+        else if (s = Match(line, "interleave:")) {      // we have non standard interleave
             if ('1' <= s[0] && s[0] <= 52 + '0' &&
                 '1' <= s[1] && s[1] <= 52 + '0' &&
                 '1' <= s[2] && s[2] <= 52 + '0')
                 InitFmtTable(s[0] - '0', s[1] - '0', s[2] - '0');
         }
-        else if (cnt = Match(line, "os:")) {
-            s = line + cnt;
+        else if (s = Match(line, "os:")) {
             if (!Match(s, "NONE"))
                 hasSystem = true;
         }
+        else if (s = Match(line, "crlf:"))
+            decodePair(label.crlf, s);
     }
 }
 
@@ -366,7 +380,6 @@ void main(int argc, char **argv) {
     char outfile[_MAX_PATH + 4] = "";
     char *s;
     char *diskname;
-    int fmtCh;
     char dir[_MAX_DIR];
     char drive[_MAX_DRIVE];
     char fname[_MAX_FNAME];
@@ -388,12 +401,12 @@ void main(int argc, char **argv) {
                     fprintf(stderr, "ignoring invaild skew specification in -i option\n");
             break;
         case 't':
-            interTrackInterleave = true;
+            interTrackSkew = true;
             break;
         case 'f':
-            if (sscanf(argv[i] + 2, "%x", &fmtCh) != 1)
-                fmtCh = ALT_FMTBYTE;
-            formatCh = (byte)fmtCh;
+            if (sscanf(argv[i] + 2, "%x", &formatCh) != 1)
+                formatCh = ALT_FMTBYTE;
+            formatCh &= 0xff;
             break;
         }
     }
@@ -431,9 +444,9 @@ void main(int argc, char **argv) {
     }
 
     // use envionment variable to define root
-    *root = 0;                              // assume  no prefix
+    *root = 0;     // assume  no prefix
     if (s = getenv("IFILEREPO")) {         // environment variable defined
-        strncpy(root, s, _MAX_PATH - 1);    // path too long will be detected later
+        strncat(root, s, _MAX_PATH - 1);    // path too long will be detected later
         s = strchr(root, 0);                // end of path
         if (s != root && s[-1] != '/' && s[-1] != '\\') // make sure directory
             strcat(s, "/");
@@ -444,10 +457,13 @@ void main(int argc, char **argv) {
         exit(1);
     }
     ParseRecipeHeader(fp);
-    FormatDisk(diskType);
-    WriteDirectory();
+    FormatDisk(diskType, formatCh);
+    if (diskType != ISIS_PDS)
+        WriteI2Directory();
+    else
+        WriteI3Directory();
     WriteLabel();
     ParseFiles(fp);
     fclose(fp);
-    WriteImgFile(outfile, interleave ? (forcedSkew ? forcedSkew : label.fmtTable) : NULL, comment);
+    WriteImgFile(outfile, diskType, interleave ? forcedSkew ? forcedSkew : "" : NULL, interTrackSkew, comment);
 }
