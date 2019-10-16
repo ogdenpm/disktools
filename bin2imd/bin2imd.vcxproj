@@ -125,7 +125,8 @@
       <OptimizeReferences>true</OptimizeReferences>
     </Link>
     <PostBuildEvent>
-      <Command>copy /b /y $(TargetPath) $(SolutionDir)\prebuilt</Command>
+      <Command>copy /b /y $(TargetPath) $(SolutionDir)\prebuilt
+if exist d:\bin copy /y /b $(TargetPath) d:\bin</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
