@@ -55,6 +55,8 @@ bool showRdError = true;
 int rdErrorCnt = 0;
 int recoveredFiles = 0;
 
+bool debug = false;
+
 #define NIFILES	10
 
 typedef struct {
@@ -342,7 +344,7 @@ void load_imd(FILE *fp)
     switch (disk[1][0]->Nsec) {
     case 26: diskType = ISIS_SD; break;
     case 52: diskType = ISIS_DD; break;
-    case 16: diskType = ISIS_III; break;
+    case 16: diskType = ISIS_PDS; break;
     case 8: diskType = ISIS_IV; break;
     default: diskType = UNKNOWN;
     }
@@ -360,7 +362,7 @@ struct {
 } diskSizes[] = {
     256256, ISIS_SD, 77, 1, 26, 128, 26, 128,
     512512, ISIS_DD, 77, 1, 52, 128, 52, 128,
-    653312, ISIS_III, 80, 2, 16, 128, 16, 256,
+    653312, ISIS_PDS, 80, 2, 16, 128, 16, 256,
     653184, ISIS_IV, 80, 2, 15, 128, 8, 512   // currently unreliable
 };
 #define DISKOPT (sizeof(diskSizes) / sizeof(diskSizes[0]))
@@ -427,10 +429,10 @@ byte *getTS(int track, int sector)
     }
     if (disk[track][0])
         spt = disk[track][0]->Nsec;
-    else if (track != 0 || !disk[track][1] || diskType == UNKNOWN)  // special handling only for track 0 of ISIS_III and ISIS_IV disks
+    else if (track != 0 || !disk[track][1] || diskType == UNKNOWN)  // special handling only for track 0 of ISIS_PDS and ISIS_IV disks
         return NULL;
     else
-        spt = diskType == ISIS_III ? 16 : 15;
+        spt = diskType == ISIS_PDS ? 16 : 15;
     if (sector >= spt && heads > 0) {      // overflow onto other head ?
         head++;
         sector -= spt;
@@ -802,7 +804,7 @@ void extractFile(dir_t *dptr, int dirSlot)
     int blk, blkIdx;
     isisLinkage_t *links = (isisLinkage_t *)&(dptr->blocks);	// trick to pick next block from directory info
     int prevTrk, prevSec;
-    int sectorSize = diskType == ISIS_III ? 256 : 128;
+    int sectorSize = diskType == ISIS_PDS ? 256 : 128;
     int size = 0;
 
     if (*dptr->ext)
@@ -836,12 +838,15 @@ void extractFile(dir_t *dptr, int dirSlot)
 
     InitSHA1();
 
+    if (debug) printf("%s:", filename);
     for (blk = 0; blk < dptr->blocks; blk++) {
         if (blk == dptr->blocks - 1)
-            sectorSize = diskType == ISIS_III ? dptr->lastblksize + 1 : dptr->lastblksize;
+            sectorSize = diskType == ISIS_PDS ? dptr->lastblksize + 1 : dptr->lastblksize;
 
-        blkIdx = blk % (diskType == ISIS_III ? 123 : 62);
+        blkIdx = blk % (diskType == ISIS_PDS ? 123 : 62);
+        if (debug && blkIdx % 16 == 0) printf("\n ");
         if (blkIdx == 0) {
+            if (debug) printf(" %02d:%02d -> ", links->next.track, links->next.sector);
             isisLinkage_t *curLinks = links;
             if ((links = (isisLinkage_t *)getTS(links->next.track, links->next.sector)) == NULL) {
                 rdError("%s block %d bad linkage block t=%d s=%d\n", isisName, blk, curLinks->next.track, curLinks->next.sector);
@@ -853,7 +858,9 @@ void extractFile(dir_t *dptr, int dirSlot)
             }
             prevTrk = curLinks->next.track;
             prevSec = curLinks->next.sector;
-        }
+            if (debug) printf("(%02d:%02d %02d:%02d)", links->prev.track, links->prev.sector, links->next.track, links->next.sector);
+       }
+        if (debug) printf(" %02d:%02d", links->pointers[blkIdx].track, links->pointers[blkIdx].sector);
         if (links->pointers[blkIdx].sector == 0 || (p = getTS(links->pointers[blkIdx].track, links->pointers[blkIdx].sector)) == NULL) {
             rdError("%s block %d missing t=%d s=%d\n", filename, blk, links->pointers[blkIdx].track, links->pointers[blkIdx].sector);
 
@@ -866,6 +873,11 @@ void extractFile(dir_t *dptr, int dirSlot)
             AddSHA1(p, sectorSize);
         }
     }
+    if (debug && blk != 0) {
+        while (++blkIdx < (diskType == ISIS_PDS ? 123 : 62) && (links->pointers[blkIdx].track || links->pointers[blkIdx].sector))
+            printf(" [%02d:%02d]", links->pointers[blkIdx].track, links->pointers[blkIdx].sector);
+    }
+    if (debug) putchar('\n');
 
     fclose(fout);
     // update the recipe info
@@ -873,7 +885,7 @@ void extractFile(dir_t *dptr, int dirSlot)
     strcat(isisDir[dirIdx].name, isisName);
     strcpy(isisDir[dirIdx].fname, filename);
     if (dptr->blocks)
-        isisDir[dirIdx].dirLen = (dptr->blocks - 1) * (diskType == ISIS_III ? 256 : 128) + sectorSize;
+        isisDir[dirIdx].dirLen = (dptr->blocks - 1) * (diskType == ISIS_PDS ? 256 : 128) + sectorSize;
     else
         isisDir[dirIdx].dirLen = -dptr->lastblksize;
     isisDir[dirIdx].actLen = size;
@@ -897,7 +909,7 @@ void isis2_3(dir_t *dptr)
     dir_t dentry;
     int dirSlot;
 
-    printf("Looks like an ISIS %s disk\n", diskType == ISIS_III ? "III" : "II");
+    printf("Looks like an ISIS %s disk\n", diskType == ISIS_PDS ? "PDS" : "II");
 
     extractFile(dptr, 0);		// get the ISIS.DIR file, leaves filename in targetPath
     /* although processing of the header file could be done here
@@ -931,17 +943,25 @@ void main(int argc, char **argv)
     char drive[_MAX_DRIVE];
     char fname[_MAX_FNAME];
     char ext[_MAX_EXT];
+    bool local = false;
 
-    if (argc > 2 && _stricmp(argv[1], "-l") == 0) {
+    while (argc > 2) {
+        if (_stricmp(argv[1], "-l") == 0)
+            local = true;
+        else if (_stricmp(argv[1], "-d") == 0)
+            debug = true;
+        else
+            break;
         argv++;
         argc--;
     }
-    else
+    if (!local)
         loadCache();
 
     if (argc != 2 || (fp = fopen(*++argv, "rb")) == NULL) {
-        fprintf(stderr, "usage: unidsk [-l] file\n"
-            "-l for local names only\n");
+        fprintf(stderr, "usage: unidsk [-l] [-d] file\n"
+            "-l for local names only\n"
+            "-d for link info\n");
         exit(1);
     }
 

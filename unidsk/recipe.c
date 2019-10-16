@@ -20,6 +20,10 @@ MODIFICATION HISTORY
                    the new option -l or -L supresses the lookup i.e. local fiiles
     13 Sep 2018 -- Renamed skew to interleave to align with normal terminolgy
                    skew is kept as an option but not currently used
+    15-Oct 2019 -- Added crlf recipe line for junk fill in ISIS III disk
+                   Modified version and crlf recipes to accept #nn for hex value
+                   as ISIS III does not explicitly fill these so this allows
+                   arbitary data to be written
 
 TODO
     Review the information generated for an ISIS IV disk to see if it is sufficient
@@ -39,11 +43,12 @@ initial comment lines
 information lines which can occur in any order, although the order below is the default
 and can be separated with multiple comment lines starting with #. These comments are ignored
     label: name[.|-]ext             Used in ISIS.LAB name has max 6 chars, ext has max 3 chars
-    version: nn                     Up to 2 chars used in ISIS.LAB
+    version: nn                     Up to 2 chars used in ISIS.LAB (extended to allow char to have #nn hex value)
     format: diskFormat              ISIS II SD, ISIS II DD or ISIS III
     interleave:  interleaveInfo     optional non standard interleave info taken from ISIS.LAB. Rarely needed
     skew: skewInfo                  inter track skew - not currently used
     os: operatingSystem             operating system on disk. NONE or ISIS ver, PDS ver, OSIRIS ver
+    crlf: nn                        Up to 2 chars used in ISIS.LAB Each char can be #nn hex value
 marker for start of files
     Files:
 List of files to add to the image in ISIS.DIR order. Comment lines starting with # are ignored
@@ -86,6 +91,7 @@ The primary use of this is to change to prefered path names for human reading
 #include <stdlib.h>
 #include <direct.h>
 #include <string.h>
+#include <ctype.h>
 
 #include "unidsk.h"
 
@@ -110,9 +116,19 @@ struct {
     NULL, "NONE"
 };
 
-char *osFormat[] = { "UNKNOWN", "ISIS II SD", "ISIS II DD", "ISIS III", "ISIS IV" };
+char *osFormat[] = { "UNKNOWN", "ISIS II SD", "ISIS II DD", "ISIS PDS", "ISIS IV" };
 
-void mkRecipe(char *name, isisDir_t  *isisDir, char *comment, int diskType)
+
+void EncodePair(FILE *fp, char *s) {
+    putc(' ', fp);
+    for (int i = 0; i < 2; i++)
+        if (isupper(*s) || isdigit(*s) || *s == '.')
+            putc(*s++, fp);
+        else
+            fprintf(fp, "#%02X", *s++);
+}
+
+void mkRecipe(char *name, isisDir_t *isisDir, char *comment, int diskType)
 {
     FILE *fp;
     FILE *lab;
@@ -137,8 +153,7 @@ void mkRecipe(char *name, isisDir_t  *isisDir, char *comment, int diskType)
             if (*comment)
                 putc(*comment++, fp);
         }
-    }
-    else
+    } else
         fprintf(fp, "# %s\n", name);
 
     if ((lab = fopen("isis.lab", "rb")) == 0 || fread(&label, sizeof(label), 1, lab) != 1)
@@ -151,7 +166,13 @@ void mkRecipe(char *name, isisDir_t  *isisDir, char *comment, int diskType)
                 fprintf(fp, ".%.3s", label.name + 6);
         }
         fputs("\nversion:", fp);
-        if (label.version[0])
+        if (diskType == ISIS_PDS) {
+            EncodePair(fp, label.version);
+            if (label.crlf[0] != '\r' || label.crlf[1] != '\n') {
+                fputs("\ncrlf:", fp);
+                EncodePair(fp, label.crlf);
+            }
+        } else if (label.version[0])
             fprintf(fp, " %.2s", label.version);
     }
 
@@ -168,8 +189,7 @@ void mkRecipe(char *name, isisDir_t  *isisDir, char *comment, int diskType)
                 os = osMap[i].os;
                 break;
             }
-    }
-    else
+    } else
         os = "NONE";
 
     fprintf(fp, "os: %s\nFiles:\n", os);

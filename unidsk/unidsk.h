@@ -40,7 +40,7 @@ typedef unsigned __int32 dword;
 #define MAXHEAD		2
 
 // disk types
-enum { UNKNOWN, ISIS_SD, ISIS_DD, ISIS_III, ISIS_IV, ZXENIX, CPM };
+enum { UNKNOWN, ISIS_SD, ISIS_DD, ISIS_PDS, ISIS_IV, ZXENIX, CPM };
 #define ISIS_SD_SIZE   256256
 #define ISIS_DD_SIZE   512512
 
@@ -77,6 +77,7 @@ typedef struct {
 #pragma pack(pop)
 
 extern int osIdx;
+extern bool debug;
 
 void mkRecipe(char *name, isisDir_t  *isisDir, char *comment, int diskType);
 char *Dblookup(isisDir_t *entry);
