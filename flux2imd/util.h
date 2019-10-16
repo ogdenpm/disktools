@@ -26,8 +26,7 @@ enum {
 extern int debug;
 
 void* xmalloc(size_t size);
-unsigned flip(unsigned pattern);
-uint64_t encodeFM(uint32_t val);
+uint8_t flip[];
 void logFull(int level, char* fmt, ...);
 int logBasic(char* fmt, ...);
 

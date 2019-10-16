@@ -66,10 +66,10 @@ static void fixSectorMap() {
 
 static void removeTrack(track_t* p) {
     if (p) {
-		for (int i = 0; i < p->fmt->spt; i++) {
-			removeSectorData(p->sectors[i].sectorDataList);
-			p->sectors[i].sectorDataList = NULL;
-		}
+        for (int i = 0; i < p->fmt->spt; i++) {
+            removeSectorData(p->sectors[i].sectorDataList);
+            p->sectors[i].sectorDataList = NULL;
+        }
         if (p == trackPtr)
             trackPtr = NULL;
         free(p);
@@ -108,7 +108,7 @@ void finaliseTrack() {
         for (int i = 0; i < trackPtr->fmt->spt; i++)
             if (!(trackPtr->sectors[sectorToSlot[i]].status & SS_IDAMGOOD)) {
                 slotToSector[sectorToSlot[i]] =
-                    trackPtr->sectors[sectorToSlot[i]].sectorId = i + trackPtr->fmt->firstSectorId;
+                    trackPtr->sectors[sectorToSlot[i]].idam.sectorId = i + trackPtr->fmt->firstSectorId;
                 trackPtr->sectors[sectorToSlot[i]].status |= SS_FIXED;
 
             }
@@ -136,8 +136,8 @@ void initTrack(int cylinder, int head) {
     memset(trackPtr, 0, sizeof(*trackPtr) + sizeof(sector_t) * curFormat->spt);
     memset(trackPtr->slotToSector, 0xff, curFormat->spt);
     memset(trackPtr->sectorToSlot, 0xff, curFormat->spt);
-    trackPtr->cylinder = cylinder;
-    trackPtr->side = head;
+    trackPtr->altCylinder = trackPtr->cylinder = cylinder;
+    trackPtr->altSide = trackPtr->side = head;
     trackPtr->fmt = curFormat;
 }
 

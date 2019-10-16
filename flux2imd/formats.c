@@ -86,8 +86,8 @@ pattern_t ddM2FMPatterns[] = {
 
 
 pattern_t hs5Patterns[] = {
-      { 0xffff, 0xAAAA, GAP},
-      { 0xffffff ,0xAA5555, SYNC},
+      { 0xffffffC0007fff ,0x0, MTECH_SECTOR},     // created from 0xff track sector, note track is wildcarded due to track alignment problems
+      { 0xffffffffffff, 0xAAAAAAAAAAAA, GAP},             // for efficiency 
 
     {0}
 };
@@ -135,7 +135,7 @@ bool crc8(uint16_t* data, int len);
     then duplicate the head of the group  and set the O_SPC option.
 
     Note hardsectors are treated differently, currently only 8" is supported and FM encoding is
-    assumed i.e. FM8H. The determination of the true format is done in hsGetTrack as encodings
+    assumed i.e. FM8H. The determination of the true format is done in hs8GetTrack as encodings
     are non standard and examples so far have start information dependent on the sector
 */
 formatInfo_t formatInfo[] = {
@@ -148,15 +148,15 @@ formatInfo_t formatInfo[] = {
     {"SD8"        , 0, 1, 26,   E_FM8,      0, crcStd,     sdPatterns, 0xffff,     90, 115, 194},
     {"FM8-26x128" , 0, 1, 26,   E_FM8,      0, crcStd,   sdFMPatterns, 0xffff,     39, 64, 191},    // manually adjusted 
 
-    {"MFM5H"      , 1, 0, 16,  E_MFM5,O_MTECH, crc8,   hs5Patterns, 0xffff,		   40,  42, 350},
+    {"MFM5H"      , 1, 0, 16, E_MFM5H,O_MTECH, crc8,      hs5Patterns, 0xffff,	   40,  42, 350},
     {"FM8H"       , 0, 0, 32,  E_FM8H,      0, crcZDS,     hsPatterns,      0, HSIDAM,   8, 168},
     {"FM8H-ZDS"   , 0, 0, 32,  E_FM8H,  O_ZDS, crcZDS, &hsPatterns[1],      0, HSIDAM,  18, 168},
     {"FM8H-LSI"   , 0, 0, 32,  E_FM8H,  O_LSI, crcLSI,     hsPatterns,      0, HSIDAM,   8, 168}, 
-    {"LSI"        , 0, 0, 32,  E_FM8H,  O_LSI, crcLSI,    lsiPatterns,      0, HSIDAM,   8, 168}, 
+    {"LSI"        , 0, 0, 32,  E_FM8H,  O_LSI, crcLSI,    lsiPatterns,      0, HSIDAM,   8, 168},  // for future use (LSI with no option to detect ZDS)
 
     {"DD5"        , 1, 1, 16,  E_MFM5,      0, crcStd,    dd5Patterns, 0xcdb4,    155, 200, 368},
     {"MFM5"       , 1, 1, 16,  E_MFM5, O_SIZE, crcStd,  ddMFMPatterns, 0xcdb4,    155, 200, 368},
-    {"MFM5-16x256", 1, 1, 16,  E_MFM5,      0, crcStd,  ddMFMPatterns, 0xcdb4,    155, 200, 375},   // 375 works for both seen variants
+    {"MFM5-16x256", 1, 1, 16,  E_MFM5,      0, crcStd,  ddMFMPatterns, 0xcdb4,    155, 200, 375},   // spc=375 works for both seen variants
     {"MFM5-8x512" , 2, 1,  8,  E_MFM5,      0, crcStd,  ddMFMPatterns, 0xcdb4,    166, 210, 686}, 
 
     {"DD8"        , 0, 0 , 0,  E_MFM8,      0, crcStd,    dd8Patterns,      0,      0,   0,   0},
@@ -192,7 +192,7 @@ static bool crcRev(uint16_t* data, int len) {
     uint16_t crc = curFormat->crcInit;
 
     while (len-- > 0) {
-        x = (crc >> 8) ^ (flip(*data++) & 0xff);
+        x = (crc >> 8) ^ flip[*data++ & 0xff];
         x ^= x >> 4;
         crc = (crc << 8) ^ (x << 12) ^ (x << 5) ^ x;
     }
@@ -200,10 +200,10 @@ static bool crcRev(uint16_t* data, int len) {
 }
 
 bool crc8(uint16_t* data, int len) {
-	uint16_t crc = 0;
-	for (int i = 0; i < len - 1; i++)
-		crc = (crc & 0xff) + (data[i] & 0xff) + ((crc & 0x100) ? 1 : 0);
-	return (crc & 0xff) == (data[len - 1] & 0xff);
+    uint16_t crc = 0;
+    for (int i = 0; i < len - 1; i++)
+        crc = (crc & 0xff) + (data[i] & 0xff) + ((crc & 0x100) ? 1 : 0);
+    return (crc & 0xff) == (data[len - 1] & 0xff);
 }
 
 static bool crcStd(uint16_t* buf, int len) {
@@ -257,36 +257,100 @@ static char *probe() {
     return NULL;
 }
 
-uint64_t encodeFM(uint32_t val) {
-    uint64_t fmVal = 0;
-    for (uint32_t i = 0x80000000; i; i >>= 1)
-        fmVal = (fmVal << 2) + ((val & i) ? 3 : 2);
-    return fmVal;
+
+
+/*
+    Encoder Rules 
+    FM encode: 
+        1. Write data bits at the center of the bit cell, and 
+        2. Write clock bits at the beginning of the bit cell. 
+    MFM encode: 
+        1. Write data bits at the center of the bit cell, and 
+        2. Write clock bits at the beginning of the bit cell if: 
+        A. no data has been written in the previous bit cell, and 
+        B. no data bit will be written in the present bit cell. 
+    M2FM encode: 
+        1. Write data bits at the center of the bit cell, and 
+        2. Write clock bits at the beginning of the bit cell if: 
+        A. no data or clock bit has been written in the previous bit cell, and 
+        B. no data bit will be written in the present bit cell. 
+    GCR encode: NOT SUPPORTED YET
+        This code translates 4 bits into 5 bits of binary data for storing information and then re-translates the 5 
+        bits into 4 bits during a read operation. 
+
+                5 Bit 
+        4 Bit  Recorded 
+        Data     Data 
+        0000    11001 
+        0001    11011 
+        0010    10010 
+        0011    10011 
+        0100    11101 
+        0101    10101 
+        0110    10110 
+        0111    10111 
+        1000    11010 
+        1001    01001 
+        1010    01010 
+        1011    01011 
+        1100    11110 
+        1101    01101 
+        1110    01110 
+        1111    01111 
+*/
+// prevPattern is used for MFM & M2FM encoding specifically that last dbit (MFM & M2FM) and last cbit (M2FM)
+uint64_t encode(uint32_t val, uint32_t prevPattern) {
+    uint64_t pattern = prevPattern;
+    unsigned mask;           // mask for determining if cbit needed
+
+    switch (curFormat->encoding) {
+    case E_MFM5: case E_MFM8: case E_MFM5H: mask = 5; break;
+    case E_M2FM8: mask = 0xd; break;
+    default: mask = 0; break;
+    }
+
+    for (uint32_t i = 0x80000000; i; i >>= 1) {
+        pattern <<= 2;
+        if (val & i)                // add dbit
+            pattern++;
+        if ((pattern & mask) == 0)  // add cbit
+            pattern += 2;
+    }
+    return pattern;
 }
 
-int getByte() {
+
+// decode lower 16 bits of pattern into data byte + flag to indicate if suspect encoding
+// note for MFM & M2FM bits 17, 18 will are used to determine if suspect
+int decode(uint64_t pattern) {
+    unsigned mask;
     int val = 0;
-    int bit;
     bool suspect = false;
-    for (int i = 0; i < 8; i++) {
-        if (getBit() < 0 || (bit = getBit()) < 0)
-            return -1;
-        switch (curFormat->encoding) {
-        case E_FM5: case E_FM8: case E_FM8H:
-            suspect |= !(pattern & 2); break;
-        case E_MFM5: case E_MFM8:
-            suspect |= (pattern & 2) && (pattern & 5); break;
-        case E_M2FM8: case E_M2FM5:
-            suspect |= (pattern & 2) && (pattern & 0xd); break;
-        }
-        if (curFormat->options & O_REV)
-            val = (val >> 1) + (bit ? 0x80 : 0);
-        else
-            val = (val << 1) + bit;
+
+    switch (curFormat->encoding) {
+    case E_MFM5: case E_MFM8: case E_MFM5H: mask = 5; break;
+    case E_M2FM8: mask = 0xd; break;
+    default: mask = 0; break;
     }
+    for (int i = 0; i < 8; i++, pattern >>= 2) {
+        val = (val >> 1) + ((pattern & 1) ? 0x80 : 0);
+        suspect |= ((pattern & 2) == 2) ^ ((pattern & mask) == 0);
+    }
+    if (curFormat->options & O_REV)
+        val = flip[val];
     if (curFormat->options & O_INV)
         val ^= 0xff;
+
     return val + (suspect ? SUSPECT : 0);
+}
+
+
+
+int getByte() {
+    for (int i = 0; i < 16; i++)    // get the 16 c/d bits for the byte
+        if (getBit() < 0)
+            return -1;
+    return decode(pattern);
 }
 
 char* getName(int am) {
@@ -307,13 +371,20 @@ char* getName(int am) {
     case HP_DELETEDAM: return "HP_DELETEDAM";
     case LSI_SECTOR: return "LSI_SECTOR";
     case ZDS_SECTOR: return "ZDS_SECTOR";
+    case MTECH_SECTOR: return "MTECH_SECTOR";
     }
     return "NO MATCH\n";
 }
 
-void makeHSPatterns(unsigned cylinder, unsigned slot)     {
-    lsiPatterns[0].match = hsPatterns[0].match = encodeFM(flip((cylinder ? cylinder : 32) * 2 + 1));            // set LSI match pattern
-    hsPatterns[1].match = encodeFM(((slot + 0x80) << 8) + cylinder); // set ZDS match pattern
+
+void makeHS5Patterns(unsigned cylinder, unsigned slot) {
+    hs5Patterns[0].match = encode(0xff0000 + (cylinder << 8) + slot, 0xA);
+
+}
+
+void makeHS8Patterns(unsigned cylinder, unsigned slot) {
+    lsiPatterns[0].match = hsPatterns[0].match = encode(flip[(cylinder ? cylinder : 32) * 2 + 1], 0);            // set LSI match pattern
+    hsPatterns[1].match = encode(((slot + 0x80) << 8) + cylinder, 0); // set ZDS match pattern
 
 }
 

@@ -6,13 +6,15 @@
 
 
 // track status flags
-enum {TS_FIXEDID = 1, TS_BADID = 2};
+enum {TS_FIXEDID = 1, TS_BADID = 2, TS_CYL = 4, TS_MCYL = 8, TS_SIDE = 16, TS_MSIDE = 32};
 
 
 typedef struct {
     unsigned status;
     int cylinder;
     int side;
+    int altCylinder;
+    int altSide;
     formatInfo_t* fmt;
     int cntGoodIdam;
     int cntGoodData;

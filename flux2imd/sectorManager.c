@@ -100,23 +100,45 @@ void addIdam(unsigned pos, idam_t* idam) {
 
     sector_t* p = &trackPtr->sectors[slot];
 
-    if (idam->cylinder != trackPtr->cylinder || idam->side != trackPtr->side) {
-        logFull(D_WARNING, "Unexpected cylinder/side %d/%d - expected %d/%d @ slot %d\n",
-                idam->cylinder, idam->side, trackPtr->cylinder, trackPtr->side, slot);
-        trackPtr->cylinder = idam->cylinder;
-        trackPtr->side = idam->side;
-    }
+ 
+
 
     if (idam->sectorId < curFormat->firstSectorId ||  idam->sectorId - curFormat->firstSectorId >= curFormat->spt)
         logFull(D_FATAL, "@slot %d sector Id %d out of range\n", slot, idam->sectorId);
 
     if (p->status & SS_IDAMGOOD) {
-        if (idam->sectorId != p->sectorId)
-            logFull(ALWAYS, "@slot %d sector Id conflict new %d previous %d\n", slot, idam->sectorId, p->sectorId);
-    } else {
+        if (memcmp(idam, &p->idam, sizeof(idam_t)) != 0)
+            logFull(ALWAYS, "@slot %d idam mismatch prev %02d/%d/%02d (%d) new %02d/%d/%02d (%d) - change ignored\n", slot,
+                idam->cylinder, idam->side, idam->sectorId, 128 << idam->sSize,
+                p->idam.cylinder, p->idam.side, p->idam.sectorId, 128 << p->idam.sSize);
+
+    }
+    else {
+        if (idam->cylinder != trackPtr->altCylinder) {
+            if ((trackPtr->status & TS_CYL) == 0) {
+                logFull(D_WARNING, "Expected cylinder %d, read %d\n", trackPtr->altCylinder, idam->cylinder);
+                trackPtr->status |= TS_CYL;
+            }
+            else if ((trackPtr->status & TS_MCYL) == 0) {
+                logFull(D_WARNING, "Multiple cylinder ids including %d & %d\n", trackPtr->altCylinder, idam->cylinder);
+                trackPtr->status |= TS_MCYL;
+            }
+            trackPtr->altCylinder = idam->cylinder;
+        }
+        if (idam->side != trackPtr->altSide) {
+            if ((trackPtr->status & TS_SIDE) == 0) {
+                logFull(D_WARNING, "Expected head %d, read %d\n", trackPtr->altSide, idam->side);
+                trackPtr->status |= TS_SIDE;
+            }
+            else if ((trackPtr->status & TS_MSIDE) == 0) {
+                logFull(D_ERROR, "Multiple head ids %d & %d\n", trackPtr->altSide, idam->side);
+                trackPtr->status |= TS_MSIDE;
+            }
+            trackPtr->altSide = idam->side;
+        }
         trackPtr->cntGoodIdam++;
         p->status |= SS_IDAMGOOD;
-        p->sectorId = idam->sectorId;
+        p->idam = *idam;
         trackPtr->slotToSector[slot] = idam->sectorId;
         trackPtr->sectorToSlot[idam->sectorId - trackPtr->fmt->firstSectorId] = slot;
     }

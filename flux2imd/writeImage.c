@@ -49,8 +49,8 @@ static void WriteIMDHdr(FILE* fp, char* fname) {
 }
 
 
-// E_FM5, E_FM8, E_FM8H, E_MFM5, E_MFM8, E_M2FM8
-static uint8_t imdModes[] = { 2, 0, 0, 5, 3, 3 };
+// E_FM5, E_FM8, E_FM8H, E_MFM5, E_MFM8, E_MFM5H, E_M2FM8
+static uint8_t imdModes[] = { 2, 0, 0, 5, 3, 5, 3 };
 
 void writeImdFile(char *fname) {
     FILE *fp;
@@ -76,16 +76,22 @@ void writeImdFile(char *fname) {
             trackPtr = getTrack(cyl, head);
             if (!trackPtr || trackPtr->status & TS_BADID || !hasTrack(cyl, head))
                 continue;
-            if (trackPtr->cylinder != cyl || trackPtr->side != head)
-                logFull(D_WARNING, "cylinder/side mismatch %d/%d expecting %d/%d\n", trackPtr->cylinder, trackPtr->side, cyl, head);
-
             putc(imdModes[trackPtr->fmt->encoding], fp);           // mode
-            putc(trackPtr->cylinder, fp);                      // cylinder
-            putc(trackPtr->side, fp);                     // head
+            putc(cyl, fp);                      // cylinder
+            putc(head | ((trackPtr->status & TS_CYL) ? 0x80 : 0) | ((trackPtr->status & TS_SIDE) ? 0x40 : 0), fp);                     // head
             putc(trackPtr->fmt->spt, fp);       // sectors in track
             putc(trackPtr->fmt->sSize, fp);     // sector size
             fwrite(trackPtr->slotToSector, 1, trackPtr->fmt->spt, fp);    // sector numbering map
-
+            if (trackPtr->status & TS_CYL) {
+                logFull(D_WARNING, "cylinder map needed for track %02d/%d\n", trackPtr->cylinder, trackPtr->side);
+                for (int i = 0; i < trackPtr->fmt->spt; i++)
+                    putc(trackPtr->sectors[i].idam.cylinder, fp);
+            }
+            if (trackPtr->status & TS_SIDE) {
+                logFull(D_WARNING, "head map needed for track %02d/%d\n", trackPtr->cylinder, trackPtr->side);
+                for (int i = 0; i < trackPtr->fmt->spt; i++)
+                    putc(trackPtr->sectors[i].idam.side, fp);
+            }
 
             for (int slot = 0; slot < trackPtr->fmt->spt; slot++) {
                 if (trackPtr->sectors[slot].status & SS_DATAGOOD) {

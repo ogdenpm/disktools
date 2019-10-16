@@ -102,7 +102,7 @@ static void displayLine(sector_t *pSector, int offset, int len, void (*displayFu
 static void displaySector(track_t *pTrack, uint8_t slot, unsigned options) {
     sector_t *pSector = &pTrack->sectors[slot];
 
-	int size = 128 << pTrack->fmt->sSize;
+    int size = 128 << pTrack->fmt->sSize;
 
     if (!pSector->sectorDataList) {
         if (options & bOpt)
@@ -126,12 +126,12 @@ static void displaySector(track_t *pTrack, uint8_t slot, unsigned options) {
         displayLine(pSector, i, size - i >= 16 ? 16 : size - i, displayDataLine);
 
     if (!isGood || pTrack->fmt->options == O_ZDS) {
-		int cntExtra;
-		switch (pTrack->fmt->options) {
-		case O_MTECH: cntExtra = 1; break;
-		case O_ZDS: cntExtra = (pSector->status & SS_DATAGOOD) ? 4 : 8; break;
-		default: cntExtra = 2;
-		}
+        int cntExtra;
+        switch (pTrack->fmt->options) {
+        case O_MTECH: cntExtra = 1; break;
+        case O_ZDS: cntExtra = (pSector->status & SS_DATAGOOD) ? 4 : 8; break;
+        default: cntExtra = 2;
+        }
 
         displayLine(pSector, size, cntExtra, displayExtraLine);
     }
@@ -148,12 +148,14 @@ static int rowSuspectCnt(uint16_t* s, int len) {
 
 static char* sectorToString(track_t* pTrack, uint8_t slot) {
     static char s[9];
-    if (pTrack->sectors[slot].status & SS_IDAMGOOD)
-        sprintf(s, "%02d/%d/%02d", pTrack->cylinder, pTrack->side, pTrack->sectors[slot].sectorId);
-    else if (pTrack->sectors[slot].status & SS_FIXED)
-        sprintf(s, "%02d/%d/%02d*", pTrack->cylinder, pTrack->side, pTrack->sectors[slot].sectorId);
+    sector_t *p = &pTrack->sectors[slot];
+
+    if (p->status & SS_IDAMGOOD)
+        sprintf(s, "%02d/%d/%02d", p->idam.cylinder, p->idam.side, p->idam.sectorId);
+    else if (p->status & SS_FIXED)
+        sprintf(s, "%02d/%d/%02d*", p->idam.cylinder, p->idam.side, p->idam.sectorId);
     else
-        sprintf(s, "%02d/%d/??", pTrack->cylinder, pTrack->side);
+        sprintf(s, "%02d/%d/??", p->idam.cylinder, p->idam.side);
     return s;
 }
 
@@ -181,7 +183,7 @@ void displayDefectMap() {
         else {
             logBasic("\n");
             logFull(ALWAYS, "Side %d - defect map - (x) bad sector, (.) bad idam only\n", head);
-            int spt = -1;
+            int spt = 0;
             for (int cyl = 0; cyl <= maxCylinder; cyl++) {
                 if (hasTrack(cyl, head)) {
                     if (!(pTrack = getTrack(cyl, head)))
@@ -239,7 +241,7 @@ void displayTrack(int cylinder, int side, unsigned options) {
     } else if (pTrack->status & TS_FIXEDID) {
         logBasic("  Reconstructed sector order:");
         for (int i = 0; i < spt; i++) {
-            logBasic(" %2d%c", pTrack->sectors[i].sectorId, pTrack->sectors[i].status & SS_IDAMGOOD ? ' ' : '*');
+            logBasic(" %2d%c", pTrack->sectors[i].idam.sectorId, pTrack->sectors[i].status & SS_IDAMGOOD ? ' ' : '*');
             if (spt == 52 && i == 26)
                 logBasic("\n");
         }
@@ -261,7 +263,6 @@ void displayTrack(int cylinder, int side, unsigned options) {
         }
     }
     
-
     if (!(pTrack->status & TS_BADID))
         for (int i = 0; i < spt; i++)
             displaySector(pTrack, pTrack->sectorToSlot[i], options);

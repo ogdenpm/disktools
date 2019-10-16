@@ -32,7 +32,7 @@ typedef struct _sectorDataList {
 
 typedef struct _sector {
     unsigned status;
-    int sectorId;
+    idam_t idam;
     sectorDataList_t* sectorDataList;
 } sector_t;
 
