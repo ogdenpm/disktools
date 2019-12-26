@@ -22,7 +22,7 @@ MODIFICATION HISTORY
                    skew is kept as an option but not currently used
     15-Oct 2019 -- Added crlf recipe line for junk fill in ISIS III disk
                    Modified version and crlf recipes to accept #nn for hex value
-                   as ISIS III does not explicitly fill these so this allows
+                   as ISIS PDS does not explicitly fill these so this allows
                    arbitary data to be written
 
 TODO
