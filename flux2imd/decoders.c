@@ -1,3 +1,7 @@
+// This is an open source non-commercial project. Dear PVS-Studio, please check it.
+
+// PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
+
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -11,7 +15,7 @@
 #include "util.h"
 
 
-static int imdNotPossible = 0;     // to track if any track since last reset is in ZDS format
+static bool imdNotPossible = false;     // to track if any track since last reset is in ZDS format
 
 // support for sector size option in list of possible formats (O_SIZE)
 static bool chkSizeChange(unsigned sSize) {
@@ -113,46 +117,58 @@ static void hs5GetTrack(int cylinder, int side) {
     uint16_t rawData[270];		// 268 data bytes & crc
     bool sectorStatus[16] = { false };
     idam_t idam = { cylinder, 0, 0, 0 };
+    bool done = false;
 
     setInitialFormat("MFM5H");
     initTrack(cylinder, side);
     resetTracker();
+
+    int cntSlot = cntHardSectors();
+
+
     
-    for (int i = 0; (slot = seekBlock(i)) >= 0; i++) {
-        if (!sectorStatus[slot] || (debug & D_NOOPTIMISE)) {
-            retrain(0);
+    for (int profile = 0; !done && retrain(profile); profile++) {
+        for (int i = 0; (slot = seekBlock(i)) >= 0; i++) {
+            if (!sectorStatus[slot] || (debug & D_NOOPTIMISE)) {
+                retrain(0);
 
-            makeHS5Patterns(cylinder, slot);
+                makeHS5Patterns(cylinder, slot);
 
-            while ((matchType = matchPattern(20)) && matchType != MTECH_SECTOR)
-                ;
-            if (matchType) {
-                uint16_t dataPos = getByteCnt();
-                int readCylinder = decode(pattern >> 16);
-                if (readCylinder >= 77)
-                    logFull(D_DECODER, "@%d suspect cylinder\n", dataPos);
-                else if ((result = getData((slot << 8) + (readCylinder & 0xff), rawData, 269)) < 0)
-                    logFull(D_DECODER, "@%d sector %d premature end\n", dataPos, slot);
-                else if (result == 0 && (readCylinder & 0xff) != cylinder)
-                    logFull(D_DECODER, "@%d sector %d crc error in header\n", dataPos, slot);
-                else if (result == 1 && !chkZeroHeader(cylinder, side, slot, rawData))
-                    logFull(D_DECODER, "@%d sector %d sync error\n", dataPos, slot);
-                else {
-                    if (result == 1) {
-                        if (cylinder != (readCylinder & 0xff)) {
-                            logFull(D_DECODER, "@%d cylinder %d expecting %d, assuming seek error\n", dataPos, readCylinder & 0xff, cylinder);
-                            idam.cylinder = cylinder = readCylinder & 0xff;
+                while ((matchType = matchPattern(20)) && matchType != MTECH_SECTOR)
+                    ;
+                if (matchType) {
+                    uint16_t dataPos = getByteCnt();
+                    int readCylinder = decode(pattern >> 16);
+                    if (readCylinder >= 77)
+                        logFull(D_DECODER, "@%d suspect cylinder\n", dataPos);
+                    else if ((result = getData((slot << 8) + (readCylinder & 0xff), rawData, 269)) < 0)
+                        logFull(D_DECODER, "@%d sector %d premature end\n", dataPos, slot);
+                    else if (result == 0 && (readCylinder & 0xff) != cylinder)
+                        logFull(D_DECODER, "@%d sector %d crc error in header\n", dataPos, slot);
+                    else if (result == 1 && !chkZeroHeader(cylinder, side, slot, rawData))
+                        logFull(D_DECODER, "@%d sector %d sync error\n", dataPos, slot);
+                    else {
+                        if (result == 1) {
+                            if (cylinder != (readCylinder & 0xff)) {
+                                logFull(D_DECODER, "@%d cylinder %d expecting %d, assuming seek error\n", dataPos, readCylinder & 0xff, cylinder);
+                                idam.cylinder = cylinder = readCylinder & 0xff;
+                            }
+                            idam.sectorId = slot;
+                            addIdam(slot * curFormat->spacing + dataPos - 1, &idam);
                         }
-                        idam.sectorId = slot;
-                        addIdam(slot * curFormat->spacing + dataPos - 1, &idam);
+                        addSectorData(slot * curFormat->spacing + dataPos + 1, result, 257, rawData + 12);
+                        sectorStatus[slot] |= result;
                     }
-                    addSectorData(slot * curFormat->spacing + dataPos + 1, result, 257, rawData + 12);
-                    sectorStatus[slot] |= result;
-                }
+                } else
+                    logFull(D_DECODER, "cannot find start of sector %d\n", slot);
             }
-            else
-                logFull(D_DECODER, "cannot find start of sector %d\n", slot);
         }
+        done = true;
+        for (int slot = 0; slot < cntSlot; slot++)
+            if (!sectorStatus[slot]) {
+                done = false;
+                break;
+            }
     }
     for (slot = 0; slot < 16; slot++)
         if (!sectorStatus[slot]) {
@@ -161,7 +177,7 @@ static void hs5GetTrack(int cylinder, int side) {
         }
 }
 
-
+// only up to 32 sector 8" hard sector format supported
 static void hs8GetTrack(int cylinder, int side) {
     int slot;
     uint8_t sectorStatus[32] = { 0 };
@@ -169,7 +185,7 @@ static void hs8GetTrack(int cylinder, int side) {
     int matchType;
     idam_t idam = { cylinder, 0, 0, 0 };
 
-
+    bool done = false;
     setInitialFormat("FM8H");
 
     initTrack(cylinder, 0);
@@ -178,65 +194,73 @@ static void hs8GetTrack(int cylinder, int side) {
 
     int cntSlot = cntHardSectors();
 
-    for (int i = 0; (slot = seekBlock(i)) >= 0; i++) {
-        if (sectorStatus[slot] && !(debug & D_NOOPTIMISE))        // skip known good sectors unless D_NOOPTIMISE specified
-            continue;
-        uint16_t rawData[138];      // sector + cylinder + 128 bytes + 4 links + 2 CRC + 2 postamble
-        int result;
+    for (int profile = 0; !done && retrain(profile); profile++) {
+        for (int i = 0; (slot = seekBlock(i)) >= 0; i++) {
+            if (sectorStatus[slot] && !(debug & D_NOOPTIMISE))        // skip known good sectors unless D_NOOPTIMISE specified
+                continue;
+            uint16_t rawData[138];      // sector + cylinder + 128 bytes + 4 links + 2 CRC + 2 postamble
+            int result;
 
-        retrain(0);
+            retrain(profile);
 
-        if (matchType = hs8Sync(cylinder, slot)) {
-            dataPos = getByteCnt();
-            if (curFormat->options == O_LSI && matchType == ZDS_SECTOR) {    // LSI & ZDS on same track assume all ZDS
-                    DBGLOG(D_DECODER, "@%d:%d ZDS sector after LSI sector, rescan assuming ZDS\n", slot, dataPos);
-                    setFormat("FM8H-ZDS");
+            if (matchType = hs8Sync(cylinder, slot)) {
+                dataPos = getByteCnt();
+                    if (curFormat->options == O_LSI && matchType == ZDS_SECTOR) {    // LSI & ZDS on same track assume all ZDS
+                        DBGLOG(D_DECODER, "@%d:%d ZDS sector after LSI sector, rescan assuming ZDS\n", slot, dataPos);
+                        setFormat("FM8H-ZDS");
+                        updateTrackFmt();
+                        memset(sectorStatus, 0, sizeof(sectorStatus));
+                        initTrack(cylinder, 0);    // clear any data collected so far assume all ZDS
+                        i = -1;                    // restart for a whole rescan
+                        continue;
+
+                    }
+                if (!curFormat->options) {     // note LSI->ZDS detected above, ZDS->LSI cannot happen
+                    setFormat(matchType == LSI_SECTOR ? "FM8H-LSI" : "FM8H-ZDS");
                     updateTrackFmt();
-                    memset(sectorStatus, 0, sizeof(sectorStatus));
-                    initTrack(cylinder, 0);    // clear any data collected so far assume all ZDS
-                    i = -1;                    // restart for a whole rescan
-                    continue;
-
-            }
-            if (!curFormat->options) {     // note LSI->ZDS detected above, ZDS->LSI cannot happen
-                setFormat(matchType == LSI_SECTOR ? "FM8H-LSI" : "FM8H-ZDS");
-                updateTrackFmt();
-            }
-            if (matchType == LSI_SECTOR) {
-                if ((result = getData(slot, rawData, 131)) < 0) {
-                    logFull(D_DECODER, "@%d LSI sector %d premature end\n", dataPos, slot);
-                    continue;
                 }
-                idam.sectorId = (lsiInterleave[slot] + cylinder * 8) % 32;
-                addIdam(slot * curFormat->spacing + HSIDAM, &idam);
-                addSectorData(slot * curFormat->spacing + dataPos, result, 130, rawData + 1);
-            } else {
-                if ((result = getData((cylinder << 8) + slot + 0x80, rawData, 138)) < 0) {
-                    logFull(D_DECODER, "@%d ZDS sector %d premature end\n", dataPos, slot);
-                    continue;
+                if (matchType == LSI_SECTOR) {
+                    if ((result = getData(slot, rawData, 131)) < 0) {
+                        logFull(D_DECODER, "@%d LSI sector %d premature end\n", dataPos, slot);
+                        continue;
+                    }
+                    idam.sectorId = (lsiInterleave[slot] + cylinder * 8) % 32;
+                    addIdam(slot * curFormat->spacing + HSIDAM, &idam);
+                    addSectorData(slot * curFormat->spacing + dataPos, result, 130, rawData + 1);
+                } else {
+                    if ((result = getData((cylinder << 8) + slot + 0x80, rawData, 138)) < 0) {
+                        logFull(D_DECODER, "@%d ZDS sector %d premature end\n", dataPos, slot);
+                        continue;
+                    }
+                    idam.sectorId = slot;
+                    addIdam(slot * curFormat->spacing + HSIDAM, &idam);
+                    addSectorData(slot * curFormat->spacing + dataPos, result, 136, rawData + 2);
                 }
-                idam.sectorId = slot;
-                addIdam(slot * curFormat->spacing + HSIDAM, &idam);
-                addSectorData(slot * curFormat->spacing + dataPos, result, 136, rawData + 2);
+
+                DBGLOG(D_DECODER, "@%d-%d %s sector %d%s\n", dataPos, getByteCnt(), matchType == LSI_SECTOR ? "LSI" : "ZDS",
+                    slot, result == 1 ? "" : " bad crc");
+                sectorStatus[slot] |= result;
+            } else
+                logFull(D_DECODER, "cannot find start of sector %d\n", slot);
+
+            if (debug & D_DECODER) {
+                int val;
+                while ((val = getByte()) >= 0)
+                    logBasic(" %02X", val);
+                logBasic("\n");
+                DBGLOG(D_DECODER, "@%d end of sector %d\n", getByteCnt());
             }
 
-            DBGLOG(D_DECODER, "@%d-%d %s sector %d%s\n", dataPos, getByteCnt(), matchType == LSI_SECTOR ? "LSI" : "ZDS",
-                slot, result == 1 ? "" : " bad crc");
-            sectorStatus[slot] |= result;
-        } else
-            logFull(D_DECODER, "cannot find start of sector %d\n", slot);
-
-        if (debug & D_DECODER) {
-            int val;
-            while ((val = getByte()) >= 0)
-                logBasic(" %02X", val);
-            logBasic("\n");
-            DBGLOG(D_DECODER, "@%d end of sector %d\n", getByteCnt());
         }
-
+        done = true;
+        for (int slot = 0; slot < cntSlot; slot++)
+            if (!sectorStatus[slot]) {
+                done = false;
+                break;
+            }
     }
     imdNotPossible |= curFormat->options & O_NOIMD;
-// insert any missing idams
+    // insert any missing idams
     if (curFormat->options)
         for (int slot = 0; slot < cntSlot; slot++) {
             if (!sectorStatus[slot]) {
@@ -261,98 +285,95 @@ static void ssGetTrack(int cylinder, int side) {
     unsigned indexPos = 0;
     bool savedData = false;
 
-    bool done = false;
-
-
     initTrack(cylinder, side);
     unsigned sSize = curFormat->sSize;
 
+    bool done = false;
 
-    for (int i = 1; !done && (seekBlock(i) >= 0); i++) {
-        retrain(0);
-        resetTracker();
-        bool restart = false;
+    for (int profile = 0; !done && retrain(profile); profile++) {
+        for (int i = 1; !done && (seekBlock(i) >= 0); i++) {
+            resetTracker();
+            bool restart = false;
 
-        while (!restart && (matchType = matchPattern(1200))) {
-            switch (matchType) {
-            case M2FM_INDEXAM:
-            case INDEXAM:           // to note start of track
-                indexPos = getByteCnt();
-                DBGLOG(D_DECODER, "@%d index\n", indexPos);
-                break;
-            case IDAM:
-            case M2FM_IDAM:
-            case HP_IDAM:
-                idamPos = getByteCnt();
-                result = getData(matchType, rawData, matchType == HP_IDAM ? 5 : 7);
-                if (result == 1) {           // valid so ok
-                    idam.cylinder = (uint8_t)rawData[1];
-                    if (matchType == HP_IDAM) {
-                        idam.sectorId = (uint8_t)rawData[2];
-                        idam.side = 0;
-                        idam.sSize = 1;
-                    } else {
-                        idam.side = (uint8_t)rawData[2];
-                        idam.sectorId = (uint8_t)rawData[3];
-                        sSize = idam.sSize = (uint8_t)rawData[4] & 0xf;
-                    }
-                    if (chkSizeChange(sSize) && savedData) {    // new size but we already saved data!!
-                        DBGLOG(D_DECODER, "@%d restarted with new size\n", idamPos);
-                        restart = true;
-                        break;
-                    }
-                    //chkSptChange(idamPos, true);
+            while (!restart && (matchType = matchPattern(1200))) {
+                switch (matchType) {
+                case M2FM_INDEXAM:
+                case INDEXAM:           // to note start of track
+                    indexPos = getByteCnt();
+                    DBGLOG(D_DECODER, "@%d index\n", indexPos);
+                    break;
+                case IDAM:
+                case M2FM_IDAM:
+                case HP_IDAM:
+                    idamPos = getByteCnt();
+                    result = getData(matchType, rawData, matchType == HP_IDAM ? 5 : 7);
+                    if (result == 1) {           // valid so ok
+                        idam.cylinder = (uint8_t)rawData[1];
+                        if (matchType == HP_IDAM) {
+                            idam.sectorId = (uint8_t)rawData[2];
+                            idam.side = 0;
+                            idam.sSize = 1;
+                        } else {
+                            idam.side = (uint8_t)rawData[2];
+                            idam.sectorId = (uint8_t)rawData[3];
+                            sSize = idam.sSize = (uint8_t)rawData[4] & 0xf;
+                        }
+                        if (chkSizeChange(sSize) && savedData) {    // new size but we already saved data!!
+                            DBGLOG(D_DECODER, "@%d restarted with new size\n", idamPos);
+                            restart = true;
+                            break;
+                        }
+                        //chkSptChange(idamPos, true);
 
-                    DBGLOG(D_DECODER, "@%d-%d idam %d/%d/%d sSize %d\n", idamPos, getByteCnt(), idam.cylinder, idam.side, idam.sectorId, sSize);
-                    addIdam(idamPos, &idam);
-                } else
-                    logFull(D_DECODER, "@%d idam %s\n", idamPos, result < 0 ? "premature end\n" : "bad crc\n");
-                break;
-            case DATAAM:
-            case M2FM_DATAAM:
-            case HP_DATAAM:
-                dataPos = getByteCnt();
-                //chkSptChange(dataPos, false);
+                        DBGLOG(D_DECODER, "@%d-%d idam %d/%d/%d sSize %d\n", idamPos, getByteCnt(), idam.cylinder, idam.side, idam.sectorId, sSize);
+                        addIdam(idamPos, &idam);
+                    } else
+                        logFull(D_DECODER, "@%d idam %s\n", idamPos, result < 0 ? "premature end\n" : "bad crc\n");
+                    break;
+                case DATAAM:
+                case M2FM_DATAAM:
+                case HP_DATAAM:
+                    dataPos = getByteCnt();
+                    //chkSptChange(dataPos, false);
 
-                sectorLen = 128 << sSize;
+                    sectorLen = 128 << sSize;
 
-                result = getData(matchType, rawData, sectorLen + 3);
-                if (result >= 0) {
-                    addSectorData(dataPos, result, sectorLen + 2, rawData + 1);     // add data after address mark
-                    savedData = true;
-                    DBGLOG(D_DECODER, "@%d-%d data len %d%s\n", dataPos, getByteCnt(), sectorLen, result == 1 ? "" : " bad crc");
-                } else
-                    logFull(D_DECODER, "@%d premature end of sector\n", dataPos);
-                break;
-            case DELETEDAM:
-            case M2FM_DELETEDAM:
-            case HP_DELETEDAM:
-                logFull(ALWAYS, "@%d Deleted AM\n", getByteCnt());
-                sectorLen = 128 << sSize;
-                getData(matchType, rawData, sectorLen + 3);
-                break;
+                    result = getData(matchType, rawData, sectorLen + 3);
+                    if (result >= 0) {
+                        addSectorData(dataPos, result, sectorLen + 2, rawData + 1);     // add data after address mark
+                        savedData = true;
+                        DBGLOG(D_DECODER, "@%d-%d data len %d%s\n", dataPos, getByteCnt(), sectorLen, result == 1 ? "" : " bad crc");
+                    } else
+                        logFull(D_DECODER, "@%d premature end of sector\n", dataPos);
+                    break;
+                case DELETEDAM:
+                case M2FM_DELETEDAM:
+                case HP_DELETEDAM:
+                    logFull(ALWAYS, "@%d Deleted AM\n", getByteCnt());
+                    sectorLen = 128 << sSize;
+                    getData(matchType, rawData, sectorLen + 3);
+                    break;
+                }
             }
-        }
-        if (restart) {
-            initTrack(cylinder, side);
-            savedData = false;
-            i = 0;
-        } else {
-            DBGLOG(D_DECODER, "@%d end of track\n", getByteCnt());
-            done = checkTrack();
+            if (restart) {
+                initTrack(cylinder, side);
+                savedData = false;
+                i = 0;
+            } else {
+                DBGLOG(D_DECODER, "@%d end of track\n", getByteCnt());
+                done = checkTrack();
+            }
+            retrain(profile);
         }
     }
     finaliseTrack();
-}
-
-void assumeIMD() {
-    imdNotPossible = 0;
 }
 
 bool flux2Track(int cylinder, int head) {
     char *fmt = NULL;
     int maxSlot = 0;
     int hs;
+    imdNotPossible = false;
     logCylHead(cylinder, head);
     if ((hs = cntHardSectors()) > 0) {
         if (head != 0) {

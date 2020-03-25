@@ -132,6 +132,9 @@ if exist d:\bin copy /b /y $(TargetPath) D:\bin</Command>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
     </Link>
+    <PostBuildEvent>
+      <Command>copy /y $(TargetPath) d:\bin</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="decoders.c" />

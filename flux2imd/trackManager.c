@@ -1,3 +1,7 @@
+// This is an open source non-commercial project. Dear PVS-Studio, please check it.
+
+// PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -26,9 +30,8 @@ static void buildInterleaveMap(uint8_t *interleaveMap, int interleave, int spt) 
 
 static void fixSectorMap() {
     uint8_t spt = trackPtr->fmt->spt;             // makes it easier to read the code
-    int8_t interleave;
-    uint8_t* sectorToSlot = trackPtr->sectorToSlot;   // shorthand
     uint8_t* slotToSector = trackPtr->slotToSector;
+    uint8_t firstSectorId = trackPtr->fmt->firstSectorId;
 
     uint8_t interleaveMap[MAXSECTOR];
     uint8_t firstUsedSlot;
@@ -36,27 +39,36 @@ static void fixSectorMap() {
     if (trackPtr->cntGoodIdam == 0) {
         if (trackPtr->cntAnyData == 0)      // no data or idams sector order is irrelevant
             return;
-        logFull(D_WARNING, "No sector Ids found, assuming first is %d\n", trackPtr->fmt->firstSectorId);
-        sectorToSlot[0] = 0;                //  provide a value to find
+        logFull(D_WARNING, "No sector Ids found, assuming first sector is %d\n", trackPtr->fmt->firstSectorId);
+        slotToSector[0] = firstSectorId;                // provide a value to find
+        trackPtr->sectors[0].status |= SS_FIXED;        // mark as a fixed sectorId
     } else if (trackPtr->cntGoodIdam == 1)
         logFull(D_WARNING, "Only one sector Id found\n");
 
     for (firstUsedSlot = 0; firstUsedSlot < spt; firstUsedSlot++)
-        if (sectorToSlot[firstUsedSlot] != 0xff)
+        if (slotToSector[firstUsedSlot] != 0xff)
             break;
 
-    for (interleave = 1; interleave < 13; interleave++) {       // try interleaves 1-12
+    bool match = false;
+    for (int interleave = 1; !match && interleave < 13; interleave++) {         // try interleaves 1-12
         buildInterleaveMap(interleaveMap, interleave, spt);
-        uint8_t offset = (sectorToSlot[firstUsedSlot] - interleaveMap[firstUsedSlot] + spt) % spt;
-        int i;
-        for (i = firstUsedSlot; i < spt; i++)
-            if (sectorToSlot[i] != 0xff && sectorToSlot[i] != (interleaveMap[i] + offset) % spt)
-                break;
-        if (i == spt)
-            break;
+        // slotToSector uses real sector ids so find adjustment to make to interleaveMap
+        uint8_t offset = (slotToSector[firstUsedSlot] - firstSectorId - interleaveMap[firstUsedSlot] + spt) % spt;
+        match = true;
+        for (int i = firstUsedSlot; match && i < spt; i++) {
+            interleaveMap[i] = (interleaveMap[i] + offset) % spt + firstSectorId;           // fixup interleave map 
+            if (slotToSector[i] != interleaveMap[i] && slotToSector[i] != 0xff)
+                match = false;
+        }
     }
-    if (interleave < 13) {                                      // one fitted so ok
-        memcpy(sectorToSlot, interleaveMap, spt * sizeof(uint8_t));
+    if (match) {      // one fitted so ok
+        for (int i = 0; i < spt; i++) {
+            if (slotToSector[i] == 0xff) {          // fixup the missing entries
+                slotToSector[i] = interleaveMap[i];
+                trackPtr->sectors[i].status |= SS_FIXED;
+                trackPtr->sectors[i].idam.sectorId = interleaveMap[i];
+            }
+        }
         trackPtr->status |= TS_FIXEDID;
     } else {                                                    // can't fit interleave
         logFull(D_WARNING, "Cannot find suitable interleave. Allocating unused slots sequentially\n");
@@ -84,7 +96,7 @@ bool checkTrack() {
     if (debug & D_NOOPTIMISE)
         return false;
     for (int i = 0; i < trackPtr->fmt->spt; i++)
-        if (!(trackPtr->sectors[i].status & SS_IDAMGOOD))
+        if ((trackPtr->sectors[i].status & SS_GOOD) != SS_GOOD)
             return false;
     return true;
 }
@@ -94,25 +106,10 @@ void finaliseTrack() {
     if (trackPtr->cntAnyData == 0)
         return;
 
-    uint8_t* sectorToSlot = trackPtr->sectorToSlot;       // short hand
-    uint8_t* slotToSector = trackPtr->slotToSector;
-
-    uint8_t spt = trackPtr->fmt->spt;
-
-    if (trackPtr->cntGoodIdam == spt)
+    if (trackPtr->cntGoodIdam == trackPtr->fmt->spt)
         return;                                         // have a full set of sectorIds
 
     fixSectorMap();
-    if (trackPtr->status & TS_FIXEDID) {
-        // update the missing sector Ids
-        for (int i = 0; i < trackPtr->fmt->spt; i++)
-            if (!(trackPtr->sectors[sectorToSlot[i]].status & SS_IDAMGOOD)) {
-                slotToSector[sectorToSlot[i]] =
-                    trackPtr->sectors[sectorToSlot[i]].idam.sectorId = i + trackPtr->fmt->firstSectorId;
-                trackPtr->sectors[sectorToSlot[i]].status |= SS_FIXED;
-
-            }
-    }
 }
 
 track_t* getTrack(int cylinder, int head) {
@@ -135,7 +132,6 @@ void initTrack(int cylinder, int head) {
     trackPtr = disk[cylinder][head] = (track_t*)xmalloc(sizeof(track_t) + sizeof(sector_t) * curFormat->spt);
     memset(trackPtr, 0, sizeof(*trackPtr) + sizeof(sector_t) * curFormat->spt);
     memset(trackPtr->slotToSector, 0xff, curFormat->spt);
-    memset(trackPtr->sectorToSlot, 0xff, curFormat->spt);
     trackPtr->altCylinder = trackPtr->cylinder = cylinder;
     trackPtr->altSide = trackPtr->side = head;
     trackPtr->fmt = curFormat;

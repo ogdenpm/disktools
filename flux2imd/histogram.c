@@ -1,3 +1,7 @@
+// This is an open source non-commercial project. Dear PVS-Studio, please check it.
+
+// PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
+
 #include <stdio.h>
 #include <stdint.h>
 #include <memory.h>
@@ -5,12 +9,9 @@
 #include "flux.h"
 #include "util.h"
 
-
 #define HIST_MAX_US    10          // max uS for histogram
 #define HIST_SLOTS_PER_US    8   // slots per uS
 #define HIST_SLOTS   (HIST_MAX_US * HIST_SLOTS_PER_US)
-
-
 
 void displayHist(int levels)
 {
@@ -20,8 +21,6 @@ void displayHist(int levels)
     uint32_t outRange = 0;
     int val;
 
-
-    
     // load the histogram data
     for (int i = 0; seekBlock(i) >= 0; i++) {
         while ((val = getNextFlux()) >= 0) {
@@ -32,11 +31,10 @@ void displayHist(int levels)
                 outRange++;
             else if (++histogram[val] > maxHistCnt)
                 maxHistCnt++;
-
         }
     }
 
-    if(maxHistCnt == 0) {
+    if (maxHistCnt == 0) {
         logFull(ALWAYS, "No histogram data\n");
         return;
     }
@@ -47,7 +45,6 @@ void displayHist(int levels)
     // scale the counts to peak at 2 * levels (i.e. 2 values per level)
     for (int i = 0; i <= HIST_SLOTS; i++)
         cols[i] = (2 * levels * histogram[i] + maxHistCnt / 2) / maxHistCnt;
-
 
     // narrow down the graph to only live data showing at least 0.5uS to 5.5uS
     int lowVal, highVal;
@@ -60,7 +57,7 @@ void displayHist(int levels)
         "---------\n");
     logBasic("max flux value = %.1fuS, flux values > %duS = %d\n", maxHistVal / 1000.0, HIST_MAX_US, outRange);
     logBasic("x axis range = %.1fus - %.1fus, y axis range 0 - %d\n\n",
-                   (double)(lowVal) / HIST_SLOTS_PER_US, (double)(highVal) / HIST_SLOTS_PER_US, maxHistCnt);
+        (double)(lowVal) / HIST_SLOTS_PER_US, (double)(highVal) / HIST_SLOTS_PER_US, maxHistCnt);
     int fillch;
     for (int i = levels * 2; i > 0; i -= 2) {
         line[highVal + 1] = fillch = 0;

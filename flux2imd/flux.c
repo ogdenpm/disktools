@@ -1,3 +1,7 @@
+// This is an open source non-commercial project. Dear PVS-Studio, please check it.
+
+// PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
+
 #define _CRT_SECURE_NO_WARNINGS
 
 #include <stdio.h>
@@ -38,7 +42,7 @@ uint8_t* endPtr;
 static double rpm;
 
 int firstSector = 31;
-
+static uint32_t blkTicks;       // used to capture the current clock offset of last processed flux entry
 
 
 /* parsed data from the kinfo blocks*/
@@ -74,7 +78,7 @@ static physBlock_t* indexPtr = NULL;			// current item being processed, for load
 static unsigned blkNumber = 0;					// current block number
 
 
-static clearIndex() {
+static void clearIndex() {
     for (physBlock_t *q, *p = indexHead; p; p = q) {    // free any previous index chain
         q = p->next;
         free(p);
@@ -193,7 +197,7 @@ int seekBlock(unsigned num) {
 
     while (num > blkNumber && indexPtr->next) {				// scan the list
         indexPtr = indexPtr->next;
-        if (indexPtr)
+        if (indexPtr) //-V547
             blkNumber++;
         else
             return -1;
@@ -202,6 +206,7 @@ int seekBlock(unsigned num) {
     if (num == blkNumber && indexPtr->end - indexPtr->start > 128) {					// setup getNextFlux
         inPtr = fluxBuf + indexPtr->start;
         endPtr = fluxBuf + indexPtr->end;
+        blkTicks = 0;
         return indexPtr->physSector;
     } else
         return -1;
@@ -384,6 +389,7 @@ int getNextFlux() {
             }
             c += ovl16;
             ovl16 = 0;
+            blkTicks += c;
             c = (int)(c * fluxScaler);
             return c;
 
@@ -402,4 +408,8 @@ double getRPM() {
     else
         return ick / (indexPtr->indexDelta * hc) * 60;
 
+}
+
+uint32_t getBlkTicks() {
+    return blkTicks;
 }

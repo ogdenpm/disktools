@@ -1,3 +1,7 @@
+// This is an open source non-commercial project. Dear PVS-Studio, please check it.
+
+// PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -55,7 +59,7 @@ static unsigned slotAt(unsigned pos, bool isIdam) {
             adjust = curFormat->firstDATA * 3 / 4;      // allow 75% of first DATA as offset
         }
         // see if we get different sectors numbers depending on min/max spacing
-        if ((pos - adjust) / minSpacing != (pos - adjust) / maxSpacing)
+        if (pos > adjust && (pos - adjust) / minSpacing != (pos - adjust) / maxSpacing)
             logFull(D_WARNING, "Too many missing sectors, slot calculation may be wrong\n");
     }
     // calculate change in slot, allow for some JITTER
@@ -140,7 +144,6 @@ void addIdam(unsigned pos, idam_t* idam) {
         p->status |= SS_IDAMGOOD;
         p->idam = *idam;
         trackPtr->slotToSector[slot] = idam->sectorId;
-        trackPtr->sectorToSlot[idam->sectorId - trackPtr->fmt->firstSectorId] = slot;
     }
 }
 

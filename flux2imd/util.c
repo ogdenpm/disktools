@@ -1,3 +1,7 @@
+// This is an open source non-commercial project. Dear PVS-Studio, please check it.
+
+// PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
+
 #define _CRT_SECURE_NO_WARNINGS
 #include <stdio.h>
 #include <stdlib.h>
@@ -5,7 +9,7 @@
 #include "util.h"
 
 extern char curFile[];
-int debug;
+unsigned debug;
 FILE *logFp = NULL;  
 
 // flip the order of the data
@@ -51,7 +55,9 @@ int logBasic(char* fmt, ...) {
 
     if ((debug & D_ECHO) && logFp != stdout)
         vprintf(fmt, args);
-    return vfprintf(logFp, fmt, args);
+    int nchars = vfprintf(logFp, fmt, args);
+    va_end(args);
+    return nchars;
 }
 
 void logFull(int level, char *fmt, ...) {
@@ -78,10 +84,11 @@ void logFull(int level, char *fmt, ...) {
     }
  
     if (level == D_FATAL) {
-        if (logFp)
+        if (logFp != stdout)
             fclose(logFp);
         exit(1);
     }
+    va_end(args);
 }
 
 void createLogFile(const char* name) {
