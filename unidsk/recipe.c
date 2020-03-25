@@ -99,14 +99,14 @@ struct {
     char *checksum;
     char *os;
 } osMap[] = {
-    "/YmatRu9vhzEjMhDylDjhykvqZo", "ISIS 2.2",
-    "CDiOIW5+mmg+lMLUzBiKotg1Q58", "ISIS 3.4",
-    "sRiKeMMS6BzoByW8JMfR602LkRc", "ISIS 4.0",
-    "o3AUw0iiH+s7gzpbQng+QpJOpUU", "ISIS 4.1",
-    "sWQzN17YlQdDPy7hXQc+2Htq9lA", "ISIS 4.2",
-    "u/pkKs6Q7J2EBWs9znd6aTF7j3o", "ISIS 4.2w",
-    "IT/NSStKstpz2wMCcHbGrEj0GJM", "ISIS 4.3",
-    "oQXgd+7fmrQ/wH/Wfr9ptN4yK2s", "ISIS 4.3w",
+    "/YmatRu9vhzEjMhDylDjhykvqZo", "ISIS II 2.2",
+    "CDiOIW5+mmg+lMLUzBiKotg1Q58", "ISIS II 3.4",
+    "sRiKeMMS6BzoByW8JMfR602LkRc", "ISIS II 4.0",
+    "o3AUw0iiH+s7gzpbQng+QpJOpUU", "ISIS II 4.1",
+    "sWQzN17YlQdDPy7hXQc+2Htq9lA", "ISIS II 4.2",
+    "u/pkKs6Q7J2EBWs9znd6aTF7j3o", "ISIS II 4.2w",
+    "IT/NSStKstpz2wMCcHbGrEj0GJM", "ISIS II 4.3",
+    "oQXgd+7fmrQ/wH/Wfr9ptN4yK2s", "ISIS II 4.3w",
     "6zffO/tlxHVojxlqs2BQvu31814", "PDS 1.0",
     "kr87fI+DkuGXQec3i2IG7S+8usI", "PDS 1.1",
     "DJ5TiAs5F4yNGlp7fzUjT/k5Zsk", "TEST 1.0",
@@ -119,7 +119,7 @@ struct {
 char *osFormat[] = { "UNKNOWN", "ISIS II SD", "ISIS II DD", "ISIS PDS", "ISIS IV" };
 
 
-void EncodePair(FILE *fp, char *s) {
+void EncodePair(FILE *fp, unsigned char *s) {
     putc(' ', fp);
     for (int i = 0; i < 2; i++)
         if (isupper(*s) || isdigit(*s) || *s == '.')

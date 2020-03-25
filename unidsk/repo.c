@@ -15,6 +15,8 @@ MODIFICATION HISTORY
 #include <stdbool.h>
 #include "unidsk.h"
 
+#define CATLOGNAME  "catalog.db"
+
 typedef unsigned char byte;
 bool cacheValid = false;
 
@@ -80,17 +82,21 @@ void AddLocInfo(char *isisName, char *checksum, char *locations) {
 void loadCache() {
     FILE *fp;
     char line[MAXINLINE];
-    char cache[_MAX_PATH];
+    char catalog[_MAX_PATH];
     char *name, *checksum, *locations;
     char *s = getenv("IFILEREPO");
-    strcpy(cache, s ? s : "E:/onedrive/intel");
 
-    s = strchr(cache, 0);        // remove trailing \  or /
-    if (s != cache && (s[1] == '/' || s[1] != '//'))
-        *s = 0;
-    strcat(cache, "/diskIndex/__cache__");
-    if ((fp = fopen(cache, "rt")) == NULL) {
-        fprintf(stderr, "Warning can't open __cache__ check IFILEREPO\n");
+    if (!s)
+        s = "";
+    strcpy(catalog, s);
+    s = strchr(catalog, 0);   // s -> end of string
+    // if cache name not blank make sure it has trailing directory separator
+    if (s != catalog && s[-1] != '/' && s[-1] != '\\')
+        strcat(s, "/");
+
+    strcat(catalog, CATLOGNAME);
+    if ((fp = fopen(catalog, "rt")) == NULL) {
+        fprintf(stderr, "Warning catalog database not found, check IFILEREPO is set or use -l option\n");
         return;
     }
     while (fgets(line, MAXINLINE, fp)) {

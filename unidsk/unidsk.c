@@ -56,6 +56,7 @@ int rdErrorCnt = 0;
 int recoveredFiles = 0;
 
 bool debug = false;
+bool pad = false;
 
 #define NIFILES	10
 
@@ -79,18 +80,21 @@ typedef struct {
     unsigned char Smap[MAXSECTOR + 1];		// Sector numbering map
     unsigned char Cmap[MAXSECTOR + 1];		// Cylinder numbering map
     unsigned char Hmap[MAXSECTOR + 1];		// Head numbering map
+    uint64_t Smissing;      // bit set if sector is missing
     byte *buf;				// de interlaced track buffer
 } TRACK;	// Sector type flags
 
 int maxCylinder;
 
 TRACK *disk[MAXCYLINDER][MAXHEAD];
+uint64_t sectorMissing[MAXCYLINDER][MAXHEAD];        // bit set if sector is missing
 
 // Mode (data rate) index to value conversion table
 unsigned Mtext[] = { 500, 300, 250 };
 
 // Encoded sector size to actual size conversion table
 unsigned xsize[] = { 128, 256, 512, 1024, 2048, 4096, 8192 };
+uint8_t transferBuf[8192];                      // for imd data is loaded here first incase sector id is bad
 
 // Table for mode translation
 unsigned char Tmode[] = { 0, 1, 2, 3, 4, 5 };
@@ -237,14 +241,15 @@ TRACK *load_track(FILE *fp)
         error("EOF at Nsec");
     if ((t->Size = s = getc(fp)) == EOF)
         error("EOF at Size");
-    if (m > 5) {
+    if (t->Cyl >= MAXCYLINDER)
+        error("Cylinder value %d out of range 0-%d\n", t->Cyl, MAXCYLINDER - 1);
+
+    if (m > 5)
         error("Mode value %d out of range 0-5\n", m);
-        t->Mode = 0;
-    }
-    if ((h & 0x0F) > 1) {
-        error("Head value %d out of range 0-1\n", h);
-        t->Head = 0;
-    }
+
+    if ((h & 0x0F) >= MAXHEAD)
+        error("Head value %d out of range 0-%d\n", h, MAXHEAD - 1);
+
     if (s > 6) {
         error("Size value %d out of range 0-6\n", s);
         t->Size = 0;
@@ -286,18 +291,24 @@ TRACK *load_track(FILE *fp)
     }
 
     // Decode sector data blocks
+    t->Smissing = ~0ULL;
     for (i = 0; i < n; ++i) {
         if ((c = getc(fp)) == EOF)
             error("EOF at sector %d/%d flag", i, t->Smap[i]);
 
         if (c & 1) {
-            if (fread(t->buf + s * (t->Smap[i] - t->startSec), 1, s, fp) != s)
+            if (fread(transferBuf, 1, s, fp) != s)
                 error("EOF in sector %d/%d data", i, t->Smap[i]);
-        }
-        else if (c != 0) {
+        } else if (c) {
             if ((h = getc(fp)) == EOF)
                 error("EOF in sector %d/%d compress data", i, t->Smap[i]);
-            memset(t->buf + s * (t->Smap[i] - t->startSec), h, s);
+            memset(transferBuf, h, s);
+        }
+        if (c && (t->startSec > t->Smap[i] || t->Smap[i] >= n + t->startSec))
+            fprintf(stderr, "Warning: Track %d/%d - Invalid sector %d\n", t->Cyl, t->Head, t->Smap[i]);
+        else if (c == 1 || c == 2) {
+            memcpy(t->buf + s * (t->Smap[i] - t->startSec), transferBuf, s);
+            t->Smissing &= ~(1ULL << (t->Smap[i] - t->startSec));
         }
     }
 
@@ -440,11 +451,13 @@ byte *getTS(int track, int sector)
 
     if (!(p = disk[track][head]))       // sector is still missing track
         return NULL;
-
     if (sector >= p->Nsec) {
         rdError("sector %d > max sector %d for cylinder %d head %d\n", sector + 1, p->Nsec, head, track);
         return NULL;
     }
+
+    if (p->Smissing & (1ULL << sector))
+        return NULL;
 
     return p->buf + sector * p->Size;
 }
@@ -950,20 +963,24 @@ void main(int argc, char **argv)
             local = true;
         else if (_stricmp(argv[1], "-d") == 0)
             debug = true;
-        else
+        else if (_stricmp(argv[1], "-p") == 0)
+            pad = true;
             break;
         argv++;
         argc--;
     }
-    if (!local)
-        loadCache();
+
 
     if (argc != 2 || (fp = fopen(*++argv, "rb")) == NULL) {
-        fprintf(stderr, "usage: unidsk [-l] [-d] file\n"
+        fprintf(stderr, "usage: unidsk [-l] [-d] [-p] file\n"
             "-l for local names only\n"
-            "-d for link info\n");
+            "-d for link info\n"
+            "-p pad missing sectors\n");
         exit(1);
     }
+
+    if (!local)
+        loadCache();
 
     if (_splitpath_s(*argv, drive, _MAX_DRIVE, dir, _MAX_DIR, fname, _MAX_FNAME, ext, _MAX_EXT) != 0) {
         fprintf(stderr, "invalid file name %s\n", argv[1]);
