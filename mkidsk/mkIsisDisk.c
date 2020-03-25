@@ -88,6 +88,11 @@ where
 
 #include "mkIsisDisk.h"
 
+#define MAXFORMAT   15      // e.g ISIS II SD
+#define MAXOS       15      // ISIS III(n) 2.0
+#define MAXYEAR     30      // ideally only one year but allow for longer
+#define MAXPN       64      // maximum part number/name
+
 char comment[MAXCOMMENT];
 char root[_MAX_PATH + 1];
 byte diskType = ISIS_DD;
@@ -100,6 +105,9 @@ char *forcedSkew = NULL;
 
 char *special[] = { "AUTO", "DIR", "ZERO", "ZEROHDR", NULL };
 
+char *formatDensity[] = { " ??", " SD", " DD", "" };
+char *missingOS[] = { "UNKNOWN ---", "ISIS II ---", "ISIS II ---", "PDS ---" };
+
 void InitFmtTable(byte t0Interleave, byte t1Interleave, byte interleave) {
     label.fmtTable[0] = t0Interleave + '0';
     label.fmtTable[1] = t1Interleave + '0';
@@ -107,7 +115,7 @@ void InitFmtTable(byte t0Interleave, byte t1Interleave, byte interleave) {
         label.fmtTable[i] = interleave + '0';
 }
 
-char* Match(char *s, char *ref) {
+char *Match(char *s, char *ref) {
     while (*ref && toupper(*s) == toupper(*ref)) {
         if (isblank(*ref))
             while (isblank(*++s))
@@ -147,8 +155,14 @@ void decodePair(char *dest, char *src) {
     }
 }
 
+void appendComment(char const *s) {
+    if (strlen(comment) + strlen(s) < MAXCOMMENT)	// ignore if comment too long
+        strcat(comment, s);
+}
+
 void ParseRecipeHeader(FILE *fp) {
     char line[MAXLINE];
+    char osString[MAXOS + 1] = { "---" };
     char *s;
     int c;
     bool pastComment = false;
@@ -159,8 +173,7 @@ void ParseRecipeHeader(FILE *fp) {
             if (!pastComment) {
                 if (*++s == ' ')
                     s++;
-                if (strlen(comment) + strlen(s) < MAXCOMMENT)	// ignore if comment too long
-                    strcat(comment, s);
+                appendComment(s);
             }
             continue;
         }
@@ -173,12 +186,12 @@ void ParseRecipeHeader(FILE *fp) {
             while ((c = getc(fp)) != EOF && c != '\n')
                 ;
             if (c == EOF)
-                return;
+                break;
             else
                 continue;
         }
         if (Match(line, "Files:"))
-            return;
+            break;
         if (Match(line, "#"))
             continue;
         if (s = Match(line, "label:")) {
@@ -190,8 +203,7 @@ void ParseRecipeHeader(FILE *fp) {
             for (int i = 6; i < 9; i++)
                 if (isalnum(*s))
                     label.name[i] = toupper(*s++);
-        }
-        else if (s = Match(line, "version:"))
+        } else if (s = Match(line, "version:"))
             decodePair(label.version, s);
         else if (s = Match(line, "format:")) {
             if ((Match(s, "ISIS II SD")))
@@ -204,20 +216,28 @@ void ParseRecipeHeader(FILE *fp) {
                 fprintf(stderr, "Unsupported disk format %s\n", s);
                 exit(1);
             }
-        }
-        else if (s = Match(line, "interleave:")) {      // we have non standard interleave
+        } else if (s = Match(line, "interleave:")) {      // we have non standard interleave
             if ('1' <= s[0] && s[0] <= 52 + '0' &&
                 '1' <= s[1] && s[1] <= 52 + '0' &&
                 '1' <= s[2] && s[2] <= 52 + '0')
                 InitFmtTable(s[0] - '0', s[1] - '0', s[2] - '0');
-        }
-        else if (s = Match(line, "os:")) {
-            if (!Match(s, "NONE"))
+        } else if (s = Match(line, "os:")) {
+            strncpy(osString, s, MAXOS);
+            if (*osString == 0 || Match(s, "NONE") || Match(s, "UNKNOWN"))
+                strcpy(osString, "---");
+            else
                 hasSystem = true;
-        }
-        else if (s = Match(line, "crlf:"))
+        } else if (s = Match(line, "crlf:"))
             decodePair(label.crlf, s);
     }
+    // treat os NONE, UNKNOWN and missing os the same, will show as --- in the IMD
+    if (stricmp(osString, "NONE") == 0 || stricmp(osString, "UNKNOWN") == 0)
+        osString[0] = 0;
+
+    char fmt[MAXOS + 5];      // enough string space
+
+    sprintf(fmt, "%s%s\n", hasSystem ? osString : missingOS[diskType], formatDensity[diskType]);
+    appendComment(fmt);
 }
 
 char *ParseIsisName(char *isisName, char *src) {
@@ -292,8 +312,7 @@ void ParsePath(char *path, char *src, char *isisName) {
         }
         strcpy(path, root);
         src++;
-    }
-    else
+    } else
         *path = 0;
     if (strlen(path) + strlen(src) >= _MAX_PATH) {
         strcpy(path, "*path too long");
@@ -345,8 +364,7 @@ void ParseFiles(FILE *fp) {
                 printf("%s - DIR listing not created\n", line);
             else
                 CopyFile(isisName, path, attributes);
-        }
-        else
+        } else
             fprintf(stderr, "%s - missing path information\n", line);
     }
 }
@@ -370,7 +388,7 @@ void usage() {
         "           x,y & z are as per ISIS.LAB i.e. interleave + '0'\n"
         "           note the ISIS.LAB format information is not changed\n"
         "-t         apply inter track interleave\n"
-    );
+        );
 }
 
 void main(int argc, char **argv) {
@@ -427,15 +445,13 @@ void main(int argc, char **argv) {
             exit(1);
         }
         strcpy(outfile, diskname);
-    }
-    else
+    } else
         _makepath_s(outfile, _MAX_PATH, drive, dir, *fname == '@' ? fname + 1 : fname, ext); // create the default name
 
     if ((s = strrchr(diskname, '.')) && (_stricmp(s, ".imd") == 0 || _stricmp(s, ".img") == 0)) {
         if (s == diskname)                           // we had .fmt only so add
             strcat(outfile, s);
-    }
-    else
+    } else
         strcat(outfile, EXT);                          // we didn't have ext
 
     if (strlen(outfile) >= _MAX_PATH) {

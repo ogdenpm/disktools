@@ -22,8 +22,7 @@ typedef unsigned char byte;
 typedef unsigned short word;
 
 #define MAXLINE 512                     // maximum length of recipe line
-#define ROOT "E:/OneDrive/Intel/"       // my local copy of the repository - to use if recipe is not in .../Intel/diskindex/
-#define DISKINDEX   "diskIndex"         // directory name where diskIndex files are kept
+#define ROOT "F:/OneDrive/Intel/"       // my local copy of the repository - to use if recipe is not in .../Intel/diskindex/
 #define EXT ".imd"                      // default extension and hence format
 #define MAXCOMMENT	4096				// upper limit on comment length from source IMD
 
@@ -139,6 +138,9 @@ typedef struct {
 } format_t;
 
 
+
+
+
 extern format_t formats[4];
 
 extern int sPerCyl;
@@ -147,6 +149,9 @@ extern int sectorSize;
 extern bool interTrackSkew;
 extern int formatCh;
 
+#ifdef _MSC_VER
+#define stricmp _stricmp
+#endif
 void WriteImgFile(char *fname, int diskType, char *interleaves, bool useSkew, char *comment);
 void InitFmtTable(byte t0Interleave, byte t1Interleave, byte interleave);
 void CopyFile(char *isisName, char *srcName, int attrib);

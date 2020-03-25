@@ -42,7 +42,7 @@ void WriteIMDHdr(FILE *fp, char *comment) {
     if (strncmp(comment, "IMD ", 4) != 0) {		// if comment does not have IMD header put one in
         time(&curTime);
         dateTime = localtime(&curTime);
-        fprintf(fp, "IMD 1.18 %02d/%02d/%04d %02d:%02d:%02d\r\n", dateTime->tm_mday, dateTime->tm_mon, dateTime->tm_year + 1900,
+        fprintf(fp, "IMD 1.18 %02d/%02d/%04d %02d:%02d:%02d\r\n", dateTime->tm_mday, dateTime->tm_mon + 1, dateTime->tm_year + 1900,
             dateTime->tm_hour, dateTime->tm_min, dateTime->tm_sec);
     }
     while (*comment) {
