@@ -96,6 +96,17 @@ The primary use of this is to change to prefered path names for human reading
 #include "unidsk.h"
 
 struct {
+    char label[(6 + 3) * 3 + 2];    // allow for encoded numbers
+    char suffix[4];
+    char version[(2 * 3) + 1];      // allow for encoded numbers
+    char crlf[2 * 3 + 1];           // allow for encoded numbers
+    char *format;
+    char interleave[4];
+    char *os;
+} recipeInfo;
+
+
+struct {
     char *checksum;
     char *os;
 } osMap[] = {
@@ -117,6 +128,7 @@ struct {
 };
 
 char *osFormat[] = { "UNKNOWN", "ISIS II SD", "ISIS II DD", "ISIS PDS", "ISIS IV" };
+char *suffixFormat = "-SDP4";
 
 
 void EncodePair(FILE *fp, unsigned char *s) {
@@ -128,23 +140,103 @@ void EncodePair(FILE *fp, unsigned char *s) {
             fprintf(fp, "#%02X", *s++);
 }
 
-void mkRecipe(char *name, isisDir_t *isisDir, char *comment, int diskType)
+void StrEncodeNCat(char *dst, uint8_t const *src, int len) {
+    static char *hexDigits = "0123456789ABCDEF";
+    dst = strchr(dst, '\0');        // point to end of dst string
+
+    while (len-- > 0 && *src) {
+        if (isupper(*src) || isdigit(*src) || *src == '.')
+            *dst++ = *src++;
+        else {
+            *dst++ = '#';
+            *dst++ = hexDigits[*src / 16];
+            *dst++ = hexDigits[*src++ % 16];
+        }
+    }
+    *dst = 0;
+}
+
+
+void getRecipeInfo(isisDir_t *isisDir, int diskType, bool isOK) {
+    FILE *lab;
+    label_t label;
+
+    // get the none label related info
+    recipeInfo.format = osFormat[diskType];
+    recipeInfo.suffix[0] = suffixFormat[diskType];
+
+    if (osIdx >= 0) {
+        recipeInfo.os = "UNKNOWN";       // default to unknown os
+        recipeInfo.suffix[1] = 'b';      // small b if os but unknown
+        for (int i = 0; osMap[i].checksum; i++)
+            if (strcmp(osMap[i].checksum, isisDir[osIdx].checksum) == 0) {
+                recipeInfo.os = osMap[i].os;
+                recipeInfo.suffix[1] = 'B'; // yes it is bootable
+                break;
+            }
+    } else
+        recipeInfo.os = "NONE";
+    if (!isOK)
+        strcat(recipeInfo.suffix, "E");
+
+    // now get the info from isis.lab
+    if ((lab = fopen("isis.lab", "rb")) == 0) {
+        strcpy(recipeInfo.label, "nolabel");
+        return;
+    }
+    if (fread(&label, sizeof(label), 1, lab) != 1)
+        memset(&label, 0, sizeof(label));              // just in case of partial read
+    else {
+        if (label.name[0]) {
+            StrEncodeNCat(recipeInfo.label, label.name, 6);        // relies on labelInfo array being 0;
+            if (label.name[6]) {                            // copy -ext if present
+                strcat(recipeInfo.label, "-");
+                StrEncodeNCat(recipeInfo.label, &label.name[6], 3);
+            }
+        }
+        if (label.version)
+            StrEncodeNCat(recipeInfo.version, label.version, 2);
+        if (diskType == ISIS_PDS && (label.crlf[0] != '\r' || label.crlf[1] != '\n'))
+            StrEncodeNCat(recipeInfo.crlf, label.crlf, 2);
+
+        if (diskType == ISIS_SD && strncmp(label.fmtTable, "1<6", 3) ||  // nonstandard interleave suffix
+            diskType == ISIS_DD && strncmp(label.fmtTable, "145", 3))
+            strncpy(recipeInfo.interleave, label.fmtTable, 3);
+    }
+    fclose(lab);
+}
+
+
+
+void mkRecipe(char const *name, isisDir_t *isisDir, char *comment, int diskType, bool isOK)
 {
     FILE *fp;
-    FILE *lab;
-    char recipeName[_MAX_PATH];
-    label_t label;
+    char recipeName[(6+3) * 3 + 1 + 4 + 1];     // 6-3 possibly encoded - suffix '\0'
     char *dbPath;
     char *prefix;
     isisDir_t *dentry;
 
-    strcpy(recipeName, "@");
-    strcat(recipeName, name);
+    getRecipeInfo(isisDir, diskType, isOK);
+
+    sprintf(recipeName, "@%s-%s", recipeInfo.label, recipeInfo.suffix);
 
     if ((fp = fopen(recipeName, "wt")) == NULL) {
         fprintf(stderr, "can't create recipe file\n");
         return;
     }
+    fprintf(fp, "# IN-%s\n", recipeName + 1);
+
+    fprintf(fp, "label: %s\n", recipeInfo.label);
+    if (*recipeInfo.version)
+        fprintf(fp, "version: %s\n", recipeInfo.version);
+
+    fprintf(fp, "format: %s\n", recipeInfo.format);
+    fprintf(fp, "os: %s\n", recipeInfo.os);
+    if (*recipeInfo.interleave)
+    fprintf(fp, "interleave: %s\n", recipeInfo.interleave);
+    if (*recipeInfo.crlf)
+    fprintf(fp, "crlf: %s\n", recipeInfo.crlf);
+    fprintf(fp, "source: %s\n", name);
     if (*comment) {
         while (*comment) {
             fputs("# ", fp);
@@ -153,46 +245,11 @@ void mkRecipe(char *name, isisDir_t *isisDir, char *comment, int diskType)
             if (*comment)
                 putc(*comment++, fp);
         }
-    } else
-        fprintf(fp, "# %s\n", name);
-
-    if ((lab = fopen("isis.lab", "rb")) == 0 || fread(&label, sizeof(label), 1, lab) != 1)
-        fputs("label:\nversion:", fp);
-    else {
-        fputs("label:", fp);
-        if (label.name[0]) {
-            fprintf(fp, " %.6s", label.name);
-            if (label.name[6])
-                fprintf(fp, ".%.3s", label.name + 6);
-        }
-        fputs("\nversion:", fp);
-        if (diskType == ISIS_PDS) {
-            EncodePair(fp, label.version);
-            if (label.crlf[0] != '\r' || label.crlf[1] != '\n') {
-                fputs("\ncrlf:", fp);
-                EncodePair(fp, label.crlf);
-            }
-        } else if (label.version[0])
-            fprintf(fp, " %.2s", label.version);
     }
 
-    fprintf(fp, "\nformat: %s\n", osFormat[diskType]);     // the disk format
-    if (lab && diskType == ISIS_SD && strncmp(label.fmtTable, "1<6", 3) ||  // nonstandard interleave suffix
-        diskType == ISIS_DD && strncmp(label.fmtTable, "145", 3))
-        fprintf(fp, "interleave: %.3s\n", label.fmtTable);
 
-    char *os;
-    if (osIdx >= 0) {
-        os = "UNKNOWN";       // default to unknown os
-        for (int i = 0; osMap[i].checksum; i++)
-            if (strcmp(osMap[i].checksum, isisDir[osIdx].checksum) == 0) {
-                os = osMap[i].os;
-                break;
-            }
-    } else
-        os = "NONE";
 
-    fprintf(fp, "os: %s\nFiles:\n", os);
+    fprintf(fp, "Files:\n");
 
     for (dentry = isisDir; dentry < &isisDir[MAXDIR] && dentry->name[0]; dentry++) {
         if (dentry->errors || (dentry->name[0] == '#' && dentry->dirLen <= 0)) {

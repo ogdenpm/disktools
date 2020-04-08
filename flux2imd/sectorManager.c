@@ -20,7 +20,7 @@ static unsigned minSpacing;
 static unsigned maxSpacing;
 
 static void chkSptChange() {
-    for (formatInfo_t* p = curFormat + 1; p->encoding == curFormat->encoding && p->sSize == curFormat->sSize; p++) {
+    for (formatInfo_t *p = curFormat + 1; p->encoding == curFormat->encoding && p->sSize == curFormat->sSize; p++) {
         if (abs(p->spacing - curSpacing) < 3) {
             DBGLOG(D_DECODER, "Updated format to %s\n", p->name);
             curFormat = p;
@@ -33,9 +33,16 @@ static void chkSptChange() {
     DBGLOG(D_DECODER, "WARNING could not determine SPT\n");
 }
 
-static unsigned slotAt(unsigned pos, bool isIdam) {
+
+// work out the slot on the disk corresponding the given pos
+//  for pos <= 0 then -pos is the slot. this is used for hard sector disks
+
+static unsigned slotAt(int pos, bool isIdam) {
     static unsigned prevIdamPos;
     static unsigned prevDataPos;
+
+    if (pos <= 0)
+        return -pos;
 
     if (prevSlot < 0 || pos < prevIdamPos) {       // initialise either explicit or due to seek from start
         unsigned adjust;
@@ -99,31 +106,26 @@ static unsigned slotAt(unsigned pos, bool isIdam) {
 }
 
 
-void addIdam(unsigned pos, idam_t* idam) {
+void addIdam(int pos, idam_t *idam) {
     unsigned  slot = slotAt(pos, true);
 
-    sector_t* p = &trackPtr->sectors[slot];
+    sector_t *p = &trackPtr->sectors[slot];
 
- 
-
-
-    if (idam->sectorId < curFormat->firstSectorId ||  idam->sectorId - curFormat->firstSectorId >= curFormat->spt)
+    if (idam->sectorId < curFormat->firstSectorId || idam->sectorId - curFormat->firstSectorId >= curFormat->spt)
         logFull(D_FATAL, "@slot %d sector Id %d out of range\n", slot, idam->sectorId);
 
     if (p->status & SS_IDAMGOOD) {
         if (memcmp(idam, &p->idam, sizeof(idam_t)) != 0)
             logFull(ALWAYS, "@slot %d idam mismatch prev %02d/%d/%02d (%d) new %02d/%d/%02d (%d) - change ignored\n", slot,
-                idam->cylinder, idam->side, idam->sectorId, 128 << idam->sSize,
-                p->idam.cylinder, p->idam.side, p->idam.sectorId, 128 << p->idam.sSize);
+                p->idam.cylinder, p->idam.side, p->idam.sectorId, 128 << p->idam.sSize,
+                idam->cylinder, idam->side, idam->sectorId, 128 << idam->sSize);
 
-    }
-    else {
+    } else {
         if (idam->cylinder != trackPtr->altCylinder) {
             if ((trackPtr->status & TS_CYL) == 0) {
                 logFull(D_WARNING, "Expected cylinder %d, read %d\n", trackPtr->altCylinder, idam->cylinder);
                 trackPtr->status |= TS_CYL;
-            }
-            else if ((trackPtr->status & TS_MCYL) == 0) {
+            } else if ((trackPtr->status & TS_MCYL) == 0) {
                 logFull(D_WARNING, "Multiple cylinder ids including %d & %d\n", trackPtr->altCylinder, idam->cylinder);
                 trackPtr->status |= TS_MCYL;
             }
@@ -133,8 +135,7 @@ void addIdam(unsigned pos, idam_t* idam) {
             if ((trackPtr->status & TS_SIDE) == 0) {
                 logFull(D_WARNING, "Expected head %d, read %d\n", trackPtr->altSide, idam->side);
                 trackPtr->status |= TS_SIDE;
-            }
-            else if ((trackPtr->status & TS_MSIDE) == 0) {
+            } else if ((trackPtr->status & TS_MSIDE) == 0) {
                 logFull(D_ERROR, "Multiple head ids %d & %d\n", trackPtr->altSide, idam->side);
                 trackPtr->status |= TS_MSIDE;
             }
@@ -148,10 +149,10 @@ void addIdam(unsigned pos, idam_t* idam) {
 }
 
 
-void addSectorData(unsigned pos, bool isGood, unsigned len, uint16_t rawData[]) {
+void addSectorData(int pos, bool isGood, unsigned len, uint16_t rawData[]) {
     unsigned slot = slotAt(pos, false);
-    sector_t* p = &trackPtr->sectors[slot];
-    sectorDataList_t* q;
+    sector_t *p = &trackPtr->sectors[slot];
+    sectorDataList_t *q;
 
     if (p->status & SS_DATAGOOD) {     // already have good data
         if (isGood && memcmp(p->sectorDataList->sectorData.rawData, rawData, len * sizeof(rawData[0])) != 0)
@@ -159,7 +160,7 @@ void addSectorData(unsigned pos, bool isGood, unsigned len, uint16_t rawData[]) 
         return;
     }
 
-    if (isGood) {                    
+    if (isGood) {
         p->status |= SS_DATAGOOD;
         removeSectorData(p->sectorDataList);        // remove any previous bad sector data
         p->sectorDataList = NULL;
@@ -169,7 +170,7 @@ void addSectorData(unsigned pos, bool isGood, unsigned len, uint16_t rawData[]) 
         trackPtr->cntAnyData++;
 
     // put data at head of list
-    q = (sectorDataList_t*)xmalloc(sizeof(sectorDataList_t) + len * sizeof(q->sectorData.rawData[0]));
+    q = (sectorDataList_t *)xmalloc(sizeof(sectorDataList_t) + len * sizeof(q->sectorData.rawData[0]));
     q->sectorData.len = len;
     memcpy(q->sectorData.rawData, rawData, len * sizeof(q->sectorData.rawData[0]));
     q->next = p->sectorDataList;
@@ -177,8 +178,7 @@ void addSectorData(unsigned pos, bool isGood, unsigned len, uint16_t rawData[]) 
 }
 
 
-void removeSectorData(sectorDataList_t *p)
-{
+void removeSectorData(sectorDataList_t *p) {
     sectorDataList_t *q;
     for (; p; p = q) {
         q = p->next;

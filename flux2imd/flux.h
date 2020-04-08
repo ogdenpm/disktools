@@ -11,7 +11,7 @@ double getRPM();
 int loadFlux(uint8_t* image, size_t size);
 int seekBlock(unsigned num);
 void unloadFlux();
-uint32_t getBlkTicks();
+uint32_t getBitPos(uint32_t cellSize);
 
 
 

@@ -54,9 +54,11 @@ static void fixSectorMap() {
         buildInterleaveMap(interleaveMap, interleave, spt);
         // slotToSector uses real sector ids so find adjustment to make to interleaveMap
         uint8_t offset = (slotToSector[firstUsedSlot] - firstSectorId - interleaveMap[firstUsedSlot] + spt) % spt;
+        for (int i = 0; i < spt; i++)
+            interleaveMap[i] = (interleaveMap[i] + offset) % spt + firstSectorId;           // fixup interleave map 
+
         match = true;
         for (int i = firstUsedSlot; match && i < spt; i++) {
-            interleaveMap[i] = (interleaveMap[i] + offset) % spt + firstSectorId;           // fixup interleave map 
             if (slotToSector[i] != interleaveMap[i] && slotToSector[i] != 0xff)
                 match = false;
         }
@@ -91,9 +93,9 @@ static void removeTrack(track_t* p) {
 
 
 
-bool checkTrack() {
+bool checkTrack(int profile) {
     assert(trackPtr);
-    if (debug & D_NOOPTIMISE)
+    if (profile == 0 && (debug & D_NOOPTIMISE))
         return false;
     for (int i = 0; i < trackPtr->fmt->spt; i++)
         if ((trackPtr->sectors[i].status & SS_GOOD) != SS_GOOD)

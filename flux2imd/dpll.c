@@ -13,6 +13,7 @@
 
 
 static uint32_t ctime, etime;       // clock time and end of cell time
+static uint32_t nominalCellSize = 1; 
 static uint32_t cellSize;           // width of a cell
 static int fCnt, aifCnt, adfCnt, pcCnt; // dpll paramaters
 static bool up; 
@@ -22,7 +23,7 @@ static uint32_t minCell;
 static uint32_t cellDelta;
 
 uint64_t pattern;
-static unsigned bitCnt;
+uint16_t bits65_66 = 0;
 
 
 // profile information 
@@ -44,50 +45,103 @@ adapt_t adaptConfig_FM5[] = {
     {0, 100, 128, 10.0, 300, 256, 8.0, 400, 8.0},   // wide training window with long settle time
     {0, 100, 32, 10.0, 200, 32, 4.0, 200, 2.0},     // narrow training window with short settle time
     {0, 100, 16, 8.0, 200, 32, 4.0, 400, 0.25},     // very narrow training window
-    {0, 100, 21, 8.0, 400, 32, 4.0, 600, 0.25},    // FM hard sector default as no gap pre sync bytes also short blocks
-    {0, 200, 32, 6.0, 400, 32, 2.0, 600, 0.25},    // FM hard sector default as no gap pre sync bytes also short blocks
+    {0, 100, 21, 8.0, 400, 32, 4.0, 600, 0.25},    // hard sector default as no gap pre sync bytes also short blocks
+    {0, 200, 32, 6.0, 400, 32, 2.0, 600, 0.25},    // hard sector default as no gap pre sync bytes also short blocks
     {-1}
 };
+
+adapt_t adaptConfig_FM5H[] = {
+    {0, 100, 21, 8.0, 400, 32, 4.0, 600, 0.25},    // hard sector default as no gap pre sync bytes also short blocks
+    {0, 200, 32, 6.0, 400, 32, 2.0, 600, 0.25},    // hard sector default as no gap pre sync bytes also short blocks
+    {0, 100, 128, 10.0, 300, 256, 8.0, 400, 8.0},   // wide training window with long settle time
+    {0, 100, 32, 10.0, 200, 32, 4.0, 200, 2.0},     // narrow training window with short settle time
+    {0, 100, 16, 8.0, 200, 32, 4.0, 400, 0.25},     // very narrow training window
+    {-1}
+};
+
 
 adapt_t adaptConfig_FM8[] = {
     {0, 100, 128, 10.0, 300, 256, 8.0, 400, 8.0},   // wide training window with long settle time
     {0, 100, 32, 10.0, 200, 32, 4.0, 200, 2.0},     // narrow training window with short settle time
     {0, 100, 16, 8.0, 200, 32, 4.0, 400, 0.25},     // very narrow training window
-    {0, 100, 21, 8.0, 400, 32, 4.0, 600, 0.25},    // FM hard sector default as no gap pre sync bytes also short blocks
-    {0, 200, 32, 6.0, 400, 32, 2.0, 600, 0.25},    // FM hard sector default as no gap pre sync bytes also short blocks
+    {0, 100, 21, 8.0, 400, 32, 4.0, 600, 0.25},    // hard sector default as no gap pre sync bytes also short blocks
+    {0, 200, 32, 6.0, 400, 32, 2.0, 600, 0.25},    // hard sector default as no gap pre sync bytes also short blocks
+    {-1}
+};
 
-    {-1}
-};
-adapt_t adaptConfig_MFM5[] = {
-    {0, 100, 16, 8.0, 200, 32, 4.0, 400, 0.25},
-    {0, 100, 128, 10.0, 200, 256, 8.0, 400, 8.0},
-    {0, 100, 64, 8.0, 400, 64, 3.0, 600, 0.25},
-    {0, 100, 32, 10.0, 200, 32, 4.0, 200, 2.0},
-    {0, 100, 32, 8.0, 150, 32, 3.0, 200, 2.0},
-    {-1}
-};
-adapt_t adaptConfig_MFM8[] = {
-    {0, 100, 16, 8.0, 200, 32, 4.0, 400, 0.25},
-    {0, 100, 128, 10.0, 200, 256, 8.0, 400, 8.0},
-    {0, 100, 64, 8.0, 400, 64, 3.0, 600, 0.25},
-    {0, 100, 32, 10.0, 200, 32, 4.0, 200, 2.0},
-    {0, 100, 32, 8.0, 150, 32, 3.0, 200, 2.0},
-    {-1}
-};
-adapt_t adaptConfig_M2FM8[] = {
-
+adapt_t adaptConfig_FM8H[] = {
+    {0, 100, 21, 8.0, 400, 32, 4.0, 600, 0.25},    // hard sector default as no gap pre sync bytes also short blocks
+    {0, 200, 32, 6.0, 400, 32, 2.0, 600, 0.25},    // hard sector default as no gap pre sync bytes also short blocks
     {0, 100, 128, 10.0, 300, 256, 8.0, 400, 8.0},   // wide training window with long settle time
     {0, 100, 32, 10.0, 200, 32, 4.0, 200, 2.0},     // narrow training window with short settle time
     {0, 100, 16, 8.0, 200, 32, 4.0, 400, 0.25},     // very narrow training window
-//   {0, 100, 21, 8.0, 400, 32, 4.0, 600, 0.25},    // FM hard sector default as no gap pre sync bytes also short blocks
-//   {0, 200, 32, 6.0, 400, 32, 2.0, 600, 0.25},    // FM hard sector default as no gap pre sync bytes also short blocks
-//    {0, 100, 64, 8.0, 400, 64, 3.0, 600, 0.25},
-//    {0, 100, 32, 8.0, 150, 32, 3.0, 200, 2.0},
     {-1}
 };
 
-adapt_t *adaptConfig;                           // the current adapt config set
-int curConfig;
+
+adapt_t adaptConfig_MFM5[] = {
+    {0, 100, 128, 10.0, 300, 256, 8.0, 400, 8.0},   // wide training window with long settle time
+    {0, 100, 32, 10.0, 200, 32, 4.0, 200, 2.0},     // narrow training window with short settle time
+    {0, 100, 16, 8.0, 200, 32, 4.0, 400, 0.25},     // very narrow training window
+    {0, 100, 21, 8.0, 400, 32, 4.0, 600, 0.25},    // hard sector default as no gap pre sync bytes also short blocks
+    {0, 200, 32, 6.0, 400, 32, 2.0, 600, 0.25},    // hard sector default as no gap pre sync bytes also short blocks
+    {-1}
+};
+
+adapt_t adaptConfig_MFM5H[] = {
+    {0, 100, 21, 8.0, 400, 32, 4.0, 600, 0.25},    // hard sector default as no gap pre sync bytes also short blocks
+    {0, 200, 32, 6.0, 400, 32, 2.0, 600, 0.25},    // hard sector default as no gap pre sync bytes also short blocks
+    {0, 100, 128, 10.0, 300, 256, 8.0, 400, 8.0},   // wide training window with long settle time
+    {0, 100, 32, 10.0, 200, 32, 4.0, 200, 2.0},     // narrow training window with short settle time
+    {0, 100, 16, 8.0, 200, 32, 4.0, 400, 0.25},     // very narrow training window
+    {-1}
+};
+
+adapt_t adaptConfig_MFM8[] = {
+    {0, 100, 128, 10.0, 300, 256, 8.0, 400, 8.0},   // wide training window with long settle time
+    {0, 100, 32, 10.0, 200, 32, 4.0, 200, 2.0},     // narrow training window with short settle time
+    {0, 100, 16, 8.0, 200, 32, 4.0, 400, 0.25},     // very narrow training window
+    {0, 100, 21, 8.0, 400, 32, 4.0, 600, 0.25},    // hard sector default as no gap pre sync bytes also short blocks
+    {0, 200, 32, 6.0, 400, 32, 2.0, 600, 0.25},    // hard sector default as no gap pre sync bytes also short blocks
+    {-1}
+};
+
+adapt_t adaptConfig_MFM8H[] = {
+    {0, 100, 21, 8.0, 400, 32, 4.0, 600, 0.25},    // hard sector default as no gap pre sync bytes also short blocks
+    {0, 200, 32, 6.0, 400, 32, 2.0, 600, 0.25},    // hard sector default as no gap pre sync bytes also short blocks
+    {0, 100, 128, 10.0, 300, 256, 8.0, 400, 8.0},   // wide training window with long settle time
+    {0, 100, 32, 10.0, 200, 32, 4.0, 200, 2.0},     // narrow training window with short settle time
+    {0, 100, 16, 8.0, 200, 32, 4.0, 400, 0.25},     // very narrow training window
+    {-1}
+};
+
+adapt_t adaptConfig_M2FM8[] = {
+    {0, 100, 128, 10.0, 300, 256, 8.0, 400, 8.0},   // wide training window with long settle time
+    {0, 100, 32, 10.0, 200, 32, 4.0, 200, 2.0},     // narrow training window with short settle time
+    {0, 100, 16, 8.0, 200, 32, 4.0, 400, 0.25},     // very narrow training window
+    {0, 100, 32, 10.0, 200, 32, 4.0, 200, 2.0},     // narrow training window with short settle time
+    {0, 100, 16, 8.0, 200, 32, 4.0, 400, 0.25},     // very narrow training window
+    {-1}
+};
+
+// profiles used by encodings E_FM5 = 0, E_FM5H, E_FM8, E_FM8H, E_MFM5, E_MFM5H, E_MFM8, E_MFM8H, E_M2FM8
+
+struct {
+    unsigned nominalCellSize;
+    adapt_t *adaptConfig;                           // the current adapt config set
+} dpllConfigs[] = {
+    { 4000, adaptConfig_FM5 },
+    { 4000, adaptConfig_FM5H},
+    { 2000, adaptConfig_FM8},
+    { 2000, adaptConfig_FM8H },
+    { 2000, adaptConfig_MFM5 },
+    { 2000, adaptConfig_MFM5H },
+    { 1000, adaptConfig_MFM8 },
+    { 1000, adaptConfig_MFM8H},
+    { 1000, adaptConfig_M2FM8 },
+};
+
+adapt_t *adaptConfig;
 
 static uint32_t adaptCnt;
 static uint32_t adaptBitCnt;
@@ -147,8 +201,8 @@ int getBit() {
     int slot;
     int cstate = 1;			// default is IPC
 
+    bits65_66 = ((bits65_66 << 1) + (pattern >> 63)) & 3;
     pattern <<= 1;
-    bitCnt++;
 
     while (ctime < etime) {					// get next transition in a cell
         if ((fluxVal = getNextFlux()) < 0)
@@ -193,35 +247,20 @@ int getBit() {
 }
 
 unsigned getBitCnt() {
-    return bitCnt;
+    return getBitPos(nominalCellSize);
 }
 
 unsigned getByteCnt() {
-    return bitCnt / 16;
+    return getBitCnt() / 16;
 }
 
 
 bool retrain(int profile) {
-    switch (curFormat->encoding) {
-    case E_FM5:
-        cellSize = 4000;
-        adaptConfig = adaptConfig_FM5;
-        break;
-    case E_FM8: case E_FM8H:
-        cellSize = 2000;
-        adaptConfig = adaptConfig_FM8;
-        break;
-    case E_MFM5: case E_MFM5H:
-        cellSize = 2000;
-        adaptConfig = adaptConfig_MFM5;
-        break;
-    case E_MFM8: case E_M2FM8:
-        cellSize = 1000;
-        adaptConfig = adaptConfig_M2FM8;
-        break;
-    default:
+    if (curFormat->encoding > E_M2FM8)
         logFull(D_FATAL, "For %s unknown encoding %d\n", curFormat->name, curFormat->encoding);
-    }
+    nominalCellSize = dpllConfigs[curFormat->encoding].nominalCellSize;
+    adaptConfig = dpllConfigs[curFormat->encoding].adaptConfig;
+
     for (int i = 0; i <= profile; i++)          // check we have enough profiles
         if (adaptConfig[i].model < 0) {
             adaptProfile = 0;
@@ -232,13 +271,12 @@ bool retrain(int profile) {
     
     if (adaptConfig[profile].model == 0) {
         pattern = 0;                        // reset pattern stream
-        bitCnt = 0;
         fCnt = aifCnt = adfCnt = pcCnt = 0; // reset the dpll
         up = false;
 
         int flux = getNextFlux();           // prime dpll with firstr sample
         double rpm = getRPM();
-        cellSize = (uint32_t)(cellSize * (rpm < 320.0 ? 300.0 : 360.0) / rpm);
+        cellSize = (uint32_t)(nominalCellSize * (rpm < 320.0 ? 300.0 : 360.0) / rpm);
 
         ctime = flux > 0 ? flux : 0;
         etime = ctime + cellSize / 2;       // assume its the middle of a cel

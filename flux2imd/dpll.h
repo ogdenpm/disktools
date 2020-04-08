@@ -7,6 +7,7 @@
 #include <stdbool.h>
 
 extern uint64_t pattern;
+extern uint16_t bits65_66;
 
 int getBit();               // get next bit or -1 if end of flux stream
 unsigned getBitCnt();       // support function to return number of bits processed

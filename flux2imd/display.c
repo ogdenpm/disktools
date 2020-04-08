@@ -52,8 +52,11 @@ static void displayDataLine(uint16_t *p, int len) {
     logBasic("\n");
 }
 
-static void displayExtraLine(uint16_t *p, int len) {       // len: 2 just CRC, 4 just fwd/bwd len, 8 fwd/bwd/crc & postamble
+static void displayExtraLine(uint16_t *p, int len) {       // len: 1 or 2 just CRC, 4 just fwd/bwd len, 8 fwd/bwd/crc & postamble
     switch (len) {
+    case 1:
+        logBasic("crc %02X%s\n", p[0] & 0xff, (p[0] & SUSPECT) ? "*" : "");
+        break;
     case 2: // simple CRC for bad sector
         logBasic("crc %02X%s %02X%s\n", p[0] & 0xff, (p[0] & SUSPECT) ? "*" : "", p[1] & 0xff, (p[1] & SUSPECT) ? "*" : "");
         break;
@@ -132,6 +135,7 @@ static void displaySector(track_t *pTrack, uint8_t slot, unsigned options) {
     if (!isGood || pTrack->fmt->options == O_ZDS) {
         int cntExtra;
         switch (pTrack->fmt->options) {
+        case O_NSI:
         case O_MTECH: cntExtra = 1; break;
         case O_ZDS: cntExtra = (pSector->status & SS_DATAGOOD) ? 4 : 8; break;
         default: cntExtra = 2;
@@ -273,7 +277,7 @@ void displayTrack(int cylinder, int side, unsigned options) {
     memset(sectorToSlot, 0xff, MAXSECTOR);  // mark all as not available
     for (int i = 0; i < spt; i++)
         if (slotToSector[i] != 0xff)
-            sectorToSlot[slotToSector[i]- firstSectorId] = i;
+            sectorToSlot[slotToSector[i] - firstSectorId] = i;
 
     if (pTrack->status & TS_BADID) {
         logFull(D_WARNING, "Track %02d/%d unable to reconstruct sector order\n", cylinder, side);

@@ -94,19 +94,20 @@ where
 #define MAXPN       64      // maximum part number/name
 
 char comment[MAXCOMMENT];
+char source[MAXCOMMENT];
 char root[_MAX_PATH + 1];
 byte diskType = ISIS_DD;
 label_t label;
 bool hasSystem = false;
 bool interleave = false;
 bool interTrackSkew = false;
+bool addSource = false;
 int formatCh = -1;                     // format character -e sets, otherwise defaults to 0xc7 for ISIS_II and 0xe5 for ISIS_PDS
 char *forcedSkew = NULL;
 
 char *special[] = { "AUTO", "DIR", "ZERO", "ZEROHDR", NULL };
 
-char *formatDensity[] = { " ??", " SD", " DD", "" };
-char *missingOS[] = { "UNKNOWN ---", "ISIS II ---", "ISIS II ---", "PDS ---" };
+char *osName[] = { "UNKNOWN", "ISIS II SD", "ISIS II DD", "ISIS PDS" };
 
 void InitFmtTable(byte t0Interleave, byte t1Interleave, byte interleave) {
     label.fmtTable[0] = t0Interleave + '0';
@@ -155,9 +156,10 @@ void decodePair(char *dest, char *src) {
     }
 }
 
-void appendComment(char const *s) {
-    if (strlen(comment) + strlen(s) < MAXCOMMENT)	// ignore if comment too long
-        strcat(comment, s);
+
+void append(char *dst, char const *s) {
+    if (strlen(dst) + strlen(s) < MAXCOMMENT)	// ignore if comment too long
+        strcat(dst, s);
 }
 
 void ParseRecipeHeader(FILE *fp) {
@@ -165,19 +167,16 @@ void ParseRecipeHeader(FILE *fp) {
     char osString[MAXOS + 1] = { "---" };
     char *s;
     int c;
-    bool pastComment = false;
+    char *appendTo = comment;
 
     while (fgets(line, MAXLINE, fp)) {
         s = line;
         if (*s == '#') {
-            if (!pastComment) {
-                if (*++s == ' ')
-                    s++;
-                appendComment(s);
-            }
+            if (appendTo)
+                append(appendTo, ++s);
             continue;
         }
-        pastComment = true;
+        appendTo = NULL;
 
         if (s = strchr(line, '\n'))
             *s = 0;
@@ -221,23 +220,25 @@ void ParseRecipeHeader(FILE *fp) {
                 '1' <= s[1] && s[1] <= 52 + '0' &&
                 '1' <= s[2] && s[2] <= 52 + '0')
                 InitFmtTable(s[0] - '0', s[1] - '0', s[2] - '0');
-        } else if (s = Match(line, "os:")) {
+        } else if (s = Match(line, "os:"))
             strncpy(osString, s, MAXOS);
-            if (*osString == 0 || Match(s, "NONE") || Match(s, "UNKNOWN"))
-                strcpy(osString, "---");
-            else
-                hasSystem = true;
-        } else if (s = Match(line, "crlf:"))
+        else if (s = Match(line, "crlf:"))
             decodePair(label.crlf, s);
+        else if ((s = Match(line, "source:")) && addSource) {
+            append(source, "\n");
+            append(source, line);
+            append(source, "\n");
+            appendTo = source;
+        }
     }
-    // treat os NONE, UNKNOWN and missing os the same, will show as --- in the IMD
-    if (stricmp(osString, "NONE") == 0 || stricmp(osString, "UNKNOWN") == 0)
-        osString[0] = 0;
 
-    char fmt[MAXOS + 5];      // enough string space
-
-    sprintf(fmt, "%s%s\n", hasSystem ? osString : missingOS[diskType], formatDensity[diskType]);
-    appendComment(fmt);
+    char fmt[128];      // enough string space
+    if (*osString && strcmp(osString, "NONE") != 0)
+        sprintf(fmt, "\n%s System Disk - format %s\n", osString, osName[diskType]);
+    else
+        sprintf(fmt, "\nNon-System Disk - format %s\n", osName[diskType]);
+    append(comment, fmt);
+    append(comment, source);
 }
 
 char *ParseIsisName(char *isisName, char *src) {
@@ -375,15 +376,18 @@ void usage() {
         return;
     shown++;
     printf(
+        "mkidsk - Generate imd or img files from ISIS II / PDS recipe files (c) Mark Ogden 29-Mar-2020\n\n"
         "usage: mkidsk [options]* [-]recipe [diskname][.fmt]\n"
         "where\n"
         "recipe     file with instructions to build image. Optional - prefix\n"
         "           if name starts with @\n"
         "diskname   generated disk image name - defaults to recipe without leading @\n"
-        "fmt        disk image format either .img or imd - defaults to " EXT "\n"
+        "fmt        disk image format either .img or .imd - defaults to " EXT "\n"
         "\noptions are\n"
-        "-f[nn]     override C7 format byte with E5 or hex value specified by nn\n"
         "-h         displays this help info\n"
+        "-s         add source: info to imd images\n"
+        "-f[nn]     override C7 format byte with E5 or hex value specified by nn\n"
+
         "-i[xyz]    apply interleave. xyz forces the interleave for track 0, 1, 2-76\n"
         "           x,y & z are as per ISIS.LAB i.e. interleave + '0'\n"
         "           note the ISIS.LAB format information is not changed\n"
@@ -426,6 +430,8 @@ void main(int argc, char **argv) {
                 formatCh = ALT_FMTBYTE;
             formatCh &= 0xff;
             break;
+        case 's':
+            addSource = true;
         }
     }
     if (i != argc - 1 && i != argc - 2) {                 // allow for recipe and optional diskname

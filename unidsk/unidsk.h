@@ -79,6 +79,6 @@ typedef struct {
 extern int osIdx;
 extern bool debug;
 
-void mkRecipe(char *name, isisDir_t  *isisDir, char *comment, int diskType);
+void mkRecipe(char const *name, isisDir_t  *isisDir, char *comment, int diskType, bool isOK);
 char *Dblookup(isisDir_t *entry);
 void loadCache();

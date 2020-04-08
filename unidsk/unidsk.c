@@ -808,7 +808,7 @@ void GetSHA1(byte *checksum) {
     *--checksum = 0;            // replace 28th char with 0;
 }
 
-void extractFile(dir_t *dptr, int dirSlot)
+bool extractFile(dir_t *dptr, int dirSlot)
 {
     char filename[16];
     char isisName[11];
@@ -827,10 +827,10 @@ void extractFile(dir_t *dptr, int dirSlot)
 
     if (!*isisName)        
         if (dptr->status != 0)  // ignore missing name if deleted file
-            return;
+            return true;
         else {
             fprintf(stderr, "Missing file name for ISIS.DIR entry %d\n", dirSlot);
-            return;
+            return false;
         }
 
     if (dptr->status != 0)
@@ -842,7 +842,7 @@ void extractFile(dir_t *dptr, int dirSlot)
 
     if ((fout = fopen(filename, "wb")) == NULL) {
         fprintf(stderr, "can't create %s\n", filename);
-        return;
+        return false;
     }
     prevTrk = prevSec = 0;
 
@@ -863,10 +863,12 @@ void extractFile(dir_t *dptr, int dirSlot)
             isisLinkage_t *curLinks = links;
             if ((links = (isisLinkage_t *)getTS(links->next.track, links->next.sector)) == NULL) {
                 rdError("%s block %d bad linkage block t=%d s=%d\n", isisName, blk, curLinks->next.track, curLinks->next.sector);
+                rdErrorCnt++;
                 break;
             }
             if (prevSec != links->prev.sector && prevTrk != links->prev.track) {
                 rdError("%s block %d corrupt linkage block t=%d s=%d\n", isisName, blk, curLinks->next.track, curLinks->next.sector);
+                rdErrorCnt++;
                 break;
             }
             prevTrk = curLinks->next.track;
@@ -876,6 +878,7 @@ void extractFile(dir_t *dptr, int dirSlot)
         if (debug) printf(" %02d:%02d", links->pointers[blkIdx].track, links->pointers[blkIdx].sector);
         if (links->pointers[blkIdx].sector == 0 || (p = getTS(links->pointers[blkIdx].track, links->pointers[blkIdx].sector)) == NULL) {
             rdError("%s block %d missing t=%d s=%d\n", filename, blk, links->pointers[blkIdx].track, links->pointers[blkIdx].sector);
+            rdErrorCnt++;
 
             for (int i = 0; i < sectorSize; i++)
                 putc(0xc7, fout);
@@ -909,35 +912,39 @@ void extractFile(dir_t *dptr, int dirSlot)
         osIdx = dirIdx;
 
     dirIdx++;
-    if (dptr->status != 0)          // deleted file
+    if (dptr->status != 0) {         // deleted file
         if (rdErrorCnt || size == 0)
             _unlink(filename);
         else
             recoveredFiles++;
+        return true;
+    }
+    return rdErrorCnt == 0;
 }
 
-void isis2_3(dir_t *dptr)
+bool isis2_3(dir_t *dptr)
 {
     FILE *fp;
     dir_t dentry;
     int dirSlot;
-
+    bool ok = true;
     printf("Looks like an ISIS %s disk\n", diskType == ISIS_PDS ? "PDS" : "II");
 
-    extractFile(dptr, 0);		// get the ISIS.DIR file, leaves filename in targetPath
+    ok &= extractFile(dptr, 0);		// get the ISIS.DIR file, leaves filename in targetPath
     /* although processing of the header file could be done here
        it is simpler to re-read the ISIS.DIR file that has just been saved
     */
     if ((fp = fopen("ISIS.DIR", "rb")) == NULL) {
         fprintf(stderr, "can't read ISIS.DIR file\n");
-        return;
+        return false;
     }
-    fseek(fp, sizeof(dir_t), 0);	// skip ISIS.DIR entry it has already been done
     dirSlot = 0;
     while (fread(&dentry, sizeof(dir_t), 1, fp) == 1 && dentry.status != 0x7f) {
         dirSlot++;
+        if (memcmp(dentry.name, "ISIS\0\0DIR", 9) == 0)
+            continue;
         if (dentry.status == 0 || dentry.status == 0xff)
-            extractFile(&dentry, dirSlot);
+            ok &= extractFile(&dentry, dirSlot);
         else {
             fprintf(stderr, "corrupt directory - status byte %02X\n", dentry.status);
             break;
@@ -946,25 +953,42 @@ void isis2_3(dir_t *dptr)
     fclose(fp);
     if (recoveredFiles)
         printf("%d deleted files recovered for checking\n", recoveredFiles);
+    return ok;
 }
+
+byte *chkIsisDir(byte *p) {
+    for (int i = 0; i < 4; i++, p += sizeof(dir_t))
+        if (memcmp(p, "\0ISIS\0\0DIR", 10) == 0)
+            return p;
+    return NULL;
+}
+
+char const *GetFileName(char const *path) {
+    char const *name;
+    while (name = strpbrk(path, "/\\:"))
+        path = name + 1;
+    return path;
+}
+
 
 void main(int argc, char **argv)
 {
     byte *p;
     FILE *fp;
+    char targetPath[_MAX_PATH];
     char dir[_MAX_DIR];
     char drive[_MAX_DRIVE];
     char fname[_MAX_FNAME];
     char ext[_MAX_EXT];
     bool local = false;
+    bool ok;
 
     while (argc > 2) {
         if (_stricmp(argv[1], "-l") == 0)
             local = true;
         else if (_stricmp(argv[1], "-d") == 0)
             debug = true;
-        else if (_stricmp(argv[1], "-p") == 0)
-            pad = true;
+        else
             break;
         argv++;
         argc--;
@@ -972,10 +996,11 @@ void main(int argc, char **argv)
 
 
     if (argc != 2 || (fp = fopen(*++argv, "rb")) == NULL) {
-        fprintf(stderr, "usage: unidsk [-l] [-d] [-p] file\n"
+        fprintf(stderr,
+            "unidsk - extract files from ISIS disks in img or imd format (c) Mark Ogden 29-Mar-2020\n\n"
+            "usage: unidsk [-l] [-d] file\n"
             "-l for local names only\n"
-            "-d for link info\n"
-            "-p pad missing sectors\n");
+            "-d for link info\n");
         exit(1);
     }
 
@@ -1001,11 +1026,14 @@ void main(int argc, char **argv)
     _makepath_s(targetPath, _MAX_PATH, drive, dir, fname, NULL);        // create a directory name with filename - extension
     _mkdir(targetPath);
     _chdir(targetPath);                                                 // move to new directory for simple file creation
-    if (((p = getTS(1, 2)) && memcmp(p + 1, "ISIS\0\0DIR", 9) == 0)
-        || ((p = getTS(0x27, 2)) && memcmp(p + 1, "ISIS\0\0DIR", 9) == 0)) {
-        isis2_3((dir_t *)p);
-        mkRecipe(fname, isisDir, comment, diskType);
-    }
-    else
+    // because there are example disks (i.e. I have seen one) where ISIS.DIR is not in
+    // the correct place, look through 4 entries to see if it exists
+    if ((p = getTS(1, 2)) && (p = chkIsisDir(p))) {
+        ok = isis2_3((dir_t *)p);
+        mkRecipe(GetFileName(*argv), isisDir, comment, diskType, ok);
+    } else if ((p = getTS(0x27, 2)) && (p = chkIsisDir(p))) {
+        ok = isis2_3((dir_t *)p);
+        mkRecipe(GetFileName(*argv), isisDir, comment, diskType, ok);
+    } else
         isis4();
 }

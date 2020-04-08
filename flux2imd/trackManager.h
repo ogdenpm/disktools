@@ -32,7 +32,7 @@ extern int maxHead;
 
 extern track_t* trackPtr;
 
-bool checkTrack();
+bool checkTrack(int profile);
 void finaliseTrack();
 track_t* getTrack(int cylinder, int side);
 bool hasTrack(int cylinder, int head);

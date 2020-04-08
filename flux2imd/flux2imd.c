@@ -153,14 +153,21 @@ static bool loadZipFile(struct zip_t *zip) {
 
 static _declspec(noreturn) void usage() {
     fprintf(stderr,
+        "flux2imd - convert fluxfiles to imd format (c) Mark Ogden 29-Mar-2020\n\n"
         "usage: analysis [-b] [-d[n]] [-g] [-h[n]] [-p] [zipfile|rawfile]+\n"
         "options can be in any order before the first file name\n"
-        "-b will write bad (idam or data) sectors to the log file\n"
-        "-d sets debug flags to n (n is in hex) default is 1 which echos log to console\n"
-        "-g will write good (idam and data) sectors to the log file\n"
-        "-h displays flux histogram. n is optional number of levels\n"
-        "-p ignores parity bit in sector dump ascii display\n"
+        "  -b will write bad (idam or data) sectors to the log file\n"
+        "  -d sets debug flags to n (n is in hex) default is 1 which echos log to console\n"
+        "  -g will write good (idam and data) sectors to the log file\n"
+        "  -h displays flux histogram. n is optional number of levels\n"
+        "  -p ignores parity bit in sector dump ascii display\n"
         "Note ZDS disks and rawfiles force -g as image files are not created\n"
+#ifdef _DEBUG
+        "\nDebug options - add the hex values:\n"
+        "  01 -> echo    02 -> flux     04 -> detect    08 -> pattern\n"
+        "  10 -> AM      20 -> decode   40 -> no Opt    80 -> tracker\n"
+#endif
+
     );
     exit(1);
 }
@@ -184,7 +191,7 @@ int main(int argc, char** argv) {
             if (argv[arg][2]) {
                 if (sscanf(argv[arg] + 2, "%x", &debug) != 1)
                     debug = D_ECHO;
-            } else if (arg + 1 < argc && sscanf(argv[arg + 1], "%x%c", &debug, &optCh) == 1)
+            } else if (arg + 1 < argc && isxdigit(argv[arg + 1][0]) && sscanf(argv[arg + 1], "%x%c", &debug, &optCh) == 1)
                 arg++;
              else
                  debug = D_ECHO;;
@@ -193,7 +200,7 @@ int main(int argc, char** argv) {
             if (argv[arg][2]) {
                 if (sscanf(argv[arg] + 2, "%d", &histLevels) != 1)
                     histLevels = 10;
-            } else if (arg + 1 < argc && sscanf(argv[arg + 1], "%d%c", &histLevels, &optCh) == 1)
+            } else if (arg + 1 < argc && isxdigit(argv[arg + 1][0]) && sscanf(argv[arg + 1], "%d%c", &histLevels, &optCh) == 1)
                 arg++;
             else
                 histLevels = 10;

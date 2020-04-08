@@ -41,7 +41,7 @@ typedef struct _sector {
 } sector_t;
 
 
-void addIdam(unsigned pos, idam_t* idam);
-void addSectorData(unsigned pos, bool isGood, unsigned len, uint16_t rawData[]);
+void addIdam(int pos, idam_t* idam);
+void addSectorData(int pos, bool isGood, unsigned len, uint16_t rawData[]);
 void removeSectorData(sectorDataList_t* p);
 void resetTracker();
