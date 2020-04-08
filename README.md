@@ -7,10 +7,10 @@ The tools are
   * imdu
   * td02imd
 * td02img a variant of td02imd that created .img files
-* idd2imd - used to convert KryoFlux image files in imdimage files.
+* flux2imd - used to convert KryoFlux image files in imd image files. Replaces idd2imd
 * unidsk - tool to decode an ISIS disk in imd or img format. Supports ISIS II (SD & DD) ISIS III, ISIS IV and some irmx
-* mkidsk - takes a recipe file decribing an ISIS II (SD or DD) disk and creates a corresponding imd image
+* mkidsk - takes a recipe file describing an ISIS II (SD or DD) disk and creates a corresponding imd image
 
 Mark
 
-17-Jan-2019
+8-Apr-2020
