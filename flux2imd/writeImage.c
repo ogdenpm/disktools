@@ -52,9 +52,8 @@ static void WriteIMDHdr(FILE* fp, char* fname) {
     fprintf(fp, "Created from %s by flux2imd\r\n\x1a", fileName(fname));
 }
 
-
-// E_FM5, E_FM8, E_FM8H, E_MFM5, E_MFM8, E_MFM5H, E_M2FM8
-static uint8_t imdModes[] = { 2, 0, 0, 5, 3, 5, 3 };
+// E_FM5, E_FM5H, E_FM8, E_FM8H, E_MFM5, E_MFM5H, E_MFM8, E_MFM8H, E_M2FM8
+static uint8_t imdModes[] = { 2, 2, 0, 0, 5, 5, 3, 3, 3 };
 
 void writeImdFile(char *fname) {
     FILE *fp;
