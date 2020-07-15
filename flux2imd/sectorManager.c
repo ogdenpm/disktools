@@ -34,18 +34,22 @@ static void chkSptChange() {
 }
 
 
+bool isBigGap(int delta) {
+    return delta > 0 && ((double)delta / minSpacing - (double)delta / maxSpacing > 0.75);
+}
+
 // work out the slot on the disk corresponding the given pos
 //  for pos <= 0 then -pos is the slot. this is used for hard sector disks
 
 static unsigned slotAt(int pos, bool isIdam) {
     static unsigned prevIdamPos;
     static unsigned prevDataPos;
+    int posDelta;
 
     if (pos <= 0)
         return -pos;
 
-    if (prevSlot < 0 || pos < prevIdamPos) {       // initialise either explicit or due to seek from start
-        unsigned adjust;
+    if (prevSlot < 0 || pos < (isIdam ? prevDataPos : prevIdamPos)) {       // initialise either explicit or due to seek from start
         curSpacing = curFormat->spacing;
         if (cntHardSectors())
             minSpacing = maxSpacing = curSpacing;
@@ -53,31 +57,35 @@ static unsigned slotAt(int pos, bool isIdam) {
             minSpacing = curFormat->spacing * 97 / 100;     // +/- 3%
             maxSpacing = curFormat->spacing * 103 / 100;
         }
-
-        prevSlot = pos / curSpacing;
-
         if (isIdam) {
             prevIdamPos = pos;
             prevDataPos = prevIdamPos + curFormat->firstDATA - curFormat->firstIDAM;
-            adjust = curFormat->firstIDAM * 3 / 4;      // allow 75% of first IDAM as offset
         } else {
             prevDataPos = pos;
             prevIdamPos = prevDataPos + curFormat->firstIDAM - curFormat->firstDATA;
-            adjust = curFormat->firstDATA * 3 / 4;      // allow 75% of first DATA as offset
         }
-        // see if we get different sectors numbers depending on min/max spacing
-        if (pos > adjust && (pos - adjust) / minSpacing != (pos - adjust) / maxSpacing)
-            logFull(D_WARNING, "Too many missing sectors, slot calculation may be wrong\n");
+
+        if (isBigGap(pos - (isIdam ? curFormat->firstIDAM : curFormat->firstDATA)) && !(trackPtr->status & TS_TOOMANY)) {
+            logFull(D_WARNING, "Too many missing sectors at start of track, slot calculation may be wrong\n");
+            trackPtr->status |= TS_TOOMANY;
+        }
+        prevSlot = pos / curSpacing;
     }
+    posDelta = pos - (isIdam ? prevIdamPos : prevDataPos);
+    if (isBigGap(posDelta) && !(trackPtr->status & TS_TOOMANY)) {
+            logFull(D_WARNING, "Too many missing sectors, slot calculation may be wrong\n");
+            trackPtr->status |= TS_TOOMANY;
+        }
+
     // calculate change in slot, allow for some JITTER
-    unsigned slotDelta = (pos - (isIdam ? prevIdamPos : prevDataPos) + POSJITTER) / curSpacing;
+    unsigned slotDelta = (posDelta + POSJITTER) / curSpacing;
     if (slotDelta == 0) {
         if (!isIdam)                    // already  have IDAM so put in real data pos
             prevDataPos = pos;
     } else {
         prevSlot += slotDelta;
         // now work out effective spacing
-        unsigned newSpacing = (pos - (isIdam ? prevIdamPos : prevDataPos)) / slotDelta;
+        unsigned newSpacing = posDelta / slotDelta;
         // keep in tolerance
         newSpacing = newSpacing > maxSpacing ? maxSpacing : newSpacing < minSpacing ? minSpacing : newSpacing;
 

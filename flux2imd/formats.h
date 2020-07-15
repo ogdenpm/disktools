@@ -14,6 +14,7 @@ enum {
     GAP= 0x1ff, SYNC = 0x100, IBM_GAP = 0x4e, INDEXAM = 0xfc, IDAM = 0xfe, DATAAM = 0xfb, DELETEDAM = 0xf8,
     M2FM_INDEXAM = 0xc, M2FM_IDAM = 0xe, M2FM_DATAAM = 0xb, M2FM_DELETEDAM = 0x8,   // INTEL M2FM flavour
     HP_IDAM = 0x10e, HP_DATAAM = 0xa , HP_DELETEDAM = 0xf,                          // HP M2FM flavour
+    TI_IDAM = 0x10a, TI_DATAAM = 0x10b,
     LSI_SECTOR = 0x200, ZDS_SECTOR = 0x300,  MTECH_SECTOR = 0x400,                  // Hard sector specials
     NSI_SECTOR = 0x500, NSI_IDAM = 0x600};                 
 
@@ -31,7 +32,8 @@ enum options {
     O_LSI = O_REV + 2,
     O_HP = O_REV + 3,
     O_MTECH = O_NOIMD + 4,
-    O_NSI = 5
+    O_NSI = 5,
+    O_TI = O_NOIMD + 6
 };
 
 
@@ -56,6 +58,9 @@ typedef struct {
     int firstIDAM;
     int firstDATA;
     int spacing;
+    unsigned nominalCellSize;
+    char *profileOrder;
+    char *description;
 } formatInfo_t;
 
 extern formatInfo_t *curFormat;
@@ -69,3 +74,5 @@ int matchPattern(int searchLimit);
 void setFormat(char *fmtName);
 bool setInitialFormat(char *fmtName);
 bool crc8(uint16_t* data, int len);
+char *getFormat(const char *userfmt, int cyl, int head);
+void showFormats();

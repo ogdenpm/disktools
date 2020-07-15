@@ -169,7 +169,7 @@ static void endIndex(uint32_t streamPos) {
             } else
                 startIndex = p->indexCnt;
     }
-    if (endIndex)
+    if (endIndex && endIndex != startIndex)
         rpm = ick / (endIndex - startIndex) * 60;
 
     seekBlock(0);
@@ -289,7 +289,9 @@ static size_t oob(size_t fluxPos, size_t size, size_t streamIdx) {
                 sck = atof(s + 4);
                 fluxScaler = 1.0e9 / sck;
             }
-            if (s = strstr(oobBlk, "ick="))
+            if (s = strstr(oobBlk, "ick=="))        // handle spurious double = in some older kryoflux versions
+                ick = atof(s + 5);
+            else if (s = strstr(oobBlk, "ick="))
                 ick = atof(s + 4);
             if (s = strstr(oobBlk, "host_date="))
                 strncpy(scanDate, s + 10, 10);		// scanDate[10] will be 0 due to bss initialisation

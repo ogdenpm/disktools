@@ -15,8 +15,6 @@
 #include "util.h"
 
 
-static bool imdNotPossible = false;     // to track if any track since last reset is in ZDS format
-
 // support for sector size option in list of possible formats (O_SIZE)
 static bool chkSizeChange(unsigned sSize) {
     unsigned curSSize = curFormat->sSize;
@@ -128,8 +126,6 @@ static void hs5GetTrack(int cylinder, int side) {
     bool done = false;
 
     int cntSlot = cntHardSectors();
-    if (!setInitialFormat(NULL))
-        return;
     int sectorSize = 128 << curFormat->sSize;
 
     initTrack(cylinder, side);
@@ -198,11 +194,9 @@ static void hs8GetTrack(int cylinder, int side) {
     int matchType;
 
     bool done = false;
-    setInitialFormat("FM8H");
 
     initTrack(cylinder, 0);
     resetTracker();
-    imdNotPossible = false;
 
     int cntSlot = cntHardSectors();
     for (int profile = 0; !done; profile++) {
@@ -221,7 +215,7 @@ static void hs8GetTrack(int cylinder, int side) {
                 dataPos = getByteCnt();
                     if (curFormat->options == O_LSI && matchType == ZDS_SECTOR) {    // LSI & ZDS on same track assume all ZDS
                         DBGLOG(D_DECODER, "@%d:%d ZDS sector after LSI sector, rescan assuming ZDS\n", slot, dataPos);
-                        setFormat("FM8H-ZDS");
+                        setFormat("ZDS");
                         updateTrackFmt();
                         memset(sectorStatus, 0, sizeof(sectorStatus));
                         initTrack(cylinder, 0);    // clear any data collected so far assume all ZDS
@@ -230,7 +224,7 @@ static void hs8GetTrack(int cylinder, int side) {
 
                     }
                 if (!curFormat->options) {     // note LSI->ZDS detected above, ZDS->LSI cannot happen
-                    setFormat(matchType == LSI_SECTOR ? "FM8H-LSI" : "FM8H-ZDS");
+                    setFormat(matchType == LSI_SECTOR ? "FM8H-LSI" : "ZDS");
                     updateTrackFmt();
                 }
                 if (matchType == LSI_SECTOR) {
@@ -271,7 +265,6 @@ static void hs8GetTrack(int cylinder, int side) {
                 break;
             }
     }
-    imdNotPossible |= curFormat->options & O_NOIMD;
     // add the idams
     idam_t idam = { cylinder, 0, 0, 0 };
 
@@ -282,7 +275,7 @@ static void hs8GetTrack(int cylinder, int side) {
     finaliseTrack();
 }
 
-static void ssGetTrack(int cylinder, int side) {
+static void ssGetTrack(int cylinder, int side, char *usrfmt) {
 
     unsigned matchType;
     int result;
@@ -305,13 +298,29 @@ static void ssGetTrack(int cylinder, int side) {
         for (int i = 1; !done && (seekBlock(i) >= 0); i++) {
             resetTracker();
             bool restart = false;
-
+            logFull(D_DECODER, "Profile %d, block %d\n", profile, i);
             while (!restart && (matchType = matchPattern(1200))) {
                 switch (matchType) {
                 case M2FM_INDEXAM:
                 case INDEXAM:           // to note start of track
                     indexPos = getByteCnt();
                     DBGLOG(D_DECODER, "@%d index\n", indexPos);
+                    break;
+                case TI_IDAM:
+                    idamPos = getByteCnt();
+                    result = getData(matchType, rawData, 9);
+                    if (result == 1) {
+                        idam.cylinder = (rawData[2] & 0x7f);
+                        idam.side = side;       // ignore the disk info -- pending check we have different data
+                        idam.sSize = 2;         // treat as 256 byte sector
+                        idam.sectorId = rawData[4] & 0xff;
+                        addIdam(idamPos, &idam);
+                        logFull(D_DECODER, "TI IDAM @%d - head=%d, cyl=%d, sector=%d\n", idamPos, (rawData[1] & 0xff) >> 3, rawData[2] & 0x7f, rawData[4] & 0xff);
+                    }
+                    else
+                        logFull(D_DECODER, "TI IDAM @%d (crc error) - %02X % 02X % 02X % 02X % 02X % 02X\n", idamPos,
+                        rawData[1] & 0xff, rawData[2] & 0xff, rawData[3] & 0xff, rawData[4] & 0xff, rawData[5] & 0xff, rawData[6] & 0xff);
+
                     break;
                 case IDAM:
                 case M2FM_IDAM:
@@ -341,6 +350,16 @@ static void ssGetTrack(int cylinder, int side) {
                     } else
                         logFull(D_DECODER, "@%d idam %s\n", idamPos, result < 0 ? "premature end\n" : "bad crc\n");
                     break;
+                case TI_DATAAM:
+                    dataPos = getByteCnt();
+                    result = getData(matchType, rawData, 291);
+                    logFull(D_DECODER, "TI DATA @%d %s\n", dataPos, result == 1 ? "ok" : "crc error");
+                    if (result >= 0) {
+                        addSectorData(dataPos, result, 288 + 2, rawData + 1);
+                        savedData = true;
+                    }
+                    break;
+
                 case DATAAM:
                 case M2FM_DATAAM:
                 case HP_DATAAM:
@@ -380,31 +399,31 @@ static void ssGetTrack(int cylinder, int side) {
     finaliseTrack();
 }
 
-bool flux2Track(int cylinder, int head) {
+bool flux2Track(int cylinder, int head, char *usrfmt) {
     char *fmt = NULL;
     int maxSlot = 0;
     int hs;
-    imdNotPossible = false;
     logCylHead(cylinder, head);
+
+    if (!setInitialFormat(getFormat(usrfmt, cylinder, head))) {
+        logFull(D_ERROR, "Could not determine encoding\n");
+        return false;
+    }
     if ((hs = cntHardSectors()) > 0) {
-        if (hs != 32 && hs != 16 && hs != 10) {
+        if (hs == 16 || hs == 10)
+            hs5GetTrack(cylinder, head);
+        else if (hs == 32)
+            hs8GetTrack(cylinder, head);
+        else {
             logFull(D_ERROR, "Disk has %d Hard Sectors - currently not supported\n", hs);
             return false;
         }
-
-        if (hs == 16 || hs == 10)           // note 16 not yet supported this will only accces DEBUG builds
-            hs5GetTrack(cylinder, head);
-        else
-            hs8GetTrack(cylinder, head);
-    } else if (!setInitialFormat(NULL)) {
-        logFull(D_ERROR, "Could not determine encoding\n");
-        return false;
     } else
-        ssGetTrack(cylinder, head);
+        ssGetTrack(cylinder, head, usrfmt);
     return true;
 }
 
 
 bool noIMD() {
-    return imdNotPossible;
+    return curFormat->options & O_NOIMD;
 }

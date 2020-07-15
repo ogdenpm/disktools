@@ -8,7 +8,7 @@
 
 // decoders.c
 void assumeIMD();
-bool flux2Track(int cylinder, int side);
+bool flux2Track(int cylinder, int side, char *usrfmt);
 bool noIMD();
 
 // display.c
@@ -20,3 +20,4 @@ void displayHist(int levels);
 
 // writeImage.c
 void writeImdFile(char *fname);
+void analyse(char *opt);

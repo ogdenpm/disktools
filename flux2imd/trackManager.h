@@ -10,7 +10,7 @@
 
 
 // track status flags
-enum {TS_FIXEDID = 1, TS_BADID = 2, TS_CYL = 4, TS_MCYL = 8, TS_SIDE = 16, TS_MSIDE = 32};
+enum {TS_FIXEDID = 1, TS_BADID = 2, TS_CYL = 4, TS_MCYL = 8, TS_SIDE = 16, TS_MSIDE = 32, TS_TOOMANY = 64};
 
 
 typedef struct {

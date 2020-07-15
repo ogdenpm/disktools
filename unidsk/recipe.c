@@ -127,7 +127,7 @@ struct {
     NULL, "NONE"
 };
 
-char *osFormat[] = { "UNKNOWN", "ISIS II SD", "ISIS II DD", "ISIS PDS", "ISIS IV" };
+char *osFormat[] = { "UNKNOWN", "ISIS II SD", "ISIS II DD", "ISIS PDS", "ISIS IV", "ISIS-DOS" };
 char *suffixFormat = "-SDP4";
 
 
@@ -224,7 +224,10 @@ void mkRecipe(char const *name, isisDir_t *isisDir, char *comment, int diskType,
         fprintf(stderr, "can't create recipe file\n");
         return;
     }
+
+
     fprintf(fp, "# IN-%s\n", recipeName + 1);
+
 
     fprintf(fp, "label: %s\n", recipeInfo.label);
     if (*recipeInfo.version)
@@ -232,11 +235,13 @@ void mkRecipe(char const *name, isisDir_t *isisDir, char *comment, int diskType,
 
     fprintf(fp, "format: %s\n", recipeInfo.format);
     fprintf(fp, "os: %s\n", recipeInfo.os);
+
     if (*recipeInfo.interleave)
-    fprintf(fp, "interleave: %s\n", recipeInfo.interleave);
+        fprintf(fp, "interleave: %s\n", recipeInfo.interleave);
     if (*recipeInfo.crlf)
     fprintf(fp, "crlf: %s\n", recipeInfo.crlf);
     fprintf(fp, "source: %s\n", name);
+
     if (*comment) {
         while (*comment) {
             fputs("# ", fp);
@@ -246,7 +251,6 @@ void mkRecipe(char const *name, isisDir_t *isisDir, char *comment, int diskType,
                 putc(*comment++, fp);
         }
     }
-
 
 
     fprintf(fp, "Files:\n");

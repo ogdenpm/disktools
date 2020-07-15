@@ -44,6 +44,8 @@ TODO
 
 char targetPath[_MAX_PATH];
 
+bool isDOS = false;     // set to true if ISIS named DOS
+
 isisDir_t isisDir[MAXDIR];
 int dirIdx;
 int osIdx = -1;
@@ -355,7 +357,7 @@ void load_imd(FILE *fp)
     switch (disk[1][0]->Nsec) {
     case 26: diskType = ISIS_SD; break;
     case 52: diskType = ISIS_DD; break;
-    case 16: diskType = ISIS_PDS; break;
+    case 16: diskType = disk[1][0]->Size == 128 ? ISIS_PDS : ISIS_DOS; break;
     case 8: diskType = ISIS_IV; break;
     default: diskType = UNKNOWN;
     }
@@ -374,6 +376,7 @@ struct {
     256256, ISIS_SD, 77, 1, 26, 128, 26, 128,
     512512, ISIS_DD, 77, 1, 52, 128, 52, 128,
     653312, ISIS_PDS, 80, 2, 16, 128, 16, 256,
+    327680, ISIS_DOS, 80, 1, 16, 256, 16, 256,  // requires img in true linear order
     653184, ISIS_IV, 80, 2, 15, 128, 8, 512   // currently unreliable
 };
 #define DISKOPT (sizeof(diskSizes) / sizeof(diskSizes[0]))
@@ -432,8 +435,12 @@ byte *getTS(int track, int sector)
     TRACK *p;
     int head = 0;
     int spt;
-
+    int offset = 0;     // for ISIS-DOS, 256 byte sectors treated as 2x128 byte sectors, offset = 128 for 2nd sector
     sector--;					// 0 base sector
+    if (diskType == ISIS_DOS) {
+        offset = (sector % 2 * 128);
+        sector /= 2;
+    }
     if (track > maxCylinder) {
         rdError("track %d > maxCylinder %d\n", track, maxCylinder);
         return NULL;
@@ -458,8 +465,7 @@ byte *getTS(int track, int sector)
 
     if (p->Smissing & (1ULL << sector))
         return NULL;
-
-    return p->buf + sector * p->Size;
+    return p->buf + sector * p->Size + offset;
 }
 
 byte *getBlock(int blk)
@@ -928,20 +934,23 @@ bool isis2_3(dir_t *dptr)
     dir_t dentry;
     int dirSlot;
     bool ok = true;
+    char *isisName = isDOS ? "DOS.DIR" : "ISIS.DIR";
+
+
     printf("Looks like an ISIS %s disk\n", diskType == ISIS_PDS ? "PDS" : "II");
 
     ok &= extractFile(dptr, 0);		// get the ISIS.DIR file, leaves filename in targetPath
     /* although processing of the header file could be done here
        it is simpler to re-read the ISIS.DIR file that has just been saved
     */
-    if ((fp = fopen("ISIS.DIR", "rb")) == NULL) {
-        fprintf(stderr, "can't read ISIS.DIR file\n");
+    if ((fp = fopen(isisName, "rb")) == NULL) {
+        fprintf(stderr, "can't read %s file\n", isisName);
         return false;
     }
     dirSlot = 0;
     while (fread(&dentry, sizeof(dir_t), 1, fp) == 1 && dentry.status != 0x7f) {
         dirSlot++;
-        if (memcmp(dentry.name, "ISIS\0\0DIR", 9) == 0)
+        if (memcmp(dentry.name, isDOS ? "DOS\0\0\0DIR" : "ISIS\0\0DIR", 9) == 0)
             continue;
         if (dentry.status == 0 || dentry.status == 0xff)
             ok &= extractFile(&dentry, dirSlot);
@@ -957,9 +966,14 @@ bool isis2_3(dir_t *dptr)
 }
 
 byte *chkIsisDir(byte *p) {
+
     for (int i = 0; i < 4; i++, p += sizeof(dir_t))
         if (memcmp(p, "\0ISIS\0\0DIR", 10) == 0)
             return p;
+        else if (memcmp(p, "\0DOS\0\0\0DIR", 10) == 0) {
+            isDOS = true;
+            return p;
+        }
     return NULL;
 }
 
@@ -971,8 +985,7 @@ char const *GetFileName(char const *path) {
 }
 
 
-void main(int argc, char **argv)
-{
+void main(int argc, char **argv) {
     byte *p;
     FILE *fp;
     char targetPath[_MAX_PATH];
@@ -1021,6 +1034,7 @@ void main(int argc, char **argv)
         exit(1);
     }
     fclose(fp);
+    isDOS = diskType == ISIS_DOS;
 
     /* make a directory path from the name*/
     _makepath_s(targetPath, _MAX_PATH, drive, dir, fname, NULL);        // create a directory name with filename - extension
@@ -1028,12 +1042,14 @@ void main(int argc, char **argv)
     _chdir(targetPath);                                                 // move to new directory for simple file creation
     // because there are example disks (i.e. I have seen one) where ISIS.DIR is not in
     // the correct place, look through 4 entries to see if it exists
-    if ((p = getTS(1, 2)) && (p = chkIsisDir(p))) {
+
+    if ((p = getTS(1, 2)) && (p = chkIsisDir(p))) {                         // ISIS-II
         ok = isis2_3((dir_t *)p);
         mkRecipe(GetFileName(*argv), isisDir, comment, diskType, ok);
-    } else if ((p = getTS(0x27, 2)) && (p = chkIsisDir(p))) {
+    } else if ((p = getTS(0x27, 2)) && (p = chkIsisDir(p))) {               // ISIS-PDS
         ok = isis2_3((dir_t *)p);
         mkRecipe(GetFileName(*argv), isisDir, comment, diskType, ok);
-    } else
+    } else 
         isis4();
+
 }

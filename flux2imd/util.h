@@ -12,6 +12,8 @@
 #define pOpt    1
 #define gOpt    2
 #define bOpt    4
+#define sOpt    8
+
 // current file for log prefix
 extern char curFile[];
 

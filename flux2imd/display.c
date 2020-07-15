@@ -109,7 +109,7 @@ static void displayLine(sector_t *pSector, int offset, int len, void (*displayFu
 static void displaySector(track_t *pTrack, uint8_t slot, unsigned options) {
     sector_t *pSector = &pTrack->sectors[slot];
 
-    int size = 128 << pTrack->fmt->sSize;
+    int size = pTrack->fmt->options == O_TI ? 288 : 128 << pTrack->fmt->sSize;
 
     if (!pSector->sectorDataList) {
         if (options & bOpt)
@@ -286,8 +286,10 @@ void displayTrack(int cylinder, int side, unsigned options) {
             if (sectorToSlot[i] == 0xff)
                 logBasic(" %02d", i + firstSectorId);
         logBasic("\n");
-    } else if (pTrack->status & TS_FIXEDID) {
-        logBasic("  Reconstructed sector order:");
+    } else if ((pTrack->status & TS_FIXEDID) || (options & (sOpt | gOpt | bOpt))) {
+        logBasic(pTrack->status & TS_FIXEDID ? " Reconstructed sector order:" : " Sector order:");
+        if (spt == 52)
+            logBasic("\n ");        // will be 2 lines so make it so they align
         for (int i = 0; i < spt; i++) {
             if (spt == 52 && i % 26 == 0)
                 logBasic("\n  ");

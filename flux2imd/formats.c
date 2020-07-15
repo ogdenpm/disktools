@@ -5,6 +5,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <ctype.h>
+#include <stdlib.h>
 #include "sectorManager.h"
 #include "dpll.h"
 #include "formats.h"
@@ -41,6 +43,8 @@ pattern_t dd8Patterns[] = {
     {0xffffffff, 0x55552A45, M2FM_DATAAM},
     {0xffffffff, 0x55552A48, M2FM_DELETEDAM},
     {0xffffffff, 0x55552A55, HP_DELETEDAM},
+    {0xffffffff, 0x11112244, TI_IDAM},
+    {0xffffffff, 0x11112245, TI_DATAAM},
     {0}
 };
 
@@ -115,6 +119,13 @@ pattern_t mtech5Patterns[] = {
     {0}
 };
 
+pattern_t ddTIPatterns[] = {
+    {0xffffffff, 0x11112244, TI_IDAM},
+    {0xffffffff, 0x11112245, TI_DATAAM},
+    {0xffffffff, 0x11111111, SYNC},
+    {0}
+};
+
 pattern_t nsi5DPatterns[] = {
       { 0xffffffffffffffff, 0xAAAAAAAA55455545, NSI_SECTOR },      // 00  FD VOL TRK
       { 0xffffffffffff, 0xAAAAAAAAAAAA, GAP},     // for efficiency 
@@ -175,41 +186,76 @@ bool crcNSI(uint16_t *data, int len);
 */
 formatInfo_t formatInfo[] = {
     //   name        siz 1st spt    enc     opt   crc         pattern      crcinit   idam data spc
-       {"SD5"        , 0, 1, 16,   E_FM5,      0, crcStd,     sdPatterns, 0xffff,     77,  99, 188},
-       {"FM5"        , 0, 1, 16,   E_FM5,  O_SPC, crcStd,   sdFMPatterns, 0xffff,     79, 103, 191},    // U
-       {"FM5-16x128" , 0, 1, 16,   E_FM5,      0, crcStd,   sdFMPatterns, 0xffff,     77, 101, 187},    // U
-       {"FM5-15x128" , 0, 1, 15,   E_FM5,      0, crcStd,   sdFMPatterns, 0xffff,     82, 106, 196},    // U
+       {"SD5"        , 0, 1, 16,   E_FM5,      0, crcStd,     sdPatterns, 0xffff,     77,  99, 188, 4000, "01234", NULL},
+       {"FM5"        , 0, 1, 16,   E_FM5,  O_SPC, crcStd,   sdFMPatterns, 0xffff,     79, 103, 191, 4000, "01234", "5 1/4\" SD **"},    // U
+       {"FM5-16x128" , 0, 1, 16,   E_FM5,      0, crcStd,   sdFMPatterns, 0xffff,     77, 101, 187, 4000, "01234", "5 1/4\" SD 16 x 128 sectors" },    // U
+       {"FM5-15x128" , 0, 1, 15,   E_FM5,      0, crcStd,   sdFMPatterns, 0xffff,     82, 106, 196, 4000, "01234", "5 1/4\" SD 15 x 128 sectors" },    // U
 
-       {"SD8"        , 0, 1, 26,   E_FM8,      0, crcStd,     sdPatterns, 0xffff,     90, 115, 194},
-       {"FM8-26x128" , 0, 1, 26,   E_FM8,      0, crcStd,   sdFMPatterns, 0xffff,     82, 106, 191},    // manually adjusted 
+       {"SD8"        , 0, 1, 26,   E_FM8,      0, crcStd,     sdPatterns, 0xffff,     90, 115, 194, 2000, "01234", NULL},
+       {"FM8-26x128" , 0, 1, 26,   E_FM8,      0, crcStd,   sdFMPatterns, 0xffff,     82, 106, 191, 2000, "01234", "8\" SD 26 x 128 sectors"},    // manually adjusted 
 
-       {"SD5H"        , 0, 1, 16, E_FM5H,      0, crcStd,     sd5HPatterns, 0xffff,     77,  99, 188},
-       {"FM5H-NSI"    , 1, 1, 10, E_FM5H,   O_NSI, crcNSI, nsi5SPatterns, 0xffff,	    0,   0,  0},
+       {"SD5H"        , 0, 1, 16, E_FM5H,      0, crcStd,     sd5HPatterns, 0xffff,     77,  99, 188, 4000, "34012", NULL},
+       {"NSI-SD"    , 1, 1, 10, E_FM5H,   O_NSI, crcNSI, nsi5SPatterns, 0xffff,	    0,   0,  0, 4000, "34012", "5 1/4\" SD NSI 10 x 256 hard sectors"},
 
-       {"SD8H"       , 0, 0, 32,  E_FM8H,      0, crcZDS,     sd8HPatterns,      0,       0,   0,  0},
-       {"FM8H"       , 0, 0, 32,  E_FM8H,      0, crcZDS,     sd8HPatterns,      0,       0,   0,  0},
-       {"FM8H-ZDS"   , 0, 0, 32,  E_FM8H,  O_ZDS, crcZDS, &sd8HPatterns[1],      0,       0,   0,  0},
-       {"FM8H-LSI"   , 0, 0, 32,  E_FM8H,  O_LSI, crcLSI,     sd8HPatterns,      0,       0,   0,  0},
-       {"LSI"        , 0, 0, 32,  E_FM8H,  O_LSI, crcLSI,    lsiPatterns,      0,       0,   0,  0},  // for future use (LSI with no option to detect ZDS)
+       {"SD8H"       , 0, 0, 32,  E_FM8H,      0, crcZDS,     sd8HPatterns,      0,       0,   0,  0, 2000, "34012", "8\" SD hard sectors **"},
+       {"ZDS"        , 0, 0, 32,  E_FM8H,  O_ZDS, crcZDS, &sd8HPatterns[1],      0,       0,   0,  0, 2000, "34012", "ZDS 8\" SD 32 x 128 sectors"},
+       {"FM8H-LSI"   , 0, 0, 32,  E_FM8H,  O_LSI, crcLSI,     sd8HPatterns,      0,       0,   0,  0, 2000, "34012", NULL},
+       {"LSI"        , 0, 0, 32,  E_FM8H,  O_LSI, crcLSI,    lsiPatterns,      0,       0,   0,  0, 2000, "34012", "LSI 8\" SD 32 x 128 sectors"},  // LSI with no option to detect ZDS
 
-       {"DD5"        , 1, 1, 16,  E_MFM5,      0, crcStd,    dd5Patterns, 0xcdb4,    155, 200, 368},
-       {"MFM5"       , 1, 1, 16,  E_MFM5, O_SIZE, crcStd,  ddMFMPatterns, 0xcdb4,    163, 207, 378},
-       {"MFM5-16x256", 1, 1, 16,  E_MFM5,      0, crcStd,  ddMFMPatterns, 0xcdb4,    160, 204, 378},   // U spc=375 works for both seen variants
-       {"MFM5-8x512" , 2, 1,  8,  E_MFM5,      0, crcStd,  ddMFMPatterns, 0xcdb4,    166, 211, 689},   // U
+       {"DD5"        , 1, 1, 16,  E_MFM5,      0, crcStd,    dd5Patterns, 0xcdb4,    155, 200, 368, 2000, "01234", NULL},
+       {"MFM5"       , 1, 1, 16,  E_MFM5, O_SIZE, crcStd,  ddMFMPatterns, 0xcdb4,    163, 207, 378, 2000, "01234", "5 1/4\" DD **"},
+       {"MFM5-16x256", 1, 1, 16,  E_MFM5,      0, crcStd,  ddMFMPatterns, 0xcdb4,    160, 204, 378, 2000, "01234", "5 1/4\" DD 16 x 256 sectors"},   // U spc=375 works for both seen variants
+       {"MFM5-8x512" , 2, 1,  8,  E_MFM5,      0, crcStd,  ddMFMPatterns, 0xcdb4,    166, 211, 689, 2000, "01234", "5 1/4\" DD 8 x 512 sectors"},   // U
 
-       {"DD8"        , 0, 0 , 0,  E_MFM8,      0, crcStd,    dd8Patterns,      0,      0,   0,   0},
-       {"MFM8-52x128", 0, 1, 52,  E_MFM8, O_SIZE, crcStd,    dd8Patterns, 0xcdb4,     138, 182, 195},    // needs checking with real disk
-       {"MFM8-26x256", 1, 1, 26,  E_MFM8,      0, crcStd,    dd8Patterns, 0xcdb4,     138, 182, 368},
-       {"M2FM8-INTEL", 0, 1, 52, E_M2FM8,      0, crcStd, ddM2FMPatterns,      0,     75, 111, 195},    // U
-       {"M2FM8-HP"   , 1, 0, 30, E_M2FM8,   O_HP, crcRev,   ddHPPatterns, 0xffff,     92, 123, 332},    // U
+       {"DD8"        , 0, 0 , 0,  E_MFM8,      0, crcStd,    dd8Patterns,      0,      0,   0,   0, 1000, "01234", "8\" DD MFM & M2FM **"},
+       {"MFM8-52x128", 0, 1, 52,  E_MFM8, O_SIZE, crcStd,    dd8Patterns, 0xcdb4,     138, 182, 195, 1000, "01234", "8\" DD 52 x 128 sectors"},    // needs checking with real disk
+       {"MFM8-26x256", 1, 1, 26,  E_MFM8,      0, crcStd,    dd8Patterns, 0xcdb4,     138, 182, 368, 1000, "01234", "8\" DD 26 x 256 sectors"},
+       {"M2FM8-INTEL", 0, 1, 52, E_M2FM8,      0, crcStd, ddM2FMPatterns,      0,     75, 111, 195, 1000, "01234", "8\" Intel M2FM DD 52 x 128 sectors"},    // U
+       {"M2FM8-HP"   , 1, 0, 30, E_M2FM8,   O_HP, crcRev,   ddHPPatterns, 0xffff,     92, 123, 332, 1000, "01234", "8\" HP DD 30 x 256 sectors"},   // U
+       {"TI",     1, 0, 26, E_MFM8,    O_TI, crcStd,   ddTIPatterns, 0xffff,     131, 169, 392, 1000, "34012", "8\" TI 26 x 288 sectors"},
 
-       {"DD5H"       , 1, 0, 16,  E_MFM5H,      0, crcStd,    dd5HPatterns, 0xcdb4,    155, 200, 368},    // only used to probe 
-       {"MFM5H-MTECH", 1, 0, 16,  E_MFM5H,O_MTECH,   crc8, mtech5Patterns, 0xffff,	    0,   0,  0},
-       {"MFM5H-NSI"  , 2, 1, 10,  E_MFM5H,   O_NSI, crcNSI, nsi5DPatterns, 0xffff,	    0,   0,  0},
-
-    
+       {"DD5H"       , 1, 0, 16,  E_MFM5H,      0, crcStd,    dd5HPatterns, 0xcdb4,    155, 200, 368, 2000, "01234", "** 5 1/4\" DD hard sectors"},    // only used to probe 
+       {"MTECH"      , 1, 0, 16,  E_MFM5H,O_MTECH,   crc8, mtech5Patterns, 0xffff,	    0,   0,  0, 2000, "34012", "Mtech 5 1/4\" DD 16 x 256 hard sectors" },
+       {"NSI-DD"  , 2, 1, 10,  E_MFM5H,   O_NSI, crcNSI, nsi5DPatterns, 0xffff,	    0,   0,  0, 2000, "34012", "NSI 5 1/4\" DD 10 x 512 hard sectors"},
+       {"\x80""FM5"    , 0, 1, 16,  E_FM5,         0, NULL,  sdPatterns,          0,      0,   0,  0, 4000, "01234", NULL},
+       {"\x80""MFM5"   , 0, 1, 16,  E_MFM5,        0, NULL,  dd8Patterns,          0,      0,   0,  0, 2000, "01234", NULL},
+       {"\x80""FM8"    , 0, 1, 16,  E_FM8,         0, NULL,  sdPatterns,          0,      0,   0,  0, 2000, "01234", NULL},
+       {"\x80""MFM8"   , 0, 1, 16,  E_MFM8,        0, NULL,  dd8Patterns,          0,      0,   0,  0, 1000, "01234", NULL},
+       {"\x80""M2FM8"  , 0, 1, 16,  E_M2FM8,       0, NULL,  dd8Patterns,          0,      0,   0,  0, 1000, "01234", NULL},
     {0}
 };
+
+char *precannedFormats[][2] = {
+    {"PDS", "[0/0]FM5,MFM5-16x256"},
+    {NULL, NULL}
+};
+
+
+void showFormats() {
+    printf("Current user specified single formats are\n");
+    printf("    %-12s  Description\n", "Format");
+    for (int i = 0; formatInfo[i].name; i++)
+        if (*formatInfo[i].name != 0x80 && formatInfo[i].description)
+            printf("    %-12s  %s\n", formatInfo[i].name, formatInfo[i].description);
+    printf("Note ** formats will auto adapt based on detected sectors / encoding\n\n");
+    printf("Current predefined multi formats are\n");
+    for (int i = 0; precannedFormats[i][0]; i++)
+        printf("    %-12s %s\n", precannedFormats[i][0], precannedFormats[i][1]);
+
+    printf("\n"
+        "Bespoke multi formats can be created using a comma separated list of formats\n"
+        "a prefix is used to determine when the format applies; they are in precedence order\n"
+        "  [c/h]                     -> format applies to cylinder c head h\n"
+        "  [c] or [c/*]              -> format applies to cylinder c\n"
+        "  [*/h]                     -> format applies to head h\n"
+        "  [*] or [*/*] or no prefix -> format applies to all cylinders / heads\n"
+        "if there is no match then flux2imd will attempt to auto detect for format\n\n");
+
+    exit(0);
+}
+
+
+
 
 formatInfo_t *curFormat;
 
@@ -310,6 +356,9 @@ static char *probe() {
         case HP_DATAAM:
         case HP_DELETEDAM:
             return "M2FM8-HP";
+        case TI_IDAM:
+        case TI_DATAAM:
+            return "MFM8-TI";
         case MTECH_SECTOR:
             if (cntHardSectors() != 16)
                 break;
@@ -441,6 +490,8 @@ char* getName(int am) {
     case ZDS_SECTOR: return "ZDS_SECTOR";
     case MTECH_SECTOR: return "MTECH_SECTOR";
     case NSI_SECTOR: return "NSI_SECTOR";
+    case TI_IDAM: return "TI_IDAM";
+    case TI_DATAAM: return "TI_DATAAM";
     }
     return "NO MATCH\n";
 }
@@ -517,13 +568,26 @@ int matchPattern(int searchLimit) {
 void setFormat(char* fmtName) {
     curFormat = lookupFormat(fmtName);
     if (!curFormat)
-        logFull(D_FATAL, "Attempt to select unknown format %s\n", fmtName);
+        logFull(D_FATAL, "Attempt to select unknown format %s\n", *fmtName == 0x80 ? fmtName + 1 : fmtName);
 
 }
 
 bool setInitialFormat(char *fmtName) {
-    if (!fmtName || !lookupFormat(fmtName)) {
-        int hs = cntHardSectors();
+    int hs = cntHardSectors();
+    formatInfo_t *fmt = NULL;
+
+    if (fmtName && (fmt = lookupFormat(fmtName))) {
+        if (fmt->encoding == E_FM5H || fmt->encoding == E_FM8H || fmt->encoding == E_MFM5H || fmt->encoding == E_MFM8H) {
+            if (hs == 0) {
+                logFull(D_WARNING, "format %s is incompatible with soft sector disk\n", fmtName);
+                fmt = NULL;
+            }
+        } else if (hs != 0) {
+            logFull(D_WARNING, "format %s is incompatible with hard sector disk\n", fmtName);
+            fmt = NULL;
+        }
+    }
+    if (!fmt) {
         int diskSize = getRPM() < 320.0 ? 5 : 8;
         char *testFmt;
 
@@ -536,7 +600,7 @@ bool setInitialFormat(char *fmtName) {
 
         // now see if we can detect the type
         if (strcmp(testFmt, "DD8H") == 0) {      // currently only support FM for 8" hard sector, decoder determines type
-            setFormat("FMH8");
+            setFormat("SDH8");
             DBGLOG(D_DETECT, "8\" hard sector trying SD8H %s\n", testFmt);
             return true;
         }  else {
@@ -572,4 +636,59 @@ bool setInitialFormat(char *fmtName) {
 
 
 
+char *getFormat(const char *userfmt, int cyl, int head) {
+    const char *s;
+    int i;
+    static char format[32]; // used to hold current format
+    int score = 0;          // 0 no match, 1 match any, 2 match head, 3 match cylinder, 4 match both
+    int tscore;             // current test score
+    const char *match = ""; // where highest score matched
 
+    if (userfmt)
+        for (int i = 0; precannedFormats[i][0]; i++)
+            if (_stricmp(userfmt, precannedFormats[i][0]) == 0) {
+                userfmt = precannedFormats[i][1];
+                break;
+            }
+
+    for (s = userfmt; score != 4 && s && *s && (*s != ',' || *++s); s = strchr(s, ',')) {
+        if (*s != '[')
+            tscore = 1;
+        else {
+            if (isdigit(*++s)) {        // we have a cylinder specified
+                int mcyl = *s - '0';
+                while (isdigit(*++s))
+                    mcyl = mcyl * 10 + *s - '0';
+                if (mcyl != cyl)        // doesn't match the cylinder
+                    continue;
+                tscore = 3;             // match cylinder
+            } else if (*s == '*')       // match any
+                tscore = 1;
+            else
+                continue;               // bad format should be [nn  or [*
+            if (*++s == '/') {          // we have head specified
+                if (isdigit(*++s)) {
+                    int mhead = *s - '0';
+                    while (isdigit(*++s))
+                        mhead = mhead * 10 + *s - '0';
+                    if (mhead != head)      // head mismatch
+                        continue;
+                    score++;                // convert to head match or both match
+                } else if (*s++ != '*')     // error if not wild card
+                    continue;
+            }
+            if (*s++ != ']')                // should have closing ]
+                continue;
+        }
+        if (tscore > score) {               // better match
+            score = tscore;
+            match = s;
+        }
+    }
+    if (*match == 0)                         // revert to auto match
+        return NULL;
+    for (i = 0; i < 31 && *match && *match != ','; i++) // copy matched format
+        format[i] = *match++;
+    format[i] = 0;
+    return format;
+}

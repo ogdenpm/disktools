@@ -35,12 +35,12 @@ typedef unsigned __int32 dword;
 
 #define	TSIZE	32768				// Max size of track
 
-#define MAXCYLINDER	80
+#define MAXCYLINDER	84
 #define	MAXSECTOR	52
 #define MAXHEAD		2
 
 // disk types
-enum { UNKNOWN, ISIS_SD, ISIS_DD, ISIS_PDS, ISIS_IV, ZXENIX, CPM };
+enum { UNKNOWN, ISIS_SD, ISIS_DD, ISIS_PDS, ISIS_IV, ISIS_DOS, ZXENIX, CPM };
 #define ISIS_SD_SIZE   256256
 #define ISIS_DD_SIZE   512512
 
