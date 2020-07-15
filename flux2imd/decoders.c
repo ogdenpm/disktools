@@ -77,6 +77,7 @@ static uint8_t conflicts[32] = {
 
 static uint16_t hs8Sync(unsigned cylinder, unsigned slot) {
     int matchType;
+
     makeHS8Patterns(cylinder, slot);
 
     matchType = matchPattern(30);
@@ -234,7 +235,7 @@ static void hs8GetTrack(int cylinder, int side) {
                     }
                     addSectorData(-slot , result, 130, rawData + 1);
                 } else {
-                    if ((result = getData((slot << 8) + cylinder + 0x80, rawData, 138)) < 0) {
+                    if ((result = getData(((slot + 0x80) << 8) + cylinder, rawData, 138)) < 0) {
                         logFull(D_DECODER, "@%d ZDS sector %d premature end\n", dataPos, slot);
                         continue;
                     }

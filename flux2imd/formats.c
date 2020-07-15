@@ -332,6 +332,7 @@ static formatInfo_t *lookupFormat(char* fmtName) {
 
 static char *probe() {
     int matchType;
+    int firstMatch = 0;     // 1 MFM or FM, 2 M2FM, 3 Intel M2FM, 4 HP M2FM, 5 TI
     int limit = cntHardSectors() > 0 ? 100 : 1200;
     retrain(0);
     do {
@@ -341,34 +342,50 @@ static char *probe() {
         case IDAM:
         case INDEXAM:
         case DATAAM:
-            if (curFormat->encoding == (curFormat + 1)->encoding)
-                return (curFormat + 1)->name;
-            else
-                return NULL;
+            if (firstMatch == 1) {
+                if (curFormat->encoding == (curFormat + 1)->encoding)
+                    return (curFormat + 1)->name;
+                else
+                    return NULL;
+            } else
+                firstMatch = 1;
+            break;
         case M2FM_IDAM:                 // skip IDAM bytes (ok even for HP as it will just skip 2 GAP bytes)
             for (int i = 0; i < 6; i++)
                 getByte();
+            firstMatch = 2;
             break;
+
         case M2FM_INDEXAM:
         case M2FM_DATAAM:
         case M2FM_DELETEDAM:
-            return "M2FM8-INTEL";
+            if (firstMatch == 2 || firstMatch == 3)
+                return "M2FM8-INTEL";
+            firstMatch = 3;
+            break;
+                
         case HP_DATAAM:
         case HP_DELETEDAM:
-            return "M2FM8-HP";
+            if (firstMatch == 2 || firstMatch == 4)
+                return "M2FM8-HP";
+            firstMatch = 4;
+            break;
         case TI_IDAM:
         case TI_DATAAM:
-            return "MFM8-TI";
+            if (firstMatch == 5)
+                return "TI";
+            firstMatch = 5;
+            break;
         case MTECH_SECTOR:
             if (cntHardSectors() != 16)
                 break;
-            return getByteCnt() > 50 ? NULL: "MFM5H-MTECH";
+            return getByteCnt() > 50 ? NULL: "MTECH";
         case NSI_SECTOR:
             if (cntHardSectors() != 10)
                 break;
             if (getByteCnt() > 50)
                 return NULL;
-            return curFormat->encoding == E_MFM5H ? "MFM5H-NSI" : "FM5H-NSI";
+            return curFormat->encoding == E_MFM5H ? "NSI-DD" : "NSI-SD";
         }
     } while (matchType > 0);
     return NULL;
@@ -600,7 +617,7 @@ bool setInitialFormat(char *fmtName) {
 
         // now see if we can detect the type
         if (strcmp(testFmt, "DD8H") == 0) {      // currently only support FM for 8" hard sector, decoder determines type
-            setFormat("SDH8");
+            setFormat("SD8H");
             DBGLOG(D_DETECT, "8\" hard sector trying SD8H %s\n", testFmt);
             return true;
         }  else {

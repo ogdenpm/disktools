@@ -49,7 +49,7 @@ static unsigned slotAt(int pos, bool isIdam) {
     if (pos <= 0)
         return -pos;
 
-    if (prevSlot < 0 || pos < (isIdam ? prevDataPos : prevIdamPos)) {       // initialise either explicit or due to seek from start
+    if (prevSlot < 0 || pos + POSJITTER < (isIdam ? prevIdamPos : prevDataPos)) {       // initialise either explicit or due to seek from start
         curSpacing = curFormat->spacing;
         if (cntHardSectors())
             minSpacing = maxSpacing = curSpacing;
