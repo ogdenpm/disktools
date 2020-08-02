@@ -294,10 +294,15 @@ static void ssGetTrack(int cylinder, int side, char *usrfmt) {
     unsigned sSize = curFormat->sSize;
 
     bool done = false;
-
-    for (int profile = 0; !done && retrain(profile); profile++) {
+    int profile;
+    for (profile = 0; !done; profile++) {
         for (int i = 1; !done && (seekBlock(i) >= 0); i++) {
+            if (!retrain(profile)) {
+                done = true;
+                break;
+            }
             resetTracker();
+            
             bool restart = false;
             logFull(D_DECODER, "Profile %d, block %d\n", profile, i);
             while (!restart && (matchType = matchPattern(1200))) {
@@ -312,7 +317,7 @@ static void ssGetTrack(int cylinder, int side, char *usrfmt) {
                     result = getData(matchType, rawData, 9);
                     if (result == 1) {
                         idam.cylinder = (rawData[2] & 0x7f);
-                        idam.side = side;       // ignore the disk info -- pending check we have different data
+                        idam.side = (rawData[1] >> 3) & 0xf;
                         idam.sSize = 2;         // treat as 256 byte sector
                         idam.sectorId = rawData[4] & 0xff;
                         addIdam(idamPos, &idam);
@@ -352,23 +357,13 @@ static void ssGetTrack(int cylinder, int side, char *usrfmt) {
                         logFull(D_DECODER, "@%d idam %s\n", idamPos, result < 0 ? "premature end\n" : "bad crc\n");
                     break;
                 case TI_DATAAM:
-                    dataPos = getByteCnt();
-                    result = getData(matchType, rawData, 291);
-                    logFull(D_DECODER, "TI DATA @%d %s\n", dataPos, result == 1 ? "ok" : "crc error");
-                    if (result >= 0) {
-                        addSectorData(dataPos, result, 288 + 2, rawData + 1);
-                        savedData = true;
-                    }
-                    break;
-
                 case DATAAM:
                 case M2FM_DATAAM:
                 case HP_DATAAM:
                     dataPos = getByteCnt();
                     //chkSptChange(dataPos, false);
 
-                    sectorLen = 128 << sSize;
-
+                    sectorLen = matchType == TI_DATAAM ? 288 : 128 << sSize;
                     result = getData(matchType, rawData, sectorLen + 3);
                     if (result >= 0) {
                         addSectorData(dataPos, result, sectorLen + 2, rawData + 1);     // add data after address mark
@@ -394,7 +389,6 @@ static void ssGetTrack(int cylinder, int side, char *usrfmt) {
                 DBGLOG(D_DECODER, "@%d end of track\n", getByteCnt());
                 done = checkTrack(profile);
             }
-            retrain(profile);
         }
     }
     finaliseTrack();

@@ -7,6 +7,7 @@
 
 int cntHardSectors();
 int getNextFlux();
+int peekNextFlux();
 double getRPM();
 int loadFlux(uint8_t* image, size_t size);
 int seekBlock(unsigned num);

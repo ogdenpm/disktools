@@ -368,6 +368,15 @@ void unloadFlux() {
 }
 
 
+int peekNextFlux() {
+    uint8_t *here = inPtr;
+    uint32_t clock = blkTicks;
+    int val = getNextFlux();
+    inPtr = here;
+    blkTicks = clock;
+    return val;
+}
+
 int getNextFlux() {
 
     int c;

@@ -234,19 +234,15 @@ void displayDefectMap() {
 void displayBadSlots(track_t *pTrack) {
     uint8_t const *slotToSector = pTrack->slotToSector;
 
-    logBasic("  (#)Missing/(?)Corrupt Slots:");
+    logBasic(" (#)Missing/(?)Corrupt Slot(Sector):");
     for (unsigned i = 0; i < pTrack->fmt->spt; i++)
-        if (!(trackPtr->sectors[i].status & SS_DATAGOOD))
-            logBasic("%3d%c", i, trackPtr->sectors[i].sectorDataList ? '?' : '#');
-    logBasic("\n");
-    logBasic("  Allocated SectorId (*)Fixed:");
-    for (unsigned i = 0; i < pTrack->fmt->spt; i++) {
-        if (!(trackPtr->sectors[i].status & SS_DATAGOOD))
+        if (!(trackPtr->sectors[i].status & SS_DATAGOOD)) {
+            logBasic(" %c%d", trackPtr->sectors[i].sectorDataList ? '?' : '#', i);
             if (slotToSector[i] != 0xff)
-                logBasic("%3d%c", slotToSector[i], pTrack->sectors[i].status & SS_IDAMGOOD ? ' ' : '*');
+                logBasic("(%d)", slotToSector[i]);
             else
-                logBasic(" ?? ");
-    }
+                logBasic("(??)");
+        }
     logBasic("\n");
 }
 
@@ -293,7 +289,7 @@ void displayTrack(int cylinder, int side, unsigned options) {
         for (int i = 0; i < spt; i++) {
             if (spt == 52 && i % 26 == 0)
                 logBasic("\n  ");
-            logBasic(" %2d%c", sectorToSlot[i], pTrack->sectors[i].status & SS_IDAMGOOD ? ' ' : '*');
+            logBasic(" %2d%c", slotToSector[i], pTrack->sectors[i].status & SS_IDAMGOOD ? ' ' : '*');
         }
         logBasic("\n");
     }

@@ -95,7 +95,7 @@ static void removeTrack(track_t* p) {
 
 bool checkTrack(int profile) {
     assert(trackPtr);
-    if (profile == 0 && (debug & D_NOOPTIMISE))
+    if (debug & D_NOOPTIMISE)
         return false;
     for (int i = 0; i < trackPtr->fmt->spt; i++)
         if ((trackPtr->sectors[i].status & SS_GOOD) != SS_GOOD)

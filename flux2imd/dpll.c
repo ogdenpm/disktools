@@ -123,7 +123,20 @@ int getBit() {
         etime += cellSize;
         return 0;
     }
-
+    //// see if next flux transition is close and nearer to middle
+    //while (1) {
+    //    int nextFlux = peekNextFlux();
+    //    if (nextFlux > 0) {
+    //        int nslot = 16 * (ctime + nextFlux - etime) / cellSize;
+    //        if (nslot < 16 && (nslot < 8 ? 8 - nslot : nslot - 8) < (slot < 8 ? 8 - slot : slot - 8)) {
+    //            printf("fix\n");
+    //            ctime += getNextFlux();
+    //            slot = nslot;
+    //        } else
+    //            break;
+    //    } else
+    //        break;
+    //}
     if (slot < 7 || slot > 8) {
         if (slot <= 6 && !up || slot >= 9 && up) {			// check for up/down switch
             up = !up;
