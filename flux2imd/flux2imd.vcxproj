@@ -218,6 +218,7 @@
     <ClCompile Include="sectorManager.c" />
     <ClCompile Include="trackManager.c" />
     <ClCompile Include="util.c" />
+    <ClCompile Include="version.c" />
     <ClCompile Include="writeImage.c" />
     <ClCompile Include="zip.c" />
   </ItemGroup>
@@ -231,6 +232,9 @@
     <ClInclude Include="trackManager.h" />
     <ClInclude Include="util.h" />
     <ClInclude Include="zip.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="version.rc" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

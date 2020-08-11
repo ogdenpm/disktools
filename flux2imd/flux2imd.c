@@ -18,6 +18,8 @@
 #include "util.h"
 #include "zip.h"
 
+void showVersion(FILE *fp, bool full);
+
 _declspec(noreturn) void usage();
 void writeImdFile(char* fname);
 
@@ -198,6 +200,10 @@ int main(int argc, char** argv) {
 
     createLogFile(NULL);
 
+    if (argc == 2 && _stricmp(argv[1], "-v") == 0) {
+        showVersion(stdout, argv[1][1] == 'V');
+        exit(0);
+    }
     for (arg = 1; arg < argc && sscanf(argv[arg], "-%c", &optCh) == 1; arg++) {
         switch (tolower(optCh)) {
         case 'g':

@@ -54,6 +54,9 @@
     <ClCompile Include="analyse.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="version.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="flux.h">
@@ -83,5 +86,10 @@
     <ClInclude Include="flux2imd.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="version.rc">
+      <Filter>Resource Files</Filter>
+    </ResourceCompile>
   </ItemGroup>
 </Project>
