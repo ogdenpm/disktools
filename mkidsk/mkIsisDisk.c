@@ -87,6 +87,7 @@ where
 */
 
 #include "mkIsisDisk.h"
+void showVersion(FILE *fp, bool full);
 
 #define MAXFORMAT   15      // e.g ISIS II SD
 #define MAXOS       15      // ISIS III(n) 2.0
@@ -407,6 +408,10 @@ void main(int argc, char **argv) {
     char fname[_MAX_FNAME];
     char ext[_MAX_EXT];
 
+    if (argc == 2 && _stricmp(argv[1], "-v") == 0) {
+        showVersion(stdout, argv[1][1] == 'V');
+        exit(0);
+    }
     for (i = 1; i < argc; i++) {
         if (argv[i][0] != '-' || argv[i][1] == '@')
             break;

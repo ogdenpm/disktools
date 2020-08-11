@@ -42,6 +42,8 @@ TODO
 #include <stdarg.h>
 #include "unidsk.h"
 
+void showVersion(FILE *fp, bool full);
+
 char targetPath[_MAX_PATH];
 
 bool isDOS = false;     // set to true if ISIS named DOS
@@ -996,6 +998,10 @@ void main(int argc, char **argv) {
     bool local = false;
     bool ok;
 
+    if (argc == 2 && _stricmp(argv[1], "-v") == 0) {
+        showVersion(stdout, argv[1][1] == 'V');
+        exit(0);
+    }
     while (argc > 2) {
         if (_stricmp(argv[1], "-l") == 0)
             local = true;
