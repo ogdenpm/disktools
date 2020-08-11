@@ -1,8 +1,9 @@
 /*
- * TD02IMD - Convert Teledisk .TD0 images to ImageDisk .IMD format
+ * TD02IMG - Convert Teledisk .TD0 images to ImageDisk .IMD format
+ * Minor changes by Mark Ogden to Dave Dunfield's TD02IMD
  *
- * TD02IMD reads a teledisk .TD0 image file, and reformats it into an
- * ImageDisk .IMD file.
+ * TD02IMF reads a teledisk .TD0 image file, and reformats it into an
+ * ImageDisk .IMG file.
  *
  * Note that the Teledisk file format is closed and completely undocumented.
  * TD02IMD relies on information obtained by reverse engineering and may not
@@ -29,6 +30,7 @@
 #include <stdarg.h>
 #include <ctype.h>
 #include "version.h"
+#include "Generated/gitVersion.h"
 
 typedef unsigned char byte;
 
@@ -783,10 +785,10 @@ void filename(unsigned char *file, unsigned char *ext, char dropext)
 }
 
 char help[] = { "\
-TD0-2-IMG " VERSION "/ " __DATE__ "\n\
-Copyright 2017 Mark Ogden based on\n\
-TD0-2-IMageDisk Copyright 2007-2008 Dave Dunfield - All rights reserved.\n\n\
-Use:	TD02IMG filename[.TD0] [options]\n\n\
+TD0-2-IMG " GIT_VERSION " [" GIT_CTIME "]\n"
+"Based on TD0-2-IMageDisk Copyright 2007-2008 Dave Dunfield - All rights reserved.\n"
+"Modifications -- Mark Ogden (C)2017-" GIT_YEAR "\n\n"
+"Use:	TD02IMG filename[.TD0] [options]\n\n\
 Opts:	/Dx,l,h	- enable Debug options\n\
     /F	- don't assume whole disk is FM if file FM indicator set\n\
     /L	- don't convert 300kbps (LD in HD drive) to 250 (standard LD)\n\

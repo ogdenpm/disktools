@@ -21,6 +21,7 @@
 #include <ctype.h>
 #include <time.h>
 #include "version.h"
+#include "Generated/gitVersion.h"
 
 unsigned char
 *ptr,				// General parse pointer
@@ -445,6 +446,7 @@ void write_track(unsigned char head)
 }
 
 unsigned char help[] = { "Copyright 2005-" CYEAR " Dave Dunfield - All rights reserved.\n"
+"Windows port " GIT_VERSION " -- Mark Ogden " GIT_YEAR "\n\n"
 "\nUse: BIN2IMD binary-input-file IMD-output-file [option-file] [options]\n\n"
 "opts:	/1			- 1-sided output\n"
 "	/2			- 2-sided output\n"

@@ -30,6 +30,7 @@
 #include <malloc.h>
 #include <string.h>
 #include <ctype.h>
+#include "Generated/gitVersion.h"
 
 typedef unsigned char byte;
 
@@ -796,9 +797,10 @@ void filename(unsigned char *file, unsigned char *ext, char dropext)
 }
 
 char help[] = { "\
-TD0-2-IMageDisk " VERSION " / " __DATE__"\n\
-Copyright 2007-2008 Dave Dunfield - All rights reserved.\n\n\
-Use:	TD02IMD filename[.TD0] [options]\n\n\
+TD0-2-IMageDisk " VERSION " / " __DATE__"\n"
+"Copyright 2007-2008 Dave Dunfield - All rights reserved.\n"
+"Windows port " GIT_VERSION " -- Mark Ogden " GIT_YEAR "\n\n"
+"Use:	TD02IMD filename[.TD0] [options]\n\n\
 Opts:	/Dx,l,h	- enable Debug options\n\
     /F	- don't assume whole disk is FM if file FM indicator set\n\
     /L	- don't convert 300kbps (LD in HD drive) to 250 (standard LD)\n\

@@ -24,6 +24,7 @@
 #include <ctype.h>
 #include <string.h>
 #include <conio.h>
+#include "Generated/gitVersion.h"
 
 #define	TSIZE	32768				// Max size of track
 #define abort   error
@@ -97,8 +98,9 @@ FILE
 *fpm,			// Merge file
 *fpw;			// Write (output) file
 
-unsigned char help[] = { "Copyright 2005-" CYEAR " Dave Dunfield - All rights reserved.\n\
-\nUse: IMDU image [[merge-image] [output-image]] [options]\n\n\
+unsigned char help[] = { "Copyright 2005-" CYEAR " Dave Dunfield - All rights reserved.\n"
+"Windows port " GIT_VERSION " -- Mark Ogden " GIT_YEAR "\n\n"
+"Use: IMDU image [[merge-image] [output-image]] [options]\n\n\
 opts:	/B			- output Binary image\n\
     /C			- Compress \"all-same\" sectors\n\
     /D			- display track/sector Detail\n\

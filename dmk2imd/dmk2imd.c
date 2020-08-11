@@ -24,6 +24,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include <ctype.h>
+#include "Generated/gitVersion.h"
 
 
 #define	A1A1A1	0xCDB4			// CRC of: 0xA1, 0xA1, 0xA1
@@ -252,7 +253,8 @@ void filename(unsigned char *file, unsigned char *ext, char dropext)
 
 char help[] = { 
 	"DMK-2-IMageDisk " VERSION " / " __DATE__ "\n"
-	"Copyright 2007-" CYEAR " Dave Dunfield - All rights reserved.\n\n"
+	"Copyright 2007-" CYEAR " Dave Dunfield - All rights reserved.\n"
+	"Windows port " GIT_VERSION " -- Mark Ogden " GIT_YEAR "\n\n"
 	"Use: DMK2IMD filename[.DMK] [options]\n\n"
 	"Opts:	/C[filename]	- insert Comment record\n"
 	"	/H		- force High density	(500kbps)\n"
