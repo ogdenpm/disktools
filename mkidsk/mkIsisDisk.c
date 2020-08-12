@@ -378,8 +378,9 @@ void usage() {
     shown++;
     printf(
         "mkidsk - Generate imd or img files from ISIS II / PDS recipe files (c) Mark Ogden 29-Mar-2020\n\n"
-        "usage: mkidsk [options]* [-]recipe [diskname][.fmt]\n"
+        "usage: mkidsk -v | -V | [options]* [-]recipe [diskname][.fmt]\n"
         "where\n"
+        "-v / -V    show version infomation and exit. Must be only option\n"
         "recipe     file with instructions to build image. Optional - prefix\n"
         "           if name starts with @\n"
         "diskname   generated disk image name - defaults to recipe without leading @\n"

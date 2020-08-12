@@ -1017,9 +1017,10 @@ void main(int argc, char **argv) {
     if (argc != 2 || (fp = fopen(*++argv, "rb")) == NULL) {
         fprintf(stderr,
             "unidsk - extract files from ISIS disks in img or imd format (c) Mark Ogden 29-Mar-2020\n\n"
-            "usage: unidsk [-l] [-d] file\n"
-            "-l for local names only\n"
-            "-d for link info\n");
+            "usage: unidsk -v | -V | [-l] [-d] file\n"
+            "-v/-V   show version information and exit\n"
+            "-l      for local names only\n"
+            "-d      for link info\n");
         exit(1);
     }
 

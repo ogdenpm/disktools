@@ -172,9 +172,10 @@ static bool loadZipFile(struct zip_t *zip) {
 static _declspec(noreturn) void usage() {
     fprintf(stderr,
         "flux2imd - convert fluxfiles to imd format (c) Mark Ogden 15-Jul-2020\n\n"
-        "usage: analysis [-b] [-d[n]] [-f format] [-g] [-h[n]] [-p] [-s] [zipfile|rawfile]+\n"
+        "usage: analysis -v | -V | [-b] [-d[n]] [-f format] [-g] [-h[n]] [-p] [-s] [zipfile|rawfile]+\n"
         "options can be in any order before the first file name\n"
 //      "  -a encoding - undocumented option to help analyse new disk formats\n"
+        "  -v / -V show version information and exit. Must be only option\n"
         "  -b will write bad (idam or data) sectors to the log file\n"
         "  -d sets debug flags to n (n is in hex) default is 1 which echos log to console\n"
         "  -f forces the specified format, use -f help for more info\n"
