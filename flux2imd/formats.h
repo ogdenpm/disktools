@@ -23,6 +23,7 @@ enum encodings {
     E_FM5 = 0, E_FM5H, E_FM8, E_FM8H, E_MFM5,  E_MFM5H, E_MFM8, E_MFM8H, E_M2FM8  // raw encodings supported although E_MFM8 is currently used for M2FM8 detection
 };
 enum options {
+    O_UINV = 0x400,                     // user data invert
     O_NOIMD = 0x200,
     O_INV = 0x100,                      // bit to indicate bits inverted
     O_REV = 0x80,                       // bit to indicate reversed bytes

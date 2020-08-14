@@ -207,6 +207,7 @@ formatInfo_t formatInfo[] = {
        {"MFM5-16x256", 1, 1, 16,  E_MFM5,      0, crcStd,  ddMFMPatterns, 0xcdb4,    160, 204, 378, 2000, "01234", "5 1/4\" DD 16 x 256 sectors"},   // U spc=375 works for both seen variants
        {"MFM5-10x512", 2, 1, 10,  E_MFM5,  O_SPC, crcStd,  ddMFMPatterns, 0xcdb4,     66,  72, 593, 2000, "01234", "5 1/4\" DD 10 x 512 sectors **"},
        {"MFM5-8x512" , 2, 1,  8,  E_MFM5,      0, crcStd,  ddMFMPatterns, 0xcdb4,    166, 211, 689, 2000, "01234", "5 1/4\" DD 8 x 512 sectors"},   // U
+       {"WREN"       , 2, 1, 10,  E_MFM5, O_UINV, crcStd,  ddMFMPatterns, 0xcdb4,     66,  72, 593, 2000, "01234", "5 1/4\" Wren DD 10 x 512 sectors"},
 
        {"DD8"        , 0, 0 , 0,  E_MFM8,      0, crcStd,    dd8Patterns,      0,      0,   0,   0, 1000, "01234", "8\" DD MFM & M2FM **"},
        {"MFM8-52x128", 0, 1, 52,  E_MFM8, O_SIZE, crcStd,    dd8Patterns, 0xcdb4,     138, 182, 195, 1000, "01234", "8\" DD 52 x 128 sectors"},    // needs checking with real disk

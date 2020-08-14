@@ -14,6 +14,12 @@
 #include "trackManager.h"
 #include "util.h"
 
+static void invert(uint16_t *data, int len) {
+    while (len-- > 0)
+        *data++ ^= 0xff;
+}
+
+
 
 // support for sector size option in list of possible formats (O_SIZE)
 static bool chkSizeChange(unsigned sSize) {
@@ -365,6 +371,8 @@ static void ssGetTrack(int cylinder, int side, char *usrfmt) {
                     sectorLen = matchType == TI_DATAAM ? 288 : 128 << sSize;
                     result = getData(matchType, rawData, sectorLen + 3);
                     if (result >= 0) {
+                        if (curFormat->options & O_UINV)
+                            invert(rawData + 1, sectorLen);
                         addSectorData(dataPos, result, sectorLen + 2, rawData + 1);     // add data after address mark
                         savedData = true;
                         DBGLOG(D_DECODER, "@%d-%d data len %d%s\n", dataPos, getByteCnt(), sectorLen, result == 1 ? "" : " bad crc");
