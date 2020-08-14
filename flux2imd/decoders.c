@@ -361,7 +361,6 @@ static void ssGetTrack(int cylinder, int side, char *usrfmt) {
                 case M2FM_DATAAM:
                 case HP_DATAAM:
                     dataPos = getByteCnt();
-                    //chkSptChange(dataPos, false);
 
                     sectorLen = matchType == TI_DATAAM ? 288 : 128 << sSize;
                     result = getData(matchType, rawData, sectorLen + 3);

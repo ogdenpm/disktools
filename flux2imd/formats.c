@@ -205,6 +205,7 @@ formatInfo_t formatInfo[] = {
        {"DD5"        , 1, 1, 16,  E_MFM5,      0, crcStd,    dd5Patterns, 0xcdb4,    155, 200, 368, 2000, "01234", NULL},
        {"MFM5"       , 1, 1, 16,  E_MFM5, O_SIZE, crcStd,  ddMFMPatterns, 0xcdb4,    163, 207, 378, 2000, "01234", "5 1/4\" DD **"},
        {"MFM5-16x256", 1, 1, 16,  E_MFM5,      0, crcStd,  ddMFMPatterns, 0xcdb4,    160, 204, 378, 2000, "01234", "5 1/4\" DD 16 x 256 sectors"},   // U spc=375 works for both seen variants
+       {"MFM5-10x512", 2, 1, 10,  E_MFM5,  O_SPC, crcStd,  ddMFMPatterns, 0xcdb4,     66,  72, 593, 2000, "01234", "5 1/4\" DD 10 x 512 sectors **"},
        {"MFM5-8x512" , 2, 1,  8,  E_MFM5,      0, crcStd,  ddMFMPatterns, 0xcdb4,    166, 211, 689, 2000, "01234", "5 1/4\" DD 8 x 512 sectors"},   // U
 
        {"DD8"        , 0, 0 , 0,  E_MFM8,      0, crcStd,    dd8Patterns,      0,      0,   0,   0, 1000, "01234", "8\" DD MFM & M2FM **"},
