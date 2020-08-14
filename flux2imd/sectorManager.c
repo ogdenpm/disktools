@@ -21,10 +21,10 @@ static unsigned maxSpacing;
 
 
 // determine new spt if spacing has changed
-static void chkSpacingChange() {
+static void chkSpacingChange(unsigned newSpacing) {
 
     for (formatInfo_t *p = curFormat + 1; p->encoding == curFormat->encoding && p->sSize == curFormat->sSize; p++) {
-        if (abs(p->spacing - curSpacing) < 3) {
+        if (abs(p->spacing - newSpacing) < 3) {
             DBGLOG(D_DECODER, "Updated format to %s\n", p->name);
             curFormat = p;
             minSpacing = (uint16_t)(curFormat->spacing * 0.97);
@@ -89,6 +89,8 @@ static unsigned slotAt(int pos, bool isIdam) {
         prevSlot += slotDelta;
         // now work out effective spacing
         unsigned newSpacing = posDelta / slotDelta;
+        if ((newSpacing < minSpacing || newSpacing > maxSpacing) && curFormat->options & O_SPC)
+            chkSpacingChange(newSpacing);
         // keep in tolerance
         newSpacing = newSpacing > maxSpacing ? maxSpacing : newSpacing < minSpacing ? minSpacing : newSpacing;
 
@@ -98,8 +100,6 @@ static unsigned slotAt(int pos, bool isIdam) {
         curSpacing = newSpacing;
 
 
-        if (curFormat->options & O_SPC)         // update format if dependent on spacing
-            chkSpacingChange();
         if (isIdam) {                           // provide new estimate for other pos info
             prevDataPos += pos - prevIdamPos;
             prevIdamPos = pos;
