@@ -135,12 +135,12 @@
       </Message>
     </PostBuildEvent>
     <CustomBuildStep>
-      <Command>call $(SolutionDir)\Scripts\version.cmd "$(ProjectDir)Generated\" "$(ProjectDir)Generated\GitVersion.h"</Command>
+      <Command>call $(SolutionDir)\Scripts\version.cmd "$(ProjectDir)Generated\" "$(ProjectDir)Generated\version.h"</Command>
     </CustomBuildStep>
     <CustomBuildStep>
       <Inputs>.force</Inputs>
       <Message>Generate Version</Message>
-      <Outputs>$(ProjectDir)Generated\gitVersion.h;$(ProjectDir)Generated\GIT_VERSION_INFO</Outputs>
+      <Outputs>$(ProjectDir)Generated\version.h;$(ProjectDir)Generated\GIT_VERSION_INFO</Outputs>
     </CustomBuildStep>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
