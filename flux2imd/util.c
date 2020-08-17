@@ -75,10 +75,10 @@ void logFull(int level, char *fmt, ...) {
         vfprintf(stderr, fmt, args);
     }
     else if (level ==  0 || (debug & level)) {
-        fprintf(logFp, "%s - ", curFile);
+        fprintf(logFp, "%s%s", curFile, *fmt ? " - " : ""); // don't use - separator if no string to emit
         vfprintf(logFp, fmt, args);
         if ((debug & D_ECHO) && logFp != stdout) {
-            printf("%s - ", curFile);
+            printf("%s%s", curFile, *fmt ? " - " : "");
             vprintf(fmt, args);
         }
     }

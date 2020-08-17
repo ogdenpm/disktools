@@ -42,7 +42,7 @@ uint8_t *endPtr;
 static double rpm;
 
 int firstSector = 31;
-static uint32_t blkTicks;       // used to capture the current clock offset of last processed flux entry
+static uint32_t trkFluxCount;       // used to capture the current clock offset of last processed flux entry
 
 
 /* parsed data from the kinfo blocks*/
@@ -209,7 +209,7 @@ int seekBlock(unsigned num) {
     if (num == blkNumber && indexPtr->end - indexPtr->start > 128) {					// setup getNextFlux
         inPtr = fluxBuf + indexPtr->start;
         endPtr = fluxBuf + indexPtr->end;
-        blkTicks = 0;
+        trkFluxCount = 0;
         return indexPtr->physSector;
     } else
         return -1;
@@ -370,10 +370,10 @@ void unloadFlux() {
 
 int peekNextFlux() {
     uint8_t *here = inPtr;
-    uint32_t clock = blkTicks;
+    uint32_t clock = trkFluxCount;
     int val = getNextFlux();
     inPtr = here;
-    blkTicks = clock;
+    trkFluxCount = clock;
     return val;
 }
 
@@ -398,9 +398,8 @@ int getNextFlux() {
             }
             c += ovl16;
             ovl16 = 0;
-            blkTicks += c;
-            c = (int)(c * fluxScaler);
-            return c;
+            trkFluxCount += c;
+            return (int)(trkFluxCount * fluxScaler);
 
         } else if (matchType == 0xb)
             ovl16 += 0x10000;
@@ -419,5 +418,5 @@ double getRPM() {
 }
 
 uint32_t getBitPos(uint32_t cellSize) {
-    return (uint32_t)(blkTicks * fluxScaler / cellSize);
+    return (uint32_t)(trkFluxCount * fluxScaler / cellSize);
 }

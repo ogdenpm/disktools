@@ -106,7 +106,6 @@ static uint8_t phaseAdjust[2][16] = {		// C1/C2, C3
     //  {13, 14, 14, 15, 15, 16, 16, 16, 16, 16, 16, 17, 17, 18, 18, 19}
 };
 int getBit() {
-    int fluxVal;
     int slot;
     int cstate = 1;			// default is IPC
 
@@ -114,29 +113,15 @@ int getBit() {
     pattern <<= 1;
 
     while (ctime < etime) {					// get next transition in a cell
-        if ((fluxVal = getNextFlux()) < 0)
-            return fluxVal;
-        ctime += fluxVal;
+        if ((ctime = getNextFlux()) < 0)
+            return ctime;
     }
 
     if ((slot = 16 * (ctime - etime) / cellSize) >= 16) {	// too big a flux transition so treat as 0
         etime += cellSize;
         return 0;
     }
-    //// see if next flux transition is close and nearer to middle
-    //while (1) {
-    //    int nextFlux = peekNextFlux();
-    //    if (nextFlux > 0) {
-    //        int nslot = 16 * (ctime + nextFlux - etime) / cellSize;
-    //        if (nslot < 16 && (nslot < 8 ? 8 - nslot : nslot - 8) < (slot < 8 ? 8 - slot : slot - 8)) {
-    //            printf("fix\n");
-    //            ctime += getNextFlux();
-    //            slot = nslot;
-    //        } else
-    //            break;
-    //    } else
-    //        break;
-    //}
+
     if (slot < 7 || slot > 8) {
         if (slot <= 6 && !up || slot >= 9 && up) {			// check for up/down switch
             up = !up;

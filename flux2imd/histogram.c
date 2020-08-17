@@ -20,13 +20,17 @@ void displayHist(int levels)
     int maxHistVal = 0;
     uint32_t outRange = 0;
     int val;
+    int prevFlux = 0;
+    int newFlux;
 
     // load the histogram data
-    for (int i = 0; seekBlock(i) >= 0; i++) {
-        while ((val = getNextFlux()) >= 0) {
+    for (int i = 0; seekBlock(i) >= 0; i++, prevFlux = 0) {
+        while ((newFlux = getNextFlux()) >= 0) {
+            val = newFlux - prevFlux;
+            prevFlux = newFlux;
             if (val > maxHistVal)
                 maxHistVal = val;
-            val = (val * HIST_SLOTS_PER_US + 500) / 1000;       // scale to slots with rounding
+            val = (val * HIST_SLOTS_PER_US + 500) / 1000 ; // scale to slots with rounding
             if (val > HIST_SLOTS)
                 outRange++;
             else if (++histogram[val] > maxHistCnt)
@@ -53,6 +57,7 @@ void displayHist(int levels)
     for (highVal = HIST_SLOTS; highVal >= (int32_t)(HIST_SLOTS_PER_US * 5.5) && cols[highVal] == 0; highVal--)
         ;
 
+    logFull(ALWAYS, "");
     logBasic("\nHistogram\n"
         "---------\n");
     logBasic("max flux value = %.1fuS, flux values > %duS = %d\n", maxHistVal / 1000.0, HIST_MAX_US, outRange);
@@ -79,5 +84,5 @@ void displayHist(int levels)
             i += logBasic("%dus", i / HIST_SLOTS_PER_US) - 1;
         else
             logBasic(" ");
-    logBasic("\n");
+    logBasic("\n\n");
 }
