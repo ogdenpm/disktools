@@ -110,6 +110,7 @@ struct {
     char *checksum;
     char *os;
 } osMap[] = {
+    "6SLy1sgk5/mEkePx2RtE6sntnQ8", "ISIS I 1.1",
     "/YmatRu9vhzEjMhDylDjhykvqZo", "ISIS II 2.2",
     "CDiOIW5+mmg+lMLUzBiKotg1Q58", "ISIS II 3.4",
     "sRiKeMMS6BzoByW8JMfR602LkRc", "ISIS II 4.0",

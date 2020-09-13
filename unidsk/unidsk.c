@@ -939,7 +939,7 @@ bool isis2_3(dir_t *dptr)
     char *isisName = isDOS ? "DOS.DIR" : "ISIS.DIR";
 
 
-    printf("Looks like an ISIS %s disk\n", diskType == ISIS_PDS ? "PDS" : "II");
+    printf("Looks like an ISIS %s disk\n", diskType == ISIS_PDS ? "PDS" : "I / II");
 
     ok &= extractFile(dptr, 0);		// get the ISIS.DIR file, leaves filename in targetPath
     /* although processing of the header file could be done here
