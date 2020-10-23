@@ -359,7 +359,7 @@ void load_imd(FILE *fp)
     switch (disk[1][0]->Nsec) {
     case 26: diskType = ISIS_SD; break;
     case 52: diskType = ISIS_DD; break;
-    case 16: diskType = disk[1][0]->Size == 128 ? ISIS_PDS : ISIS_DOS; break;
+    case 16: diskType = disk[0][0] && disk[0][0]->Size == 256 ? ISIS_DOS : ISIS_PDS; break;
     case 8: diskType = ISIS_IV; break;
     default: diskType = UNKNOWN;
     }
