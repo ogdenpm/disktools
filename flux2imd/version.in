@@ -2,11 +2,11 @@
 #ifndef v1_3_0_3
 #define v1_3_0_3
 #define GIT_APPID       "flux2imd"
+#define GIT_APPNAME     "flux2imd"
 #define GIT_VERSION     "1.3.0.X"
 #define GIT_VERSION_RC  1,3,0,3 
 #define GIT_SHA1        "untracked"
 #define GIT_BUILDTYPE   3 
-#define GIT_APPDIR      "flux2imd"
 #define GIT_CTIME       "2020-08-11 14:08:22"
 #define GIT_YEAR        "2020"
 #endif
