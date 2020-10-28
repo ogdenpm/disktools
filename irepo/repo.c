@@ -117,7 +117,7 @@ bool printEntry(FILE *fp, const char *iname, const char *attrib, KeyPtr key,  co
 
     if (isSpecial(loc)) {    // special options ingore checksum etc
         showAlt = false;
-        if (*key != '*') {
+        if (*key && *key != '*') {
             key = "";
             changed++;
         }
@@ -175,8 +175,10 @@ bool printEntry(FILE *fp, const char *iname, const char *attrib, KeyPtr key,  co
 
     if (showAlt && inRepo) {
         for (char *lp = firstLoc(key); lp; lp = nextLoc())
-            if (lp != loc && isAlt(lp, altname))
-                printf("# also ^%s\n", lp);
+            if (lp != loc && isAlt(lp, altname)) {
+                fprintf(fp, "# also ^%s\n", lp);
+                changed = true;
+            }
     }
     return changed;
 }
