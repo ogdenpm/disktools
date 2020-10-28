@@ -207,6 +207,7 @@
     </CustomBuildStep>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="db.c" />
     <ClCompile Include="repo.c" />
     <ClCompile Include="sha1.c" />
     <ClCompile Include="unidsk.c" />
@@ -214,6 +215,7 @@
     <ClCompile Include="version.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="db.h" />
     <ClInclude Include="sha1.h" />
     <ClInclude Include="unidsk.h" />
   </ItemGroup>

@@ -92,6 +92,7 @@ The primary use of this is to change to prefered path names for human reading
 #include <direct.h>
 #include <string.h>
 #include <ctype.h>
+#include <stdint.h>
 
 #include "unidsk.h"
 
@@ -107,7 +108,7 @@ struct {
 
 
 struct {
-    char *checksum;
+    KeyPtr key;
     char *os;
 } osMap[] = {
     "6SLy1sgk5/mEkePx2RtE6sntnQ8", "ISIS I 1.1",
@@ -125,7 +126,7 @@ struct {
     "7SzuQtZxju9XU/+ehbFOQ7W0tz8", "TEST 1.1",
     "yOeRj3n6yo8SYlu3Ne4L8Ci52BI", "OSIRIS 3.0",
     "JnbT/FfQLj4sVO/yJLIL8tyoGUU", "ISIS III(N) 2.0",
-    NULL, "NONE"
+    0, "NONE"
 };
 
 char *osFormat[] = { "UNKNOWN", "ISIS II SD", "ISIS II DD", "ISIS PDS", "ISIS IV", "ISIS-DOS" };
@@ -169,8 +170,8 @@ void getRecipeInfo(isisDir_t *isisDir, int diskType, bool isOK) {
     if (osIdx >= 0) {
         recipeInfo.os = "UNKNOWN";       // default to unknown os
         recipeInfo.suffix[1] = 'b';      // small b if os but unknown
-        for (int i = 0; osMap[i].checksum; i++)
-            if (strcmp(osMap[i].checksum, isisDir[osIdx].checksum) == 0) {
+        for (int i = 0; osMap[i].key; i++)
+            if (strcmp(osMap[i].key, isisDir[osIdx].key) == 0) {
                 recipeInfo.os = osMap[i].os;
                 recipeInfo.suffix[1] = 'B'; // yes it is bootable
                 break;
@@ -181,30 +182,30 @@ void getRecipeInfo(isisDir_t *isisDir, int diskType, bool isOK) {
         strcat(recipeInfo.suffix, "E");
 
     // now get the info from isis.lab
-    if ((lab = fopen("isis.lab", "rb")) == 0) {
-        strcpy(recipeInfo.label, "nolabel");
-        return;
-    }
-    if (fread(&label, sizeof(label), 1, lab) != 1)
+    if (!(lab = fopen("isis.lab", "rb")) || fread(&label, sizeof(label), 1, lab) != 1)
         memset(&label, 0, sizeof(label));              // just in case of partial read
-    else {
-        if (label.name[0]) {
-            StrEncodeNCat(recipeInfo.label, label.name, 6);        // relies on labelInfo array being 0;
-            if (label.name[6]) {                            // copy -ext if present
-                strcat(recipeInfo.label, "-");
-                StrEncodeNCat(recipeInfo.label, &label.name[6], 3);
-            }
-        }
-        if (label.version)
-            StrEncodeNCat(recipeInfo.version, label.version, 2);
-        if (diskType == ISIS_PDS && (label.crlf[0] != '\r' || label.crlf[1] != '\n'))
-            StrEncodeNCat(recipeInfo.crlf, label.crlf, 2);
+    if (lab)
+        fclose(lab);
 
+    if (label.name[0]) {
+        StrEncodeNCat(recipeInfo.label, label.name, 6);        // relies on labelInfo array being 0;
+        if (label.name[6]) {                                   // copy -ext if present
+            strcat(recipeInfo.label, "-");
+            StrEncodeNCat(recipeInfo.label, &label.name[6], 3);
+        }
+    } else
+        strcpy(recipeInfo.label, "aLabel");
+
+    if (label.version)
+        StrEncodeNCat(recipeInfo.version, label.version, 2);
+    if (diskType == ISIS_PDS && (label.crlf[0] != '\r' || label.crlf[1] != '\n'))
+        StrEncodeNCat(recipeInfo.crlf, label.crlf, 2);
+
+    if (*label.fmtTable)
         if (diskType == ISIS_SD && strncmp(label.fmtTable, "1<6", 3) ||  // nonstandard interleave suffix
             diskType == ISIS_DD && strncmp(label.fmtTable, "145", 3))
             strncpy(recipeInfo.interleave, label.fmtTable, 3);
-    }
-    fclose(lab);
+
 }
 
 
@@ -214,8 +215,8 @@ void mkRecipe(char const *name, isisDir_t *isisDir, char *comment, int diskType,
     FILE *fp;
     char recipeName[(6+3) * 3 + 1 + 4 + 1];     // 6-3 possibly encoded - suffix '\0'
     char *dbPath;
-    char *prefix;
     isisDir_t *dentry;
+    char *altname;
 
     getRecipeInfo(isisDir, diskType, isOK);
 
@@ -270,42 +271,44 @@ void mkRecipe(char const *name, isisDir_t *isisDir, char *comment, int diskType,
         if (dentry->attrib & 2) putc('S', fp);
         if (dentry->attrib & 1) putc('I', fp);
 
-        prefix = "";
+        bool inRepo = false;
         if (dentry->dirLen < 0)
-            sprintf(dentry->checksum, "** EOF count %d **", -dentry->dirLen);
+            sprintf(dentry->key, "* EOF count %d *", -dentry->dirLen);
         else if (dentry->dirLen == 0)
-            strcpy(dentry->checksum, "** null **");
+            strcpy(dentry->key, "");
         else if (dentry->actLen != dentry->dirLen)
-            sprintf(dentry->checksum, "** size %d **", dentry->dirLen);
+            sprintf(dentry->key, "* size not %d *", dentry->dirLen);
         else if (dentry->errors)
-            sprintf(dentry->checksum, "** corrupt **");
+            strcpy(dentry->key, "* corrupt *");
 
+        bool na = false;
         if (strcmp(dentry->name, "ISIS.DIR") == 0 ||
             strcmp(dentry->name, "ISIS.LAB") == 0 ||
             strcmp(dentry->name, "ISIS.MAP") == 0 ||
-            strcmp(dentry->name, "ISIS.FRE") == 0)
+            strcmp(dentry->name, "ISIS.FRE") == 0) {
             dbPath = "AUTO";
-        else if (dentry->dirLen == 0)
+            na = true;
+        } else if (dentry->dirLen == 0) {
             dbPath = "ZERO";
-        else if (dentry->dirLen < 0)
+            na = true;
+        } else if (dentry->dirLen < 0) {
             dbPath = "ZEROHDR";        // zero but link block allocated
-        else if (dbPath = Dblookup(dentry))
-            prefix = "^";
-        else if (dentry->dirLen != dentry->actLen || dentry->errors)
-            dbPath = "*Corrupt - missing data";
+            na = true;
+        } else if ((dbPath = findMatch(dentry->key, altname = dentry->name)) ||
+            (dbPath = findMatch(dentry->key, altname = NULL)))
+            inRepo = true;
         else
             dbPath = dentry->fname;
+        if (dentry->key[0] != '*' && na)
+            dentry->key[0] = 0;
 
-        fprintf(fp, ",%s,%s%s", dentry->checksum, prefix, dbPath);
+        fprintf(fp, ",%s,%s%s\n", dentry->key, inRepo ? "^" : "", dbPath);
         // print the alternative names if available
-
-        int llen = MAXOUTLINE + 1;
-        while ((dbPath = Dblookup(NULL)) && *dbPath) {
-            if (llen + strlen(dbPath) >= MAXOUTLINE - 1)
-                llen = fprintf(fp, "\n# also");
-            llen += fprintf(fp, " %s", dbPath);
+        if (inRepo) {
+            for (char *lp = firstLoc(dentry->key); lp; lp = nextLoc())
+                if (lp != dbPath && isAlt(lp, altname))
+                    fprintf(fp, "# also ^%s\n", lp);
         }
-        putc('\n', fp);
     }
     fclose(fp);
 }

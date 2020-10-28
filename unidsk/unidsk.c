@@ -40,6 +40,8 @@ TODO
 #include <string.h>
 #include <direct.h>
 #include <stdarg.h>
+#include <stdint.h>
+#include <stdbool.h>
 #include "unidsk.h"
 
 void showVersion(FILE *fp, bool full);
@@ -789,33 +791,6 @@ void isis4()
     //}
 }
 
-/* simplified interface to sha1 code */
-SHA1Context ctx;
-
-void InitSHA1()
-{
-    SHA1Reset(&ctx);
-}
-
-void AddSHA1(const byte *blk, unsigned len) {
-    SHA1Input(&ctx, blk, len);
-}
-
-void GetSHA1(byte *checksum) {
-    byte sha1[SHA1HashSize + 1];
-    static char enc[64] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
-    SHA1Result(&ctx, sha1);
-    sha1[SHA1HashSize] = 0;     // 0 pad to triple boundary
-
-    for (int i = 0; i < SHA1HashSize; i += 3) {
-        int triple = (sha1[i] << 16) + (sha1[i + 1] << 8) + sha1[i + 2];
-        for (int j = 0; j < 4; j++)
-            *checksum++ = enc[(triple >> (3 - j) * 6) & 0x3f];
-    }
-    *--checksum = 0;            // replace 28th char with 0;
-}
-
 bool extractFile(dir_t *dptr, int dirSlot)
 {
     char filename[16];
@@ -826,7 +801,6 @@ bool extractFile(dir_t *dptr, int dirSlot)
     isisLinkage_t *links = (isisLinkage_t *)&(dptr->blocks);	// trick to pick next block from directory info
     int prevTrk, prevSec;
     int sectorSize = diskType == ISIS_PDS ? 256 : 128;
-    int size = 0;
 
     if (*dptr->ext)
         sprintf(isisName, "%.6s.%.3s", dptr->name, dptr->ext);
@@ -857,17 +831,15 @@ bool extractFile(dir_t *dptr, int dirSlot)
     showRdError = dptr->status == 0;
     rdErrorCnt = 0;
 
-    InitSHA1();
-
     if (debug) printf("%s:", filename);
     for (blk = 0; blk < dptr->blocks; blk++) {
         if (blk == dptr->blocks - 1)
             sectorSize = diskType == ISIS_PDS ? dptr->lastblksize + 1 : dptr->lastblksize;
 
         blkIdx = blk % (diskType == ISIS_PDS ? 123 : 62);
-        if (debug && blkIdx % 16 == 0) printf("\n ");
+        if (debug && blkIdx && blkIdx % 16 == 0) printf("\n%10c", ' ');
         if (blkIdx == 0) {
-            if (debug) printf(" %02d:%02d -> ", links->next.track, links->next.sector);
+            if (debug) printf("\n  %02d:%02d -> ", links->next.track, links->next.sector);
             isisLinkage_t *curLinks = links;
             if ((links = (isisLinkage_t *)getTS(links->next.track, links->next.sector)) == NULL) {
                 rdError("%s block %d bad linkage block t=%d s=%d\n", isisName, blk, curLinks->next.track, curLinks->next.sector);
@@ -890,12 +862,9 @@ bool extractFile(dir_t *dptr, int dirSlot)
 
             for (int i = 0; i < sectorSize; i++)
                 putc(0xc7, fout);
-            size += sectorSize;
         }
-        else {
-            size += (int)fwrite(p, 1, sectorSize, fout);
-            AddSHA1(p, sectorSize);
-        }
+        else
+            fwrite(p, 1, sectorSize, fout);
     }
     if (debug && blk != 0) {
         while (++blkIdx < (diskType == ISIS_PDS ? 123 : 62) && (links->pointers[blkIdx].track || links->pointers[blkIdx].sector))
@@ -912,8 +881,7 @@ bool extractFile(dir_t *dptr, int dirSlot)
         isisDir[dirIdx].dirLen = (dptr->blocks - 1) * (diskType == ISIS_PDS ? 256 : 128) + sectorSize;
     else
         isisDir[dirIdx].dirLen = -dptr->lastblksize;
-    isisDir[dirIdx].actLen = size;
-    GetSHA1(isisDir[dirIdx].checksum);
+    int size = isisDir[dirIdx].actLen = getFileKey(filename, isisDir[dirIdx].key);
     isisDir[dirIdx].attrib = dptr->attributes;
     isisDir[dirIdx].errors = rdErrorCnt;
     if (osIdx < 0 && dptr->status == 0 && (strcmp(isisName, "ISIS.BIN") == 0 || strcmp(isisName, "ISIS.PDS") == 0))
@@ -1016,16 +984,16 @@ void main(int argc, char **argv) {
 
     if (argc != 2 || (fp = fopen(*++argv, "rb")) == NULL) {
         fprintf(stderr,
-            "unidsk - extract files from ISIS disks in img or imd format (c) Mark Ogden 29-Mar-2020\n\n"
-            "usage: unidsk -v | -V | [-l] [-d] file\n"
+            "unidsk - extract files from ISIS disks in img or imd format\n\n"
+            "usage: unidsk [-v] | [-V] | [-l] [-d] file\n"
             "-v/-V   show version information and exit\n"
-            "-l      for local names only\n"
-            "-d      for link info\n");
+            "-l      don't lookup in the repository\n"
+            "-d      debug - shows link info\n");
         exit(1);
     }
 
     if (!local)
-        loadCache();
+        openDb();
 
     if (_splitpath_s(*argv, drive, _MAX_DRIVE, dir, _MAX_DIR, fname, _MAX_FNAME, ext, _MAX_EXT) != 0) {
         fprintf(stderr, "invalid file name %s\n", argv[1]);
@@ -1058,5 +1026,7 @@ void main(int argc, char **argv) {
         mkRecipe(GetFileName(*argv), isisDir, comment, diskType, ok);
     } else 
         isis4();
+    if (!local)
+        closeDb();
 
 }

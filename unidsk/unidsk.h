@@ -28,7 +28,7 @@ TODO
 */
 
 #include <stdbool.h>
-#include "sha1.h"
+#include "db.h"
 typedef unsigned char byte;
 typedef unsigned short word;
 typedef unsigned __int32 dword;
@@ -53,8 +53,10 @@ enum { UNKNOWN, ISIS_SD, ISIS_DD, ISIS_PDS, ISIS_IV, ISIS_DOS, ZXENIX, CPM };
 
 #define MAXDIR      200
 #define MAXCOMMENT  2048
-#define MAXINLINE   512
+#define MAXLINE   256
 #define MAXOUTLINE  120
+
+#define ChecksumSize    27      // base 64 SHA1 hash length
 
 typedef struct {
     char name[12];      // isis name + optional # prefix for recovered files
@@ -62,7 +64,7 @@ typedef struct {
     byte attrib;
     int dirLen;         // dir record of file size or it no header block -eofcnt
     int actLen;         // bytes saved
-    byte checksum[640];  // base 64 encoding of SHA1 + trailing NULL(28 chars) + extension for messages
+    Key key;            // base 64 encoding of SHA1
     int errors;
 }  isisDir_t;
 
@@ -76,9 +78,10 @@ typedef struct {
 } label_t;
 #pragma pack(pop)
 
+
 extern int osIdx;
 extern bool debug;
 
 void mkRecipe(char const *name, isisDir_t  *isisDir, char *comment, int diskType, bool isOK);
-char *Dblookup(isisDir_t *entry);
-void loadCache();
+bool isAlt(const char *loc, const char *iname);
+char *findMatch(const KeyPtr key, const char *iname);

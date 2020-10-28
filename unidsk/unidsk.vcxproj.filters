@@ -30,12 +30,18 @@
     <ClCompile Include="version.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="db.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="unidsk.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="sha1.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="db.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
