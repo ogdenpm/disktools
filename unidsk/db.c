@@ -15,7 +15,7 @@
 
 #define CATLOGNAME  "ncatalog.db"
 
-#define HashSize    4409        // 600th prime
+#define HashSize    4583        // 620th prime
 #define MAXLINE		256	        // split very long lines
 
 // database is a text file stored as
@@ -241,8 +241,11 @@ __declspec(noreturn) void outOfMemory() {
 
 unsigned hash(const char *s) {      // generate hash value from string
     unsigned val = 0;
-    while (*s)
-        val = val * 33 + *s++;
+    unsigned shift = 24;
+    while (*s) {
+        val += *s++ << shift;
+        shift = shift ? shift - 4 : 24;
+    }
     return val % HashSize;
 }
 

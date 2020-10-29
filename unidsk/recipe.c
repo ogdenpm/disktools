@@ -182,8 +182,11 @@ void getRecipeInfo(isisDir_t *isisDir, int diskType, bool isOK) {
         strcat(recipeInfo.suffix, "E");
 
     // now get the info from isis.lab
-    if (!(lab = fopen("isis.lab", "rb")) || fread(&label, sizeof(label), 1, lab) != 1)
-        memset(&label, 0, sizeof(label));              // just in case of partial read
+    memset(&label, 0, sizeof(label));              // just in case of partial read
+    if (!(lab = fopen("isis.lab", "rb")) ||
+          fread(&label, 1, sizeof(label), lab) <= sizeof(label) -74 ||          // only need first 3 bytes of fmtTable
+          label.name[0] == 0xc7)
+        memset(&label, 0, sizeof(label));      // invalid label or uninitialised sector
     if (lab)
         fclose(lab);
 
@@ -277,7 +280,7 @@ void mkRecipe(char const *name, isisDir_t *isisDir, char *comment, int diskType,
         else if (dentry->dirLen == 0)
             strcpy(dentry->key, "");
         else if (dentry->actLen != dentry->dirLen)
-            sprintf(dentry->key, "* size not %d *", dentry->dirLen);
+            sprintf(dentry->key, "* size %d expected %d *", dentry->actLen, dentry->dirLen);
         else if (dentry->errors)
             strcpy(dentry->key, "* corrupt *");
 

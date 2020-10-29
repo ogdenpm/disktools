@@ -64,7 +64,7 @@ typedef struct {
     byte attrib;
     int dirLen;         // dir record of file size or it no header block -eofcnt
     int actLen;         // bytes saved
-    Key key;            // base 64 encoding of SHA1
+    char key[ChecksumSize + 20];   // base 64 encoding of SHA1, allow extra room for error messages
     int errors;
 }  isisDir_t;
 
