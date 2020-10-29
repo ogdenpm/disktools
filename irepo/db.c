@@ -15,7 +15,7 @@
 
 #define CATLOGNAME  "ncatalog.db"
 
-#define HashSize    4409        // 600th prime
+#define HashSize    4583        // 620th prime
 #define MAXLINE		256	        // split very long lines
 
 // database is a text file stored as
@@ -43,7 +43,6 @@ bool dbIsOpen = false;
 
 static key_t *keyHashTable[HashSize];
 static loc_t *locHashTable[HashSize];
-
 
 
 static void loadDb(char *fpart);
@@ -220,17 +219,13 @@ void openDb() {
 
 #ifdef _REBUILD
     if (rebuild)
-        rebuildDb(fpart, "intel80", "intel86", NULL);
+        rebuildDb(fpart, "Intel80", "Intel86", NULL);
     else
 #endif
         loadDb(fpart);
 
+
 }
-
-
-
-
-
 
 
 
@@ -239,10 +234,16 @@ __declspec(noreturn) void outOfMemory() {
     exit(1);
 }
 
+
 unsigned hash(const char *s) {      // generate hash value from string
     unsigned val = 0;
-    while (*s)
-        val = val * 33 + *s++;
+
+    unsigned shift = 24;
+    while (*s) {
+        val += *s++ << shift;
+        shift = shift ? shift - 4 : 24;
+
+    }
     return val % HashSize;
 }
 
@@ -389,6 +390,8 @@ static void rebuildTree(char *fpart) {
 // as this is private don't use the public iterators
 static void saveDb(char *fpart) {
     FILE *fp;
+    int uniqueCnt = 0;
+    int fileCnt = 0;
     strcpy(fpart, "/" CATLOGNAME);
 
     if ((fp = fopen(repoPath, "wt")) == NULL) {
@@ -398,6 +401,7 @@ static void saveDb(char *fpart) {
 
     for (unsigned i = 0; i < HashSize; i++) {
         for (key_t *kp = keyHashTable[i]; kp; kp = kp->hchain) {
+            uniqueCnt++;
             int linelen = fprintf(fp, "%s", kp->key);
             for (loc_t *np = kp->nchain; np; np = np->nchain) {
                 if (linelen + strlen(np->loc) + 2 >= MAXLINE) {
@@ -405,11 +409,13 @@ static void saveDb(char *fpart) {
                     linelen = fprintf(fp, "%s", kp->key);
                 }
                 linelen += fprintf(fp, ":%s", np->loc);
+                fileCnt++;
             }
             putc('\n', fp);
         }
     }
     fclose(fp);
+    printf("Catalog updated: %d files, %d unique keys\n\n", fileCnt, uniqueCnt);
 }
 
 #endif

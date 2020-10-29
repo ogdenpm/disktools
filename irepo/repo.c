@@ -7,40 +7,15 @@
 #include <ctype.h>
 #include "irepo.h"
 
-bool isSpecial(const char *name) {
-    static char *special[] = { "AUTO", "ZERO", "ZEROHDR", NULL };
-    for (int i = 0; special[i]; i++)
-        if (strcmp(name, special[i]) == 0)
-            return true;
-    return false;
-}
-
-
-void showDuplicates() {
-    KeyPtr key;
-    key = firstKey();
-    while (key) {
-        char *floc, *loc;
-        if ((floc = firstLoc(key)) && (loc = nextLoc())) {
-            printf("%s\n", floc);
-            while (loc) {
-                printf("%s\n", loc);
-                loc = nextLoc();
-            }
-            putchar('\n');
-        }
-        key = nextKey();
-    }
-}
-
-
 
 const char *fileName(const char *loc) {
-    const char *s = strrchr(loc, '/');
-    if (s)
-        loc =  s + 1;
+	const char *s;
+#ifdef _WIN32						// windows allows \ separator
     if (s = strrchr(loc, '\\'))
-        return s + 1;
+        loc = s + 1;
+#endif
+    if (s = strrchr(loc, '/'))		// *nix and windows / separator
+        loc =  s + 1;
     return loc;
 }
 
@@ -107,78 +82,123 @@ bool isAlt(const char *loc, const char *iname) {
 }
 
 
-// print entry, returns true if changed
-bool printEntry(FILE *fp, const char *iname, const char *attrib, KeyPtr key,  const char *loc, bool showAlt) {
-    Key newkey;
-    bool inRepo = false;
-    bool changed = false;
-    const char *altname = iname;
-    const char *newloc = NULL;
 
-    if (isSpecial(loc)) {    // special options ingore checksum etc
-        showAlt = false;
-        if (*key && *key != '*') {
-            key = "";
-            changed++;
-        }
-    } else {
-        const char *lp = NULL;
-        if (*loc == '^')
-            if (lp = getDbLoc(++loc)) {       // if invalid repo ref force recalc
-                inRepo = true;
-                loc = lp;
-            } else {
-                fprintf(fp, "# Next entry: ^%s moved or no longer in repository\n", loc);
-                fprintf(stderr, "Warning: ^%s moved or no longer in repository\n", loc);
-                changed = true;
-                loc = iname;
-            }
-        if (isValidKey(key)) {                                  // key is most significant indicator
-            if (!inRepo || !isValidPair(key, loc)) {            // not valid repo entry
-                inRepo = (newloc = findMatch(key, altname)) ||       // candidate found (iname match or any name match)
-                    (newloc = findMatch(key, altname = NULL));
-                if (inRepo) {
-                    loc = newloc;
-                    changed = true;
-                }
-            }
-        } else if (inRepo) {                            // if we have file in repo get it's checksum
-            key = getDbLocKey(loc);
-            changed = true;
-        }
-        
-        if (!inRepo) {                                  // if not in repo and file exists use it information to override key
-            if (*loc == '*')                            // old comment format, replace with name
-                loc = iname;
-            if (*key != '*') {
-                switch (getFileKey(loc, newkey)) {
-                case -1:
-                    key = "* file not found *";
-                    fprintf(fp, "# Next entry: no match to key: %s or location %s\n", key, loc);
-                    fprintf(stderr, "Warning: no match to key: %s or location %s\n", key, loc);
-                    break;
-                case 0:
-                    loc = "ZERO";
-                    key = "";
-                    break;
-                default:
-                    changed |= strcmp(key, newkey) != 0;
-                    key = newkey;
-                }
-            }
-        }
+// split the recipe line, return false it it doesn't contain enough fields
+bool parseRecipe(char *line, recipe_t *recipe) {
+	recipe->altname = recipe->iname = line;
+	if ((recipe->attrib = strchr(line, ',')) && (recipe->key = strchr(recipe->attrib + 1, ',')) && (recipe->loc = strchr(recipe->key + 1, ','))) {
+		*recipe->attrib++ = *recipe->key++ = *recipe->loc++ = 0;
+		recipe->inRepo = *recipe->loc == '^';
+		if (recipe->inRepo)
+			recipe->loc++;
+		return true;
+	}
+	return false;
+}
 
-    }
+// print the recipe line, along with alternates if requested
+// returns true if alternatives printed
+bool printRecipe(FILE *fp, recipe_t *recipe, bool showAlt) {
+	fprintf(fp, "%s,%s,%s,%s%s\n", recipe->iname, recipe->attrib, recipe->key, recipe->inRepo ? "^" : "", recipe->loc);
+	if (showAlt && recipe->inRepo) {
+		bool altPrinted = false;
+		for (char *lp = firstLoc(recipe->key); lp; lp = nextLoc())
+			if (lp != recipe->loc && isAlt(lp, recipe->altname)) {
+				fprintf(fp, "# also ^%s\n", lp);
+				altPrinted = true;
+			}
+		return altPrinted;
+	}
+	return false;
+}
+
+char *chkSpecial(recipe_t *r) {
+	static char *special[] = { "AUTO", "ZERO", "ZEROHDR", NULL };
+	static char *isisauto[] = { "ISIS.DIR", "ISIS.MAP", "ISIS.LAB", "ISIS.FRE", NULL };
+	for (int i = 0; special[i]; i++)
+		if (strcmp(r->loc, special[i]) == 0)
+			return special[i];
+	for (int i = 0; isisauto[i]; i++)
+		if (stricmp(r->iname, isisauto[i]) == 0)
+			return "";
+
+	return NULL;
+}
 
 
-    fprintf(fp, "%s,%s,%s,%s%s\n", iname, attrib, key, inRepo ? "^" : "", loc);
+// update the recipe
+// note if in repository loc is updated to point to the repository entry
+// returns true if updated
+bool updateRecipe(recipe_t *r) {
+	bool changed = false;
+	const char *s;
+	// check for special cases
+	if (!r->inRepo && (s = chkSpecial(r))) {
+		if (s && *s == 0) {			// loc was not special but original is reserved name
+			r->loc = "AUTO";		// new standard is to make into AUTO
+			changed = true;
+		}
+		if (*r->key && *r->key != '*') {	// error messages are kept
+			r->key = "";					// clear any key
+			changed = true;
+		}
+		return changed;
+	}
 
-    if (showAlt && inRepo) {
-        for (char *lp = firstLoc(key); lp; lp = nextLoc())
-            if (lp != loc && isAlt(lp, altname)) {
-                fprintf(fp, "# also ^%s\n", lp);
-                changed = true;
-            }
-    }
-    return changed;
+	// fix up repo references
+	if (r->inRepo) {
+		const char *lp = getDbLoc(r->loc);
+		if (!lp) {
+			fprintf(stderr, "Warning (re)moved file: %s\n", r->loc);
+			r->inRepo = false;
+			strcpy(r->loc, "*");		// force iname behaviour below
+		} else
+			r->loc = (char *)lp;		// safe
+	}
+	if (*r->loc == '*') {				// old format allowed comment instead of name for errors
+		strcpy(r->loc, r->iname);		// iname is upper case so copy to loc and convert to lowercase
+		strlwr(r->loc);
+		changed = true;
+	}
+
+	// if the file is in the repository then update the key if necessary
+	if (r->inRepo) {
+		KeyPtr key = getDbLocKey(r->loc);
+		if (strcmp(r->key, key) != 0) {
+			r->key = key;
+			changed = true;
+		}
+	} else if (isValidKey(r->key)) {				// if key looks valid see if name exists
+		const char *newloc;
+		r->inRepo = (newloc = findMatch(r->key, r->iname)) ||			// do we have an entry matching the isis name
+			(newloc = findMatch(r->key, r->altname = NULL));	// or any entry
+		if (r->inRepo) {
+			r->loc = (char *)newloc;				// safe
+			changed = true;
+		}
+	}
+
+	if (!r->inRepo) {								   // if not in repo and file exists use it information to override key
+		if (*r->loc == '*') {                          // old comment format, replace with name
+			r->loc = r->iname;
+			changed = true;
+		}
+		if (*r->key != '*') {							// don't update if recipe signalled error
+			static Key fileKey;							// so we can return an updated key
+			switch (getFileKey(r->loc, fileKey)) {
+			case -1:
+				r->key = "* file not found *";
+				fprintf(stderr, "Warning: no match to key: %s or location: %s\n", r->key, r->loc);
+				break;
+			case 0:
+				r->loc = "ZERO";
+				r->key = "";
+				break;
+			default:
+				changed |= strcmp(r->key, fileKey) != 0;
+				r->key = fileKey;
+			}
+		}
+	}
+	return changed;
 }

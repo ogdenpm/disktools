@@ -10,7 +10,22 @@
 
 void showVersion(FILE *fp, bool full);
 
-
+void showDuplicates() {
+	KeyPtr key;
+	key = firstKey();
+	while (key) {
+		char *floc, *loc;
+		if ((floc = firstLoc(key)) && (loc = nextLoc())) {
+			printf("%s\n", floc);
+			while (loc) {
+				printf("%s\n", loc);
+				loc = nextLoc();
+			}
+			putchar('\n');
+		}
+		key = nextKey();
+	}
+}
 
 
 void reIndexFile(const char *path, bool showAlt) {
@@ -24,6 +39,10 @@ void reIndexFile(const char *path, bool showAlt) {
 
 	FILE *fpin, *fpout;
 	int changes = 0;
+	int unresolved = 0;
+	bool recipeChanged = false;				// used to track single change for a recipe & alts
+	recipe_t recipe;
+
 	if ((fpin = fopen(path, "rt")) == NULL) {
 		fprintf(stderr, "can't open %s\n", path);
 		return;
@@ -53,24 +72,23 @@ void reIndexFile(const char *path, bool showAlt) {
 		}
 		if (state == FILES) {
 			if (line[0] == '#') {
-				if (strnicmp(line, "# also ^", 8) == 0) {
-					changes++;
-				} else
+				if (strnicmp(line, "# also ^", 8) == 0)		// # also only count as single change (wiht recipe itself & any added #also
+					recipeChanged = true;
+				else
 					fprintf(fpout, "%s\n", line);
 			} else {
-				char *iname, *attrib, *key, *loc;
-				iname = line;
-				if ((attrib = strchr(iname, ',')) && (key = strchr(attrib + 1, ',')) && (loc = strchr(key + 1, ','))) {
-					*attrib++ = *key++ = *loc++ = 0;
-					if (loc[0] == '^' && loc[1] == 'I') {		// repo had Intel8x renamed to intel8x
-						loc[1] = 'i';
-						changes++;
-					}
-					changes += printEntry(fpout, iname, attrib, key, loc, showAlt);
-				} else {
+				if (recipeChanged) {
+					changes++;
+					recipeChanged = false;
+				}
+				if (!parseRecipe(line, &recipe)) {
 					fprintf(stderr, "bad recipe line: %s\n", line);
 					fprintf(fpout, "%s\n", line);
-					continue;
+				} else {
+					recipeChanged = updateRecipe(&recipe);
+					recipeChanged |= printRecipe(fpout, &recipe, showAlt | recipeChanged);
+					if (!recipe.inRepo && !chkSpecial(&recipe))
+						unresolved++;
 				}
 
 			}
@@ -87,17 +105,16 @@ void reIndexFile(const char *path, bool showAlt) {
 		}
 	}
 
-
 	fclose(fpin);
 	fclose(fpout);
 
-	if (changes) {
-		printf("%s: Updated %d changes\n", fname, changes);
+	if (changes += recipeChanged) {
+		printf("%s: %d Updates + %d Unresolved\n", fname, changes, unresolved);
 		unlink(path);
 		if (rename(tmpFile, path))
 			fprintf(stderr, "cannot rename %s to %s\n", tmpFile, path);
 	} else {
-		printf("%s: Unchanged\n", fname);
+		printf("%s: No Updates + %d Unresolved\n", fname, unresolved);
 		unlink(tmpFile);
 	}
 		
