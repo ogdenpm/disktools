@@ -1,91 +1,24 @@
-/* recipe.c     (c) by Mark Ogden 2018
+/****************************************************************************
+ *  program: unidsk - unpack intel ISIS IMD/IMG images                      *
+ *  Copyright (C) 2020 Mark Ogden <mark.pm.ogden@btinternet.com>            *
+ *                                                                          *
+ *  This program is free software; you can redistribute it and/or           *
+ *  modify it under the terms of the GNU General Public License             *
+ *  as published by the Free Software Foundation; either version 2          *
+ *  of the License, or (at your option) any later version.                  *
+ *                                                                          *
+ *  This program is distributed in the hope that it will be useful,         *
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of          *
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the           *
+ *  GNU General Public License for more details.                            *
+ *                                                                          *
+ *  You should have received a copy of the GNU General Public License       *
+ *  along with this program; if not, write to the Free Software             *
+ *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,              *
+ *  MA  02110-1301, USA.                                                    *
+ *                                                                          *
+ ****************************************************************************/
 
-DESCRIPTION
-    Generates the recipe file for ISIS II and ISISI III disks.
-    Part of unidsk
-
-MODIFICATION HISTORY
-    17 Aug 2018 -- original release as unidsk onto github
-    18 Aug 2018 -- added attempted extraction of deleted files for ISIS II/III
-    19 Aug 2018 -- Changed to use environment variable IFILEREPO for location of
-                   file repository. Changed location name to use ^ prefix for
-                   repository based files, removing need for ./ prefix for
-                   local files
-    20 Aug 2018 -- replaced len, checksum model with full sha1 checksum
-                   saves files with lower case names to avoid conflict with
-                   special paths e.g. AUTO, ZERO, DIR which became a potential
-                   issue when ./ prefix was removed. Lower case is also compatible
-                   with the thames emulator and the repository file names
-    21 Aug 2018 -- Added support for auto looking up files in the repository
-                   the new option -l or -L supresses the lookup i.e. local fiiles
-    13 Sep 2018 -- Renamed skew to interleave to align with normal terminolgy
-                   skew is kept as an option but not currently used
-    15-Oct 2019 -- Added crlf recipe line for junk fill in ISIS III disk
-                   Modified version and crlf recipes to accept #nn for hex value
-                   as ISIS PDS does not explicitly fill these so this allows
-                   arbitary data to be written
-
-TODO
-    Review the information generated for an ISIS IV disk to see if it is sufficient
-    to allow recreation of the original .imd or .img file
-    Review the information generated for an ISIS III disk to see it is sufficient to
-    recreate the ISIS.LAB and ISIS.FRE files.
-
-RECIPE file format
-The following is the current recipe format, which has change a little recently
-with attributes split out and new locations behaviour
-
-initial comment lines
-    multiple comment lines each beginning a # and a space
-    these are included in generated IMD files and if the first comment starts with IMD
-    then this is used as the signature otherwise a new IMD signature is generated with
-    the current date /time
-information lines which can occur in any order, although the order below is the default
-and can be separated with multiple comment lines starting with #. These comments are ignored
-    label: name[.|-]ext             Used in ISIS.LAB name has max 6 chars, ext has max 3 chars
-    version: nn                     Up to 2 chars used in ISIS.LAB (extended to allow char to have #nn hex value)
-    format: diskFormat              ISIS II SD, ISIS II DD or ISIS III
-    interleave:  interleaveInfo     optional non standard interleave info taken from ISIS.LAB. Rarely needed
-    skew: skewInfo                  inter track skew - not currently used
-    os: operatingSystem             operating system on disk. NONE or ISIS ver, PDS ver, OSIRIS ver
-    crlf: nn                        Up to 2 chars used in ISIS.LAB Each char can be #nn hex value
-marker for start of files
-    Files:
-List of files to add to the image in ISIS.DIR order. Comment lines starting with # are ignored
-each line is formated as
-    IsisName,attributes,len,checksum,srcLocation
-where
-    isisName is the name used in the ISIS.DIR
-    attibutes are the file's attributes any of FISW
-    sha1 checksum of the file stored in base64
-    location is where the file is stored or a special marker as follows
-    AUTO - file is auto generated and the line is optional
-    DIR - file was a listing file and not saved - depreciated
-    ZERO - file has zero length and is auto generated
-    ZEROHDR - file has zero length but header is allocated eofcnt will be set to 128
-    *text - problems with the file the text explains the problem. It is ignored
-    path - location of file to load a leading ^ is replaced by the repository path
-
-if you haave ISIS files files named AUTO, DIR or ZERO please prefix the path with ./, or use lower case
-for local files.
-
-Note unidsk creates special comment lines as follows
-
-if there are problems reading a file the message below is emitted before the recipe line
-    # there were errors reading filename
-
-if there were problems reading a delete file the message
-    # file filename could not be recovered
-For other deleted files the recipe line is commented out and the file is extracted to a file
-with a leading # prefix
-
-If there are aliases in the repository these are shown in one or more comments after the file
-    # also path [path]*
-If there is a match with the ISIS name then only alises with the same ISIS name will match
-otherwise all files with the same checksum will be listed
-The primary use of this is to change to prefered path names for human reading
-
-*/
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -168,14 +101,20 @@ void getRecipeInfo(isisDir_t *isisDir, int diskType, bool isOK) {
     recipeInfo.suffix[0] = suffixFormat[diskType];
 
     if (osIdx >= 0) {
-        recipeInfo.os = "UNKNOWN";       // default to unknown os
-        recipeInfo.suffix[1] = 'b';      // small b if os but unknown
-        for (int i = 0; osMap[i].key; i++)
-            if (strcmp(osMap[i].key, isisDir[osIdx].key) == 0) {
-                recipeInfo.os = osMap[i].os;
-                recipeInfo.suffix[1] = 'B'; // yes it is bootable
-                break;
-            }
+        if (isisDir[osIdx].actLen != isisDir[osIdx].dirLen || isisDir[osIdx].errors) {
+            recipeInfo.os = "CORRUPT";
+        } else {
+            recipeInfo.os = "UNKNOWN";       // default to unknown os
+            recipeInfo.suffix[1] = 'b';      // small b if os but unknown
+            for (int i = 0; osMap[i].key; i++)
+                if (strcmp(osMap[i].key, isisDir[osIdx].key) == 0) {
+                    recipeInfo.os = osMap[i].os;
+                    recipeInfo.suffix[1] = 'B'; // yes it is bootable
+                    if (i == 0)
+                        recipeInfo.suffix[0] = '1';     // special for ISIS I
+                    break;
+                }
+        }
     } else
         recipeInfo.os = "NONE";
     if (!isOK)
@@ -197,7 +136,7 @@ void getRecipeInfo(isisDir_t *isisDir, int diskType, bool isOK) {
             StrEncodeNCat(recipeInfo.label, &label.name[6], 3);
         }
     } else
-        strcpy(recipeInfo.label, "aLabel");
+        strcpy(recipeInfo.label, "broken");
 
     if (label.version)
         StrEncodeNCat(recipeInfo.version, label.version, 2);
@@ -223,7 +162,7 @@ void mkRecipe(char const *name, isisDir_t *isisDir, char *comment, int diskType,
 
     getRecipeInfo(isisDir, diskType, isOK);
 
-    sprintf(recipeName, "@%s-%s", recipeInfo.label, recipeInfo.suffix);
+    sprintf(recipeName, "@II-%s-%s", recipeInfo.label, recipeInfo.suffix);
 
     if ((fp = fopen(recipeName, "wt")) == NULL) {
         fprintf(stderr, "can't create recipe file\n");
@@ -231,7 +170,7 @@ void mkRecipe(char const *name, isisDir_t *isisDir, char *comment, int diskType,
     }
 
 
-    fprintf(fp, "# IN-%s\n", recipeName + 1);
+    fprintf(fp, "# %s\n", recipeName + 1);
 
 
     fprintf(fp, "label: %s\n", recipeInfo.label);
