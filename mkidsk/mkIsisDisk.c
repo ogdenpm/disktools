@@ -1,5 +1,24 @@
-/* mkIsisDisk.c     (c) by Mark Ogden 2018
-
+/****************************************************************************
+ *  program: mkidsk - create IMD or IMG file from a recipe file             *
+ *  Copyright (C) 2020 Mark Ogden <mark.pm.ogden@btinternet.com>            *
+ *                                                                          *
+ *  This program is free software; you can redistribute it and/or           *
+ *  modify it under the terms of the GNU General Public License             *
+ *  as published by the Free Software Foundation; either version 2          *
+ *  of the License, or (at your option) any later version.                  *
+ *                                                                          *
+ *  This program is distributed in the hope that it will be useful,         *
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of          *
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the           *
+ *  GNU General Public License for more details.                            *
+ *                                                                          *
+ *  You should have received a copy of the GNU General Public License       *
+ *  along with this program; if not, write to the Free Software             *
+ *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,              *
+ *  MA  02110-1301, USA.                                                    *
+ *                                                                          *
+ ****************************************************************************/
+/*
 DESCRIPTION
     Creates ISIS II format disk images in .imd or .img format using a recipe file
     Supports:
@@ -19,6 +38,7 @@ MODIFICATION HISTORY
     13 Sep 2018 -- renamed skew to interleave to align with normal terminology
     15 Oct 2019 -- added support to allow fill of junk values for ISIS III version and
                    crlf values in ISIS.LAB - see undisk
+    later changes see git.
 
 
 LIMITATIONS
@@ -45,9 +65,6 @@ LIMITATIONS
     An alternative would be to use byte arrays and index into these to get the relevant
     data via macros or simple function. This approach would also support big edian data
 
-TODO
-    Add support for ISIS III, this depends on understanding the format of ISIS.LAB and
-    ISIS.FRE for ISIS III
 
 RECIPE file format
 The following is the current recipe format, which has change a little recently
@@ -78,12 +95,10 @@ where
     checksum is the file's SHA1 checksum
     location is where the file is stored or a special marker as follows
     AUTO - file is auto generated and the line is optional
-    DIR - file was a listing file and not saved - depreciated
     ZERO - file has zero length and is auto generated
     ZEROHDR - file has zero length but header is allocated eofcnt will be set to 128
-    *text - problems with the file the text explains the problem. It is ignored
     path - location of file to load a leading ^ is replaced by the repository path
-
+ * 
 */
 
 #include "mkIsisDisk.h"
@@ -100,6 +115,8 @@ char root[_MAX_PATH + 1];
 byte diskType = ISIS_DD;
 label_t label;
 bool hasSystem = false;
+bool isisBinSeen = false;
+bool isisT0Seen = false;
 bool interleave = false;
 bool interTrackSkew = false;
 bool addSource = false;
@@ -165,13 +182,15 @@ void append(char *dst, char const *s) {
 
 void ParseRecipeHeader(FILE *fp) {
     char line[MAXLINE];
-    char osString[MAXOS + 1] = { "---" };
+    char osString[MAXOS + 1] = { "NONE" };
     char *s;
     int c;
     char *appendTo = comment;
 
     while (fgets(line, MAXLINE, fp)) {
         s = line;
+        if (*s == '\n')
+            continue;
         if (*s == '#') {
             if (appendTo)
                 append(appendTo, ++s);
@@ -179,9 +198,11 @@ void ParseRecipeHeader(FILE *fp) {
         }
         appendTo = NULL;
 
-        if (s = strchr(line, '\n'))
-            *s = 0;
-        else if (strlen(line) == MAXLINE - 1) {
+        if (s = strchr(line, '\n')) {
+            while (--s != line && isblank(*s))  // trim
+                ;
+            s[1] = 0;
+        } else if (strlen(line) == MAXLINE - 1) {
             fprintf(stderr, "line too long %s\n", line);
             while ((c = getc(fp)) != EOF && c != '\n')
                 ;
@@ -234,9 +255,10 @@ void ParseRecipeHeader(FILE *fp) {
     }
 
     char fmt[128];      // enough string space
-    if (*osString && strcmp(osString, "NONE") != 0)
+    if (*osString && strcmp(osString, "NONE") != 0 && strcmp(osString, "CORRUPT") != 0) {
+        hasSystem = true;
         sprintf(fmt, "\n%s System Disk - format %s\n", osString, osName[diskType]);
-    else
+    } else
         sprintf(fmt, "\nNon-System Disk - format %s\n", osName[diskType]);
     append(comment, fmt);
     append(comment, source);
@@ -335,9 +357,11 @@ void ParseFiles(FILE *fp) {
         if (line[0] == '#')
             continue;
 
-        if (s = strchr(line, '\n'))
-            *s = 0;
-        else if (strlen(line) == MAXLINE - 1) { // if full line then we overran - otherwise unterminated last line
+        if (s = strchr(line, '\n')) {
+            while (--s != line && isblank(*s))
+                ;
+            s[1] = 0;
+        } else if (strlen(line) == MAXLINE - 1) { // if full line then we overran - otherwise unterminated last line
             fprintf(stderr, "%s - line truncated\n", line);
             while ((c = getc(fp)) != EOF && c != '\n')
                 ;
@@ -364,10 +388,23 @@ void ParseFiles(FILE *fp) {
                 fprintf(stderr, "%s - skipped because %s\n", line, path + 1);
             else if (strcmp(path, "DIR") == 0)
                 printf("%s - DIR listing not created\n", line);
-            else
+            else if (!hasSystem && (strcmp(isisName, "ISIS.BIN") == 0 || (strcmp(isisName, "ISIS.T0") == 0)))
+                printf("%s not allowed for non system disk - skipping\n", isisName);
+            else {
+                if (strcmp(isisName, "ISIS.BIN") == 0)
+                    isisBinSeen = true;
+                else if (strcmp(isisName, "ISIS.T0") == 0)
+                    isisT0Seen = true;
                 CopyFile(isisName, path, attributes);
+            }
         } else
             fprintf(stderr, "%s - missing path information\n", line);
+    }
+    if (hasSystem) {
+        if (!isisBinSeen)
+            fprintf(stderr, "Error: system disk but ISIS.BIN not seen\n");
+        else if (!isisT0Seen)
+            fprintf(stderr, "Warning: system disk but ISIS.T0 not seen, non system startup used\n");
     }
 }
 
@@ -390,10 +427,9 @@ void usage() {
         "-s         add source: info to imd images\n"
         "-f[nn]     override C7 format byte with E5 or hex value specified by nn\n"
 
-        "-i[xyz]    apply interleave. xyz forces the interleave for track 0, 1, 2-76\n"
+        "-i[xyz]    apply interleave. xyz forces the interleave for track 0, 1, 2-76 for ISIS I & ISIS II disks\n"
         "           x,y & z are as per ISIS.LAB i.e. interleave + '0'\n"
-        "           note the ISIS.LAB format information is not changed\n"
-        "-t         apply inter track interleave\n"
+        "-t         apply inter track skew\n"
         );
 }
 

@@ -1,14 +1,25 @@
-/* mkIsisDisk.h     (c) by Mark Ogden 2018
+/****************************************************************************
+ *  program: mkidsk - create IMD or IMG file from a recipe file             *
+ *  Copyright (C) 2020 Mark Ogden <mark.pm.ogden@btinternet.com>            *
+ *                                                                          *
+ *  This program is free software; you can redistribute it and/or           *
+ *  modify it under the terms of the GNU General Public License             *
+ *  as published by the Free Software Foundation; either version 2          *
+ *  of the License, or (at your option) any later version.                  *
+ *                                                                          *
+ *  This program is distributed in the hope that it will be useful,         *
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of          *
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the           *
+ *  GNU General Public License for more details.                            *
+ *                                                                          *
+ *  You should have received a copy of the GNU General Public License       *
+ *  along with this program; if not, write to the Free Software             *
+ *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,              *
+ *  MA  02110-1301, USA.                                                    *
+ *                                                                          *
+ ****************************************************************************/
 
-DESCRIPTION
-    part of mkidsk
-    Common type, defines and externs
-    Portions of the code are based on Dave Duffield's imageDisk sources
 
-MODIFICATION HISTORY
-    17 Aug 2018 -- original release as mkidsk onto github
-    18 Aug 2018 -- moved some info from mkisisDisk.c to here
-*/
 #pragma once
 #include <stdio.h>
 #include <stdlib.h>
