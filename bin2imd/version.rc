@@ -19,10 +19,8 @@ BEGIN
             VALUE "FileDescription", "convert binary file to imd"
             VALUE "FileVersion", GIT_VERSION
             VALUE "LegalCopyright", "(C)2012  Dave Dunfield"
-#ifdef GIT_APPID
-            VALUE "OriginalFilename", GIT_APPID ".exe"
-            VALUE "ProductName", GIT_APPID
-#endif
+            VALUE "OriginalFilename", GIT_APPNAME ".exe"
+            VALUE "ProductName", GIT_APPNAME
             VALUE "ProductVersion", GIT_VERSION
         END
     END
