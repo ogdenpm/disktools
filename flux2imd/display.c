@@ -257,7 +257,7 @@ void displayBadSlots(track_t *pTrack) {
     uint8_t const *slotToSector = pTrack->slotToSector;
 
     logBasic(" (#)Missing/(?)Corrupt Slot(Sector):");
-    for (unsigned i = 0; i < pTrack->fmt->spt; i++)
+    for (int i = 0; i < pTrack->fmt->spt; i++)
         if (!(trackPtr->sectors[i].status & SS_DATAGOOD)) {
             logBasic(" %c%d", trackPtr->sectors[i].sectorDataList ? '?' : '#', i);
             if (slotToSector[i] != 0xff)
