@@ -18,6 +18,36 @@
  *  MA  02110-1301, USA.                                                    *
  *                                                                          *
  ****************************************************************************/
+/*
+DESCRIPTION
+    Unpacks an isis .imd or .img file into the individual files.
+    Supports ISIS II SD, ISIS II DD, ISIS III and ISIS IV
+    For ISIS II and ISIS III a recipe file is generated to allow a sister
+    application mkidsk to reconstruct the .imd or .img file
+    Portions of the code are based on Dave Duffield's imageDisk sources
+
+MODIFICATION HISTORY
+    17 Aug 2018 -- original release as unidsk onto github
+    18 Aug 2018 -- added attempted extraction of deleted files for ISIS II/III
+    19 Aug 2018 -- Changed to use environment variable IFILEREPO for location of
+                   file repository. Changed location name to use ^ prefix for
+                   repository based files, removing need for ./ prefix for
+                   local files
+    21 Aug 2018 -- Added support for auto looking up files in the repository
+                   the new option -l or -L supresses the lookup i.e. local fiiles
+
+NOTES
+    This version relies on visual studio's pack pragma to force structures to be byte
+    aligned.
+    An alternative would be to use byte arrays and index into these to get the relevant
+    data via macros or simple function. This approach would also support big edian data
+
+TODO
+    Review the information generated for an ISIS IV disk to see if it is sufficient
+    to allow recreation of the original .imd or .img file
+    Review the information generated for an ISIS III disk to see it is sufficient to
+    recreate the ISIS.LAB and ISIS.FRE files.
+*/
 
 
 #include <stdio.h>
