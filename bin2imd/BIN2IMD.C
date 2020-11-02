@@ -423,7 +423,7 @@ void write_track(unsigned char head)
 	size = s->SSize;
 	for (i = 0; i < s->Nsec; ++i) {
 		if (fpi) {
-			j = fread(Buffer, 1, size, fpi);
+			j = (unsigned)fread(Buffer, 1, size, fpi);
 			if (size != j) {
 				memset(Buffer + j, Fill, size - j);
 				printf("Input file is smaller than output image (ends at CHS %u/%u/%u)\n", Cylinder, head, i);
@@ -466,13 +466,12 @@ unsigned char help[] = { "Copyright 2005-" CYEAR " Dave Dunfield - All rights re
  */
 main(int argc, char *argv[])
 {
-	unsigned i;
 
 	fputs("BINary-2-IMageDisk " VERSION " / " __DATE__ "\n", stdout);
 
 	Side0.Mode = Side1.Mode = 255;
 
-	for (i = 1; i < argc; ++i) {
+	for (int i = 1; i < argc; ++i) {
 		ptr = argv[i];
 		if (!option(0)) continue;		// Option was recognized
 		if (!*Ifile) {					// 1st file = input
