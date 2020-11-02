@@ -1,3 +1,25 @@
+/****************************************************************************
+ *  program: irepo - Intel Repository Tool                                  *
+ *  Copyright (C) 2020 Mark Ogden <mark.pm.ogden@btinternet.com>            *
+ *                                                                          *
+ *  This program is free software; you can redistribute it and/or           *
+ *  modify it under the terms of the GNU General Public License             *
+ *  as published by the Free Software Foundation; either version 2          *
+ *  of the License, or (at your option) any later version.                  *
+ *                                                                          *
+ *  This program is distributed in the hope that it will be useful,         *
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of          *
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the           *
+ *  GNU General Public License for more details.                            *
+ *                                                                          *
+ *  You should have received a copy of the GNU General Public License       *
+ *  along with this program; if not, write to the Free Software             *
+ *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,              *
+ *  MA  02110-1301, USA.                                                    *
+ *                                                                          *
+ ****************************************************************************/
+
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -58,7 +80,7 @@ void reIndexFile(const char *path, bool showAlt) {
 		fclose(fpin);
 		return;
 	}
-	sprintf(newtag, "# IN-%s", fname + 1);
+	sprintf(newtag, "# %s", fname + 1);
 
 	while (fgets(line, MAXLINE, fpin)) {
 		char *s;
@@ -70,6 +92,7 @@ void reIndexFile(const char *path, bool showAlt) {
 			while ((c = getc(fpin)) != '\n' && c != EOF)
 				;
 		}
+		trim(line);
 		if (state == FILES) {
 			if (line[0] == '#') {
 				if (strnicmp(line, "# also ^", 8) == 0)		// # also only count as single change (wiht recipe itself & any added #also
@@ -97,10 +120,16 @@ void reIndexFile(const char *path, bool showAlt) {
 			if (strnicmp(line, "Files:", 6) == 0)
 				state = FILES;
 		} else {
-			if (strncmp(line, "# @", 3) != 0 && strncmp(line, "# IN-", 5) != 0)
-				fprintf(stderr, "Warning: expected # @... or # NI-... for first line. Got %s\n", line);
-			changes += stricmp(line, newtag) != 0;
 			fprintf(fpout, "%s\n", newtag);
+			if (strcmp(line, newtag) != 0) {
+				changes++;
+				if (*line != '#')
+					fprintf(fpout, "%s\n", line);
+				else if (strncmp(line, newtag, 5) != 0) {
+					fprintf(stderr, "Warning keeping %s\n", line);
+					fprintf(fpout, "%s\n", line);
+				}
+			}
 			state = HEADER;
 		}
 	}
@@ -109,12 +138,15 @@ void reIndexFile(const char *path, bool showAlt) {
 	fclose(fpout);
 
 	if (changes += recipeChanged) {
-		printf("%s: %d Updates + %d Unresolved\n", fname, changes, unresolved);
+		printf("%s: %d Updates & %d files not in repository\n", fname, changes, unresolved);
 		unlink(path);
 		if (rename(tmpFile, path))
 			fprintf(stderr, "cannot rename %s to %s\n", tmpFile, path);
 	} else {
-		printf("%s: No Updates + %d Unresolved\n", fname, unresolved);
+		if (unresolved)
+			printf("%s: No Updates & %d files not in repository\n", fname, unresolved);
+		else
+			printf("%s: No Updates\n", fname);
 		unlink(tmpFile);
 	}
 		
@@ -123,7 +155,7 @@ void reIndexFile(const char *path, bool showAlt) {
 
 
 void usage() {
-	printf("Usage: refresh [options] file*\n"
+	printf("Usage: irepo [options] file*\n"
 		"Where options are:\n"
 		"   -h    show this help\n"
 		"   -v    show version information\n"

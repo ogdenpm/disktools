@@ -1,3 +1,25 @@
+/****************************************************************************
+ *  program: irepo - Intel Repository Tool                                  *
+ *  Copyright (C) 2020 Mark Ogden <mark.pm.ogden@btinternet.com>            *
+ *                                                                          *
+ *  This program is free software; you can redistribute it and/or           *
+ *  modify it under the terms of the GNU General Public License             *
+ *  as published by the Free Software Foundation; either version 2          *
+ *  of the License, or (at your option) any later version.                  *
+ *                                                                          *
+ *  This program is distributed in the hope that it will be useful,         *
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of          *
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the           *
+ *  GNU General Public License for more details.                            *
+ *                                                                          *
+ *  You should have received a copy of the GNU General Public License       *
+ *  along with this program; if not, write to the Free Software             *
+ *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,              *
+ *  MA  02110-1301, USA.                                                    *
+ *                                                                          *
+ ****************************************************************************/
+
+
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -81,7 +103,12 @@ bool isAlt(const char *loc, const char *iname) {
 
 }
 
+void trim(char *s) {
+	char *t = strchr(s, '\0') - 1;
 
+	while (t >= s && isblank(*t))
+		*t-- = 0;
+}
 
 // split the recipe line, return false it it doesn't contain enough fields
 bool parseRecipe(char *line, recipe_t *recipe) {
@@ -91,6 +118,7 @@ bool parseRecipe(char *line, recipe_t *recipe) {
 		recipe->inRepo = *recipe->loc == '^';
 		if (recipe->inRepo)
 			recipe->loc++;
+		trim(recipe->loc);
 		return true;
 	}
 	return false;
@@ -117,7 +145,7 @@ char *chkSpecial(recipe_t *r) {
 	static char *isisauto[] = { "ISIS.DIR", "ISIS.MAP", "ISIS.LAB", "ISIS.FRE", NULL };
 	for (int i = 0; special[i]; i++)
 		if (strcmp(r->loc, special[i]) == 0)
-			return special[i];
+			return r->loc;
 	for (int i = 0; isisauto[i]; i++)
 		if (stricmp(r->iname, isisauto[i]) == 0)
 			return "";
@@ -144,61 +172,56 @@ bool updateRecipe(recipe_t *r) {
 		}
 		return changed;
 	}
-
 	// fix up repo references
 	if (r->inRepo) {
 		const char *lp = getDbLoc(r->loc);
 		if (!lp) {
-			fprintf(stderr, "Warning (re)moved file: %s\n", r->loc);
+			fprintf(stderr, "Warning (re)moved file: ^%s\n", r->loc);
 			r->inRepo = false;
 			strcpy(r->loc, "*");		// force iname behaviour below
-		} else
-			r->loc = (char *)lp;		// safe
+		} else {
+			r->loc = (char *)lp;		// safe to cast
+			if (isValidPair(r->key, r->loc))
+				return false;			// no change
+			if (!keyExists(r->key)) {	// file exists and key invalid
+				r->key = getDbLocKey(r->loc);
+				return true;
+			}							// here we have conflict, in which case key wins
+			fprintf(stderr, "Warning invalid(key, loc) pair: %s, ^%s\n", r->key, r->loc);
+			r->inRepo = false;
+			strcpy(r->loc, "*");		// force iname behaviour below
+		}
 	}
-	if (*r->loc == '*') {				// old format allowed comment instead of name for errors
+	if (*r->loc == '*') {		// old format allowed comment instead of name for errors
 		strcpy(r->loc, r->iname);		// iname is upper case so copy to loc and convert to lowercase
 		strlwr(r->loc);
 		changed = true;
 	}
 
-	// if the file is in the repository then update the key if necessary
-	if (r->inRepo) {
-		KeyPtr key = getDbLocKey(r->loc);
-		if (strcmp(r->key, key) != 0) {
-			r->key = key;
-			changed = true;
-		}
-	} else if (isValidKey(r->key)) {				// if key looks valid see if name exists
-		const char *newloc;
-		r->inRepo = (newloc = findMatch(r->key, r->iname)) ||			// do we have an entry matching the isis name
-			(newloc = findMatch(r->key, r->altname = NULL));	// or any entry
-		if (r->inRepo) {
-			r->loc = (char *)newloc;				// safe
-			changed = true;
-		}
-	}
-
-	if (!r->inRepo) {								   // if not in repo and file exists use it information to override key
-		if (*r->loc == '*') {                          // old comment format, replace with name
-			r->loc = r->iname;
-			changed = true;
-		}
+	// at this point r->inRepo is false
+	if (!keyExists(r->key)) {
 		if (*r->key != '*') {							// don't update if recipe signalled error
 			static Key fileKey;							// so we can return an updated key
 			switch (getFileKey(r->loc, fileKey)) {
 			case -1:
-				r->key = "* file not found *";
 				fprintf(stderr, "Warning: no match to key: %s or location: %s\n", r->key, r->loc);
-				break;
+				r->key = "* file not found *";
+				return true;
 			case 0:
 				r->loc = "ZERO";
 				r->key = "";
-				break;
+				return true;
 			default:
 				changed |= strcmp(r->key, fileKey) != 0;
 				r->key = fileKey;
 			}
 		}
+	}
+	// check if we have a key, may have been allocated above
+	if (keyExists(r->key)) {
+		r->inRepo = (r->loc = findMatch(r->key, r->iname)) ||	// do we have an entry matching the isis name
+			(r->loc = findMatch(r->key, r->altname = NULL));	// no so use anyone
+		changed = true;
 	}
 	return changed;
 }
