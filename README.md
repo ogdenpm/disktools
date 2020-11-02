@@ -1,16 +1,21 @@
-# disktools
-These tools were originally part of the Intel80tools repository, however to simplify development they have been separated out into their own repository
+# Readme - disktools
+The tools here are ones I created  to manage disk images.
 
-The tools are
-* win32 ports of Dave Dunfield's utilities, specifically
-  * dmk2imd
-  * imdu
-  * td02imd
-* td02img a variant of td02imd that created .img files
-* flux2imd - used to convert KryoFlux image files in imd image files. Replaces idd2imd
-* unidsk - tool to decode an ISIS disk in imd or img format. Supports ISIS II (SD & DD) ISIS III, ISIS IV and some irmx
-* mkidsk - takes a recipe file describing an ISIS II (SD or DD) disk and creates a corresponding imd image
+They fall broadly into three categories
 
-Mark
+1. Win32 ports of some of Dave Dunfield's IMD tools, specifically
+   - imdu
+   - bin2imd
+   - dmk2imd
+   - td02imd
+   - td02img - a variant of td02imd that I created to create image files directly, options as per td02imd
+2. Tools to manage isis disks and my Intel repository
+   - unidsk - decodes an ISIS disk in IMD or IMG format. Supports ISIS I & II (SD & DD), ISIS PDS, ISIS IV and some iRMX
+   - mkidsk - takes a recipe file describing an ISIS I, ISIS II (SD or DD) or ISIS PDS disk and creates a corresponding IMD or IMG file
+   - irepo - this manages the Intel repository and can be used to identify files. It also supports updating recipe files.
+3. Specialist tool to work with KryoFlux files
+   - flux2imd - used to convert KryoFlux image files in IMD image files. Where IMD does not currently support the disk format, sector data is displayed  in hex format.
 
-8-Apr-2020
+```
+Updated by Mark Ogden 30-Oct-2020
+```

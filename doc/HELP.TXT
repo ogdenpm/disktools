@@ -1,0 +1,136 @@
+- I just tried to make a disk with ImageDisk and I am getting errors.
+- I just made this disk with ImageDisk, but it won't boot.
+
+Q: Whats wrong?
+
+A: Lots of things can go wrong (this is not an exact science).
+
+ImageDisk is a very powerful and flexible tool, however this capability
+comes at a price - you actually have to know a little bit about what
+you are doing to make effective use of the tool. I've put the information
+that you need to know in the ImageDisk documentation and help files, if
+you really want to make disks that work, take the time to read it and
+learn about the differences between floppy drives, data rates and the
+compatibility issues involved. This is the best and most complete
+answer to the above question.
+
+I've been getting more and more mail from people who have obviously
+"skipped" the documentation, tried to make disk which didn't work right
+away, so the next step that comes to their mind is to contact me.
+Please DO NOT ask me for help if you have not read the documentation!
+
+Here are the most common problems that people encounter, and the
+suggestions I have to offer:
+
+- Drive type does not match that in which the image was recorded.
+  Most commonly occuring with 5.25" drives.
+  IMDA will suggest drive types and settings which might be suitable.
+
+  Use IMDU to determine the data rate at which the image was recorded.
+
+  If the disk was recorded at 250kbps and you are attempting to write
+  with a HD (1.2M) drive, you MUST set the 250->300kbps data rate
+  translation (also, see documentation regarding other compatibility
+  problems).
+
+  If the disk was recorded at 300kbps and you are attempting to write
+  with a DD (360k) drive, you MUST set the 300->250kbps data rate
+  translation.
+
+  NOTE: I try to record images on the actual drive type that is used
+  in a particular system - so 5.25" DD images are recorded on a 5.25"
+  DD drive at 250kbps. Most PCs of AT or later vintage with a 5.15"
+  drive will have a 1.2M HD (300kbps) type and data rate translation
+  will have to be used to recreate those images.
+
+
+- PC is not capable of writing single-density.
+  Most PC floppy disk controllers are not capable of single-density
+  operation. Single-density formats have never been officially used
+  on the PC, and many manufacturers do not bother to include the
+  hardware necessary to support single-density operation.
+
+  Find another PC, or an add-in floppy card which does support
+  single-density operation.
+
+
+- Dirty heads / drive mechanics.
+  You finally got a disk image for your wunder-system from the 70's,
+  so you rooted around in your basement, and found an old DD drive
+  from an XT stuffed in under the bottom shelf. After blowing the bugs
+  and dust out of it, you connect it to your PC - and start making disks.
+  - Funny, they don't seem to be working.
+
+  Use good clean reliable drives - any drive thats been sitting for
+  "years" is likely to have collected dust and corrosion. This includes
+  the drives in your classic system! - Clean up the host drive(s) before
+  you try and make disks, and the system drive before you try and boot.
+  ImageDisk has plenty of features to help diagnose drive problems.
+
+
+- Marginal disk format.
+  The PC uses a fairly inflexible floppy disk controller chip, which
+  cannot handle data as close to the index pulse as the controllers
+  in some non-PC systems. These system may pack extra data onto the
+  disk (for example, 10x512byte sectors resulting in 400k disks).
+
+  Some PC controllers can handle this better than others.
+  You may also be able to create the disk by slowing the drive
+  down by 5-10rpm, allowing extra time for the data to be written
+  before the next index pulse occurs. See the ImageDisk notes.
+
+
+- Target system not working
+  Drives go bad, corrosion gets into sockets and connectors, and
+  the computer you are trying to boot may not be as reliable as
+  you think.
+
+  - Check to make sure the boot drive selects (light comes on) and
+    the motor/diskette spins when you try and boot the system. With
+    some drives, you may hear a click as the head loads. If this does
+    not happen, it's likely that your system isn't even running it's
+    boot program.
+
+  - With the power-off and diskette removed, try manually positioning
+    the drive head out to the inside position of it's travel. When you
+    power the system on and attempt to boot, you should see the head
+    retract to track-0 (on a few systems, it goes to the middle of
+    it's travel). If it does not move, makes funny/unexpected noises,
+    or appears to move erraticly, clean and lubricate the drive
+    positioner.
+
+  - If the above looks good, make sure you have the correct/proper
+    boot disk. To verify that the image was written correctly by
+    ImageDisk, try reading the newly written diskette into another
+    image file - then use IMDU to compare them, no differences in
+    the data area should be reported.
+
+  - Check your console connection - if it's integrated video, do
+    you have a blinking cursor on the screen. If it's a serial TTY
+    do you have it connected to the right port, and is it connected
+    properly. Use an RS-232 "light box" to confirm that RXD, TXD and
+    any control signals used are being correctly driven. Is the
+    terminal set to the right mode and baud rate.
+
+    - Most operating systems occupy more than one track of the boot
+      disk, so for MOST systems, when you boot, you will see the head
+      step out to the boot track, then it will step in one, two or
+      more tracks, usually pausing slightly on each one as it reads
+      the data from that track. On some systems, it will then seek
+      around the disk, reading system files, directory entries etc.
+      If you are seeing disk activity after the initial seek to the
+      boot track, this is a good sign that the system may be actually
+      booting.
+
+    - With the terminal disconnected, use a light-box, and note that
+      only ONE of RXD or TXD should be lit. Reconnect the terminal
+      and the other (RXD or TXD) should also light. Watch the light
+      that was on when only the computer was connected to see if it
+      flickers during the boot process - this indicates that messages
+      are being sent to the terminal - check the terminal settings
+      and connections to determine why you are not seeing them.
+
+    - If you don't see RXD/TXD activity, try all the other ports
+      on the system - perhaps the boot disk assigns the console to
+      a different port than you expected.
+
