@@ -1,7 +1,3 @@
-// This is an open source non-commercial project. Dear PVS-Studio, please check it.
-
-// PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
-
 /*
    miniz.c v1.15 - public domain deflate/inflate, zlib-subset, ZIP
    reading/writing/appending, PNG writing See "unlicense" statement at the end

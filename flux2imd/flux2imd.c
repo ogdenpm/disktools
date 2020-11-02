@@ -1,3 +1,25 @@
+/****************************************************************************
+ *  program: flux2imd - create imd image file from kryoflux file            *
+ *  Copyright (C) 2020 Mark Ogden <mark.pm.ogden@btinternet.com>            *
+ *                                                                          *
+ *  This program is free software; you can redistribute it and/or           *
+ *  modify it under the terms of the GNU General Public License             *
+ *  as published by the Free Software Foundation; either version 2          *
+ *  of the License, or (at your option) any later version.                  *
+ *                                                                          *
+ *  This program is distributed in the hope that it will be useful,         *
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of          *
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the           *
+ *  GNU General Public License for more details.                            *
+ *                                                                          *
+ *  You should have received a copy of the GNU General Public License       *
+ *  along with this program; if not, write to the Free Software             *
+ *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,              *
+ *  MA  02110-1301, USA.                                                    *
+ *                                                                          *
+ ****************************************************************************/
+
+
 // This is an open source non-commercial project. Dear PVS-Studio, please check it.
 
 // PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
@@ -172,17 +194,17 @@ static bool loadZipFile(struct zip_t *zip) {
 static _declspec(noreturn) void usage() {
     fprintf(stderr,
         "flux2imd - convert fluxfiles to imd format (c) Mark Ogden 15-Jul-2020\n\n"
-        "usage: analysis -v | -V | [-b] [-d[n]] [-f format] [-g] [-h[n]] [-p] [-s] [zipfile|rawfile]+\n"
+        "usage: flux2imd -v|-V | [-b] [-d[n]] [-f format] [-g] [-h[n]] [-p] [-s] [zipfile|rawfile]+\n"
         "options can be in any order before the first file name\n"
 //      "  -a encoding - undocumented option to help analyse new disk formats\n"
-        "  -v / -V show version information and exit. Must be only option\n"
-        "  -b will write bad (idam or data) sectors to the log file\n"
-        "  -d sets debug flags to n (n is in hex) default is 1 which echos log to console\n"
-        "  -f forces the specified format, use -f help for more info\n"
-        "  -g will write good (idam and data) sectors to the log file\n"
-        "  -h displays flux histogram. n is optional number of levels\n"
-        "  -p ignores parity bit in sector dump ascii display\n"
-        "  -s force writing of physical sector order in the log file\n"
+        "  -v|-V  show version information and exit. Must be only option\n"
+        "  -b     will write bad (idam or data) sectors to the log file\n"
+        "  -d     sets debug flags to n (n is in hex) default is 1 which echos log to console\n"
+        "  -f     forces the specified format, use -f help for more info\n"
+        "  -g     will write good (idam and data) sectors to the log file\n"
+        "  -h     displays flux histogram. n is optional number of levels\n"
+        "  -p     ignores parity bit in sector dump ascii display\n"
+        "  -s     force writing of physical sector order in the log file\n"
         "Note ZDS disks and rawfiles force -g as image files are not created\n"
 #ifdef _DEBUG
         "\nDebug options - add the hex values:\n"
