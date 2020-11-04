@@ -97,6 +97,9 @@ char *findMatch(const KeyPtr key, const char *iname) {
 
     char *candidate = NULL;
     int clen;
+    // for unidsk we name have a recovered file and the first char is #, skip this
+    if (iname && *iname == '#')
+        iname++;
 
     while (loc) {
         int cmp;
