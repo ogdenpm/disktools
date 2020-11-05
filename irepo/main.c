@@ -168,7 +168,7 @@ void usage() {
 		"         OS filename wildcard characters are supported\n"
 		"\n"
 		"NOTE: the environment variable IFILEREPO must be set to the location of the repository\n"
-		"where catalog.db and the directory trees intel80 and intel86 are located\n");
+		"where ncatalog.db and the directory trees intel80 and intel86 are located\n");
 }
 
 void printFileInfo(const char *fname, bool showKey) {
