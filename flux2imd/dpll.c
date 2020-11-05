@@ -35,7 +35,7 @@
 
 
 static uint32_t ctime, etime;       // clock time and end of cell time
-uint32_t nominalCellSize = 1; 
+static nominalCellSize = 1; 
 static uint32_t cellSize;           // width of a cell
 static int fCnt, aifCnt, adfCnt, pcCnt; // dpll paramaters
 static bool up; 
@@ -128,7 +128,6 @@ static uint8_t phaseAdjust[2][16] = {		// C1/C2, C3
     //  {13, 14, 14, 15, 15, 16, 16, 16, 16, 16, 16, 17, 17, 18, 18, 19}
 };
 
-#if 0
 int getBit() {
     int slot;
     int cstate = 1;			// default is IPC
@@ -176,7 +175,6 @@ int getBit() {
     pattern++;
     return 1;
 }
-#endif
 
 unsigned getBitCnt() {
     return getBitPos(nominalCellSize);
@@ -186,7 +184,6 @@ unsigned getByteCnt() {
     return getBitCnt() / 16;
 }
 
-#if 0
 bool retrain(int profile) {
     if (curFormat->encoding > E_M2FM8)
         logFull(D_FATAL, "For %s unknown encoding %d\n", curFormat->name, curFormat->encoding);
@@ -216,7 +213,6 @@ bool retrain(int profile) {
     adaptDpll();                        // trigger adapt start
     return true;
 }
-#endif
 
 
 
