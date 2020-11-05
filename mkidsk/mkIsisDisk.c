@@ -388,10 +388,10 @@ void ParseFiles(FILE *fp) {
                 fprintf(stderr, "%s - skipped because %s\n", line, path + 1);
             else if (strcmp(path, "DIR") == 0)
                 printf("%s - DIR listing not created\n", line);
-            else if (!hasSystem && (strcmp(isisName, "ISIS.BIN") == 0 || (strcmp(isisName, "ISIS.T0") == 0)))
+            else if (!hasSystem && (strcmp(isisName, "ISIS.BIN") == 0 || (strcmp(isisName, "ISIS.PDS") == 0)))
                 printf("%s not allowed for non system disk - skipping\n", isisName);
             else {
-                if (strcmp(isisName, "ISIS.BIN") == 0)
+                if (strcmp(isisName, "ISIS.BIN") == 0 || strcmp(isisName, "ISIS.PDS") == 0)
                     isisBinSeen = true;
                 else if (strcmp(isisName, "ISIS.T0") == 0)
                     isisT0Seen = true;
@@ -402,7 +402,7 @@ void ParseFiles(FILE *fp) {
     }
     if (hasSystem) {
         if (!isisBinSeen)
-            fprintf(stderr, "Error: system disk but ISIS.BIN not seen\n");
+            fprintf(stderr, "Error: system disk but ISIS.BIN / ISIS.PDS not seen\n");
         else if (!isisT0Seen)
             fprintf(stderr, "Warning: system disk but ISIS.T0 not seen, non system startup used\n");
     }
