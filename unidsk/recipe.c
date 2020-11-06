@@ -126,6 +126,7 @@ struct {
     "6zffO/tlxHVojxlqs2BQvu31814", "PDS 1.0",
     "kr87fI+DkuGXQec3i2IG7S+8usI", "PDS 1.1",
     "DJ5TiAs5F4yNGlp7fzUjT/k5Zsk", "TEST 1.0",
+    "KAlydjlWEQlAsNq8a4KYcyx0UZg", "TEST 1.0",      // same code different padding at end
     "7SzuQtZxju9XU/+ehbFOQ7W0tz8", "TEST 1.1",
     "yOeRj3n6yo8SYlu3Ne4L8Ci52BI", "OSIRIS 3.0",
     "JnbT/FfQLj4sVO/yJLIL8tyoGUU", "ISIS III(N) 2.0",
