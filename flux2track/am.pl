@@ -1,0 +1,24 @@
+sub showam {
+    my ($clock, $data) = @_;
+    my $pattern = 0;
+    my $pattern2 = 0;
+
+    for (my $mask = 0x8000; $mask; $mask >>= 1) {
+        $pattern = ($pattern << 1) + (($clock & $mask) ? 1 : 0);
+        $pattern = ($pattern << 1) + (($data & $mask) ? 1 : 0);
+        $pattern2 = ($pattern2 << 2) + (($clock & $mask) ? 2 : 0);
+        $pattern2 = ($pattern2 << 2) + (($data & $mask) ? 2 : 0);
+    }
+    printf("%X %X -> %X, %X\n", $clock, $data, $pattern, $pattern2);
+}
+
+showam(0xd7, 0xfc);
+showam(0xc7, 0xfe);
+showam(0xc7, 0xfb);
+showam(0xc7, 0xf8);
+
+showam(0x28, 0xfc); showam(0x38, 0xfe); showam(0x38, 0xfb); showam(0x38, 0xf8);
+showam(0x20, 0x0d); showam(0x20, 0x0a), showam(0x20, 0x0b); showam(0x20, 0x05);
+showam(0x01, 0xfc); showam(0x00, 0xfe); showam(0x00, 0xfb); showam(0x00, 0xf8);
+showam(0x30, 0x0c); showam(0x30, 0x0e); showam(0x30, 0x0b); showam(0x30, 0x08);
+showam(0x30, 0x0b); showam(0x30, 0x0e); showam(0x30, 0x0a); showam(0x30, 0x0f);

@@ -1,0 +1,1126 @@
+4pTAMNKma2O1rOWH2eu8+Q: Intel86/fort86.86_2.2/prog1b.ftn
+4pTAMNKma2O1rOWH2eu8+Q: Intel86/fort86.86_3.0/prog1b.ftn
+----
+dyjkXCmMM92GEAhLMplR7g: Intel80/utils_2.2/hexobj
+dyjkXCmMM92GEAhLMplR7g: Intel80/utils_2.2n/hexobj
+----
+qCu9BRkaRMuVDuVQnJXhzg: Intel86/irmx86/inc_6.0/ursiom.ext
+qCu9BRkaRMuVDuVQnJXhzg: Intel86/irmx86/nucleus_5.0/ursiom.ext
+----
+C57dB7CsJw2X++9BYV60TA: Intel86/irmx86/inc_6.0/isdlcn.ext
+C57dB7CsJw2X++9BYV60TA: Intel86/irmx86/nucleus_5.0/isdlcn.ext
+----
+vp3pocnPWMZSi28QAGZIWg: Intel86/irmx86/inc_6.0/nendln.ext
+vp3pocnPWMZSi28QAGZIWg: Intel86/irmx86/nucleus_5.0/nendln.ext
+----
+VBbRIQp5rVzNctSzSLJaig: Intel80/icu80_1.0/icu80.ov5
+VBbRIQp5rVzNctSzSLJaig: Intel80/irmx80_2.4/icu80.ov5
+----
+wJLjtFQmbE+Sye0b95eM2Q: Intel80/aedit_1.0/vt100.mac~1
+wJLjtFQmbE+Sye0b95eM2Q: Intel86/pscope.86_1.1/vt100.crt
+----
+NTZpWoSv7mw96YjR4luFnw: Intel86/irmx86/inc_6.0/hgtpar.ext
+NTZpWoSv7mw96YjR4luFnw: Intel86/irmx86/nucleus_5.0/hgtpar.ext
+----
+W74wk0RRGM5jDjZVPEN0dw: Intel80/irmx80_2.4/thdini.ext
+W74wk0RRGM5jDjZVPEN0dw: Intel80/irmx80_4.0/thdini.ext
+----
+21CVls5SHQXzp3bwqxWbKg: Intel86/irmx86/inc_6.0/nrsint.ext
+21CVls5SHQXzp3bwqxWbKg: Intel86/irmx86/nucleus_5.0/nrsint.ext
+----
+HqET2No04kXDtmhdHmyWxA: Intel86/irmx86/patchutility_2.1/ptch86.86
+zcGEj9WN4RAmId+g8HU3Fw: Intel86/irmx86/patchutility_2.1/ptch86.r86
+----
+24U0Pb5xjab2FkBK/GLPcQ: Intel80/irmx80_2.4/scanin.pex
+24U0Pb5xjab2FkBK/GLPcQ: Intel80/irmx80_4.0/scanin.pex
+----
+TW6/WAhfEsnLvRNwVeGHmQ: Intel86/irmx86/bootstraploader_4.0/b215.inc
+TW6/WAhfEsnLvRNwVeGHmQ: Intel86/irmx86/bootstraploader_6.0/b215.inc
+----
+mt8FCroASIDfsZ/bE13A7Q: Intel86/asm86.86_2.0/small.lib
+mt8FCroASIDfsZ/bE13A7Q: Intel86/irmx86/lib_6.0/small.lib
+FLczA3sqa22PjiBhw2167w: Intel86/irmx86/nucleus_5.0/small.lib
+----
+DhafZs0+X9/aW6/CXMlDEA: Intel80/ftrans_1.0/dcsktx
+DhafZs0+X9/aW6/CXMlDEA: Intel80/usercode_8048.51/dcsktx
+----
+oI6O+qjTZs2O48wqY1VjVw: Intel86/irmx86/inc_6.0/nrstsk.ext
+oI6O+qjTZs2O48wqY1VjVw: Intel86/irmx86/nucleus_5.0/nrstsk.ext
+----
+n5ppZuY+NVW7mHyRKmWVpg: Intel86/fort86.86_2.2/prog4.ftn
+n5ppZuY+NVW7mHyRKmWVpg: Intel86/fort86.86_3.0/prog4.ftn
+----
+Ea+Bqj5arWe7I+KJGpimYg: Intel86/asm86.86_2.0/compac.lib
+Ea+Bqj5arWe7I+KJGpimYg: Intel86/irmx86/lib_6.0/compac.lib
+oeZnAMAtMgt1ahoW2wN9NA: Intel86/irmx86/nucleus_5.0/compac.lib
+----
+UCrUpqrO3noC54mecQCuyg: Intel86/irmx86/inc_6.0/iachac.ext
+UCrUpqrO3noC54mecQCuyg: Intel86/irmx86/nucleus_5.0/iachac.ext
+----
+nhq2SemOpnsf7BTUZ6QPog: Intel86/irmx86/inc_6.0/utrpex.ext
+nhq2SemOpnsf7BTUZ6QPog: Intel86/irmx86/nucleus_5.0/utrpex.ext
+----
+okuvzAsZUmt+122TB2TsLA: Intel80/irmx80_2.4/demo.plm
+okuvzAsZUmt+122TB2TsLA: Intel80/irmx80_4.0/demo.plm
+----
+O/bkc2QDNJ/Vf1Fx5VcMCQ: Intel80/osiris_3.0/ren
+O/bkc2QDNJ/Vf1Fx5VcMCQ: Intel80/isis_4.3/rename
+----
+nrP2bxYBnX7+U/pVIsfwIQ: Intel86/irmx86/inc_6.0/hgtopn.ext
+nrP2bxYBnX7+U/pVIsfwIQ: Intel86/irmx86/nucleus_5.0/hgtopn.ext
+----
+Sj342h/54/f+oTQWSeGPQw: Intel80/irmx80_2.4/intrpt.ext
+Sj342h/54/f+oTQWSeGPQw: Intel80/irmx80_4.0/intrpt.ext
+----
+Fn6ZT7z+MAi7ETuizDEHtg: Intel86/irmx86/inc_6.0/isctcn.ext
+Fn6ZT7z+MAi7ETuizDEHtg: Intel86/irmx86/nucleus_5.0/isctcn.ext
+----
+bl7JMV1jDGSnRiQhzQaTvQ: Intel80/usercode_8085/usbdir.bak
+bl7JMV1jDGSnRiQhzQaTvQ: Intel80/usercode_8085/udir.txt
+----
+keox0sDAAyV3yKqGs4m7Cw: Intel86/irmx86/inc_6.0/uatach.ext
+keox0sDAAyV3yKqGs4m7Cw: Intel86/irmx86/nucleus_5.0/uatach.ext
+----
+GN/3bx/tU525zQlKV4n8rQ: Intel86/irmx86/inc_6.0/iacrfl.ext
+GN/3bx/tU525zQlKV4n8rQ: Intel86/irmx86/nucleus_5.0/iacrfl.ext
+----
+EuOE1ke1HA0vTaQ57uPi4A: Intel80/icu80_1.0/icu80
+EuOE1ke1HA0vTaQ57uPi4A: Intel80/irmx80_2.4/icu80
+----
+YZ5bQ8/UfGEBSw6F0y6TKA: Intel80/usercode_8048.51/jerry.bak
+YZ5bQ8/UfGEBSw6F0y6TKA: Intel80/usercode_8048.51/jerry.a51
+----
+bPjvJhzzi4plJMQmDXrBIQ: Intel80/plm80_3.1/plm80.ov5
+bPjvJhzzi4plJMQmDXrBIQ: Intel80/plm80_4.0/plm80.ov5
+----
+Hl80CwgD1YQgPsPoKjGLvg: Intel80/irmx80_2.4/objman.ext
+Hl80CwgD1YQgPsPoKjGLvg: Intel80/irmx80_4.0/objman.ext
+----
+vSGRJ1w2w2ECXe4xEmIOGw: Intel86/irmx86/inc_6.0/hgtocn.ext
+vSGRJ1w2w2ECXe4xEmIOGw: Intel86/irmx86/nucleus_5.0/hgtocn.ext
+----
+UmVxBB1tBeoMx7z9eYRdFA: Intel80/aedit_1.0/view3a.mac
+UmVxBB1tBeoMx7z9eYRdFA: Intel80/aedit_2.0/view3a.mac
+----
+fir1cABhoU26Z4OPQjilkA: Intel86/irmx86/inc_6.0/nrcmes.ext
+fir1cABhoU26Z4OPQjilkA: Intel86/irmx86/nucleus_5.0/nrcmes.ext
+----
+RpITkaYuCSLIlO5gh5KwRw: Intel86/irmx86/inc_6.0/iswrmv.ext
+RpITkaYuCSLIlO5gh5KwRw: Intel86/irmx86/nucleus_5.0/iswrmv.ext
+----
+Z54hVU/Q9jgq78tYZh24vw: Intel80/aedit_1.0/vt52.mac~1
+Z54hVU/Q9jgq78tYZh24vw: Intel86/pscope.86_1.1/vt52.crt
+----
+/X5EWMvQmdR1evaZFv6JKw: Intel86/fort86.86_2.2/eh87.lib
+/X5EWMvQmdR1evaZFv6JKw: Intel86/pasc86.86_3.0/eh87.lib
+----
+NO7cY4mK8SHbJhy1EuMTUg: Intel80/icu80_1.0/icu80.ov2
+NO7cY4mK8SHbJhy1EuMTUg: Intel80/irmx80_2.4/icu80.ov2
+----
+JR+SnSNFDL2Z0ZdH7hw4mA: Intel86/irmx86/inc_6.0/ugtsid.ext
+JR+SnSNFDL2Z0ZdH7hw4mA: Intel86/irmx86/nucleus_5.0/ugtsid.ext
+----
+LVb9iHpBO9InOS6oeWx6rw: Intel86/irmx86/inc_6.0/hgtipn.ext
+LVb9iHpBO9InOS6oeWx6rw: Intel86/irmx86/nucleus_5.0/hgtipn.ext
+----
+e3DACW4ulduaMfcvxjfoNw: Intel86/fort86.86_2.2/8087.lib
+e3DACW4ulduaMfcvxjfoNw: Intel86/pasc86.86_3.0/8087.lib
+----
+Tlk5V3yFwGvoP66aTRw2gg: Intel86/fort86.86_2.2/prog1c.ftn
+Tlk5V3yFwGvoP66aTRw2gg: Intel86/fort86.86_3.0/prog1c.ftn
+----
+z2j9u6qBHLMyiaphCiUn0w: Intel86/irmx86/inc_6.0/iaseek.ext
+z2j9u6qBHLMyiaphCiUn0w: Intel86/irmx86/nucleus_5.0/iaseek.ext
+----
++Dv+ChS+t6UGCF/F9vAqfQ: Intel80/isis_4.1/upm.ov2
++Dv+ChS+t6UGCF/F9vAqfQ: Intel80/upm_3.1/upm.ov2
+----
+qBJOeIJZuUsHjP92w3B8sQ: Intel86/irmx86/inc_6.0/isatfl.ext
+qBJOeIJZuUsHjP92w3B8sQ: Intel86/irmx86/nucleus_5.0/isatfl.ext
+----
+G/EpnvIL30mWNhjPvlkwuQ: Intel86/irmx86/inc_6.0/iupdat.ext
+G/EpnvIL30mWNhjPvlkwuQ: Intel86/irmx86/nucleus_5.0/iupdat.ext
+----
+XJdwGEoIp01wYdMxc1abcQ: Intel86/irmx86/inc_6.0/nstint.ext
+XJdwGEoIp01wYdMxc1abcQ: Intel86/irmx86/nucleus_5.0/nstint.ext
+----
+rmClD//7LoM7b4Lfze47OA: Intel86/irmx86/inc_6.0/iagtfs.ext
+rmClD//7LoM7b4Lfze47OA: Intel86/irmx86/nucleus_5.0/iagtfs.ext
+----
+8TSDtf3RuUm9hSntFSYENQ: Intel86/toolbox.86_1.1/xref.86
+wayJbND5/BPQ1ASCN7KkHg: Intel86/toolbox.86_1.1/xref80.86
+----
+zWXs7sDYGG/NlWS12WHhxQ: Intel86/irmx86/inc_6.0/hsncmd.ext
+zWXs7sDYGG/NlWS12WHhxQ: Intel86/irmx86/nucleus_5.0/hsncmd.ext
+----
+G42EPMNJLkfGbBt7IkZ7Sw: Intel86/irmx86/inc_6.0/ugtexh.ext
+G42EPMNJLkfGbBt7IkZ7Sw: Intel86/irmx86/nucleus_5.0/ugtexh.ext
+----
+oYqwx5k6bV9XGCCs2pGm+g: Intel86/irmx86/inc_6.0/iscrdr.ext
+oYqwx5k6bV9XGCCs2pGm+g: Intel86/irmx86/nucleus_5.0/iscrdr.ext
+----
+i5oJKCNA+9850RbeQthmaA: Intel86/irmx86/inc_6.0/ndltsk.ext
+i5oJKCNA+9850RbeQthmaA: Intel86/irmx86/nucleus_5.0/ndltsk.ext
+----
+NNffP65nGcaxEt/DcI4TOg: Intel80/toolbox_1.0/cusp6.lib
+NNffP65nGcaxEt/DcI4TOg: Intel80/toolbox_2.0/cusp6.lib
+----
+mNldnh5HZ1grjiv3bJtqxw: Intel80/ice86_1.2/diag86.ov1
+zPi04FD0Gr79/u+vVPivHA: Intel80/ice86_2.0/diag86.ov1
+----
+DINk2TPp+Qe6PHsayHtjQA: Intel86/irmx86/inc_6.0/ngtpri.ext
+DINk2TPp+Qe6PHsayHtjQA: Intel86/irmx86/nucleus_5.0/ngtpri.ext
+----
+NLA3avQBXEtJApyKBl0R9A: Intel80/isis_4.1/upm.ov1
+NLA3avQBXEtJApyKBl0R9A: Intel80/upm_3.1/upm.ov1
+----
+gmYFdmqOOb8tAD52VA2ahQ: Intel86/irmx86/inc_6.0/ischac.ext
+gmYFdmqOOb8tAD52VA2ahQ: Intel86/irmx86/nucleus_5.0/ischac.ext
+----
+KdVMGx5+/78wfhIZvM6ddA: Intel86/irmx86/inc_6.0/nincmp.ext
+KdVMGx5+/78wfhIZvM6ddA: Intel86/irmx86/nucleus_5.0/nincmp.ext
+----
++TQ4F6hO+0Vnsc5SRKxnlw: Intel86/irmx86/inc_6.0/istusr.ext
++TQ4F6hO+0Vnsc5SRKxnlw: Intel86/irmx86/nucleus_5.0/istusr.ext
+----
+n7tdoWaB2J8h2pYxpiR04A: Intel80/immx800_3.0/r18030.lib
+yLlvMe/yYq/2K3dY0PDplQ: Intel80/immx800_3.0/r18024.lib
+----
+nAxOrO3hnGf0lr8MyjQLgg: Intel80/irmx80_2.4/tsk830.lib
+nAxOrO3hnGf0lr8MyjQLgg: Intel80/irmx80_4.0/tsk830.lib
+----
+GlI4Ie9CtwnGFZ7tt7H13A: Intel80/irmx80_2.4/ied.elt
+GlI4Ie9CtwnGFZ7tt7H13A: Intel80/irmx80_4.0/ied.elt
+----
+Rrs2GUE4QJCjV84bW5e8LQ: Intel86/irmx86/inc_6.0/hfmtex.ext
+Rrs2GUE4QJCjV84bW5e8LQ: Intel86/irmx86/nucleus_5.0/hfmtex.ext
+----
+81wcFXYR68Qxnrs9mtIpMQ: Intel80/irmx80_2.4/intrpt.elt
+81wcFXYR68Qxnrs9mtIpMQ: Intel80/irmx80_4.0/intrpt.elt
+----
+E0yymf3Vau9SmU0HTZz7vg: Intel86/fort86.86_2.2/e8087.lib
+E0yymf3Vau9SmU0HTZz7vg: Intel86/fort86.86_3.0/e8087.lib
+E0yymf3Vau9SmU0HTZz7vg: Intel86/pasc86.86_3.0/e8087.lib
+E0yymf3Vau9SmU0HTZz7vg: Intel86/pasc86.86_3.1/e8087.lib
+----
+V4CIqMKsk8iw9XQ1L1eJkg: Intel86/irmx86/inc_6.0/uovly.ext
+V4CIqMKsk8iw9XQ1L1eJkg: Intel86/irmx86/nucleus_5.0/uovly.ext
+----
+C/g/QkwfOIQH9sSJKTmFZg: Intel80/osiris_3.0/lib/clref.obj
+Hw5Mxon8zHnQ6AWgdZNGEA: Intel80/osiris_3.0/lib/setef.obj
+----
+5ve2p5Ox6ycq5Gnhfv8tLQ: Intel80/irmx80_2.4/synch.ext
+5ve2p5Ox6ycq5Gnhfv8tLQ: Intel80/irmx80_4.0/synch.ext
+----
+H+kQ+aqyAe5cgXKf3qcZVA: Intel86/irmx86/inc_6.0/ngtpat.ext
+H+kQ+aqyAe5cgXKf3qcZVA: Intel86/irmx86/nucleus_5.0/ngtpat.ext
+----
+iqf2SywLuGYs0rKVm6NY3A: Intel80/misc_x.y/usb
+iqf2SywLuGYs0rKVm6NY3A: Intel80/usercode_8085/usb
+----
+0+yIINsUDV0TUOHIzzltkA: Intel86/irmx86/inc_6.0/igtusr.ext
+0+yIINsUDV0TUOHIzzltkA: Intel86/irmx86/nucleus_5.0/igtusr.ext
+----
+/+RJXMD850gF80RTSFt8ZQ: Intel80/ftrans_1.0/faxdet.asm
+/+RJXMD850gF80RTSFt8ZQ: Intel80/usercode_8048.51/faxdet.asm
+----
+Sklusea9njgWmk1+DAYt+A: Intel86/irmx86/inc_6.0/nsgex.ext
+Sklusea9njgWmk1+DAYt+A: Intel86/irmx86/nucleus_5.0/nsgex.ext
+----
+AF3nwABPhm77s+ouuI0Smg: Intel86/irmx86/inc_6.0/ilatdv.ext
+AF3nwABPhm77s+ouuI0Smg: Intel86/irmx86/nucleus_5.0/ilatdv.ext
+----
+0ccdHvaWyt75QZ5CZYw3nw: Intel86/irmx86/terminalhandler_3.1/mth.031
+0ccdHvaWyt75QZ5CZYw3nw: Intel86/irmx86/terminalhandler_3.1/mth.031~1
+----
+dZf73iCuwahNyhJU1KTQmw: Intel80/insite/aa16/aa16.bak
+dZf73iCuwahNyhJU1KTQmw: Intel80/insite/aa16/aa16.src
+----
+lMwYGCPzmshcL55pvwFMFg: Intel80/junk/p80wrk.tmp
+lMwYGCPzmshcL55pvwFMFg: Intel80/junk (1)/p80wrk.tmp
+----
+gyhIg9DAFtSKHvMxOhIgkg: Intel86/irmx86/inc_6.0/hgticn.ext
+gyhIg9DAFtSKHvMxOhIgkg: Intel86/irmx86/nucleus_5.0/hgticn.ext
+----
+//iYhHu5GSzeoADuii+46g: Intel86/irmx86/inc_6.0/ngtsiz.ext
+//iYhHu5GSzeoADuii+46g: Intel86/irmx86/nucleus_5.0/ngtsiz.ext
+----
+5yHcghFsZTu4NxybvObvng: Intel80/isis_4.2w/fixmap
+f5SAPXFddTNgPU4Zl4WxFw: Intel80/isis_4.3w/fixmap
+----
+o4ucU9r1T9XkP2V6zwEoVg: Intel86/irmx86/inc_6.0/isuncn.ext
+o4ucU9r1T9XkP2V6zwEoVg: Intel86/irmx86/nucleus_5.0/isuncn.ext
+----
+Gi75Biv20/9gq7VWzUE3fg: Intel86/irmx86/inc_6.0/iaread.ext
+Gi75Biv20/9gq7VWzUE3fg: Intel86/irmx86/nucleus_5.0/iaread.ext
+----
+9DzNAaIVSN169ThC9QzLoA: Intel86/irmx86/inc_6.0/istpfx.ext
+9DzNAaIVSN169ThC9QzLoA: Intel86/irmx86/nucleus_5.0/istpfx.ext
+----
+jztg+sMoZy18R9x8uu43fg: Intel80/pds_1.0/conpds
+jztg+sMoZy18R9x8uu43fg: Intel80/pds_1.1/conpds
+----
+HmydtHjNAuaf+oEjD2yiJA: Intel80/irmx80_2.4/get.plm
+HmydtHjNAuaf+oEjD2yiJA: Intel80/irmx80_4.0/get.plm
+----
+J8I8DfMBJtZGOzYDydua3A: Intel86/irmx86/inc_6.0/nsnmes.ext
+J8I8DfMBJtZGOzYDydua3A: Intel86/irmx86/nucleus_5.0/nsnmes.ext
+----
+Q98Q25HruSt00ThtWHglCw: Intel80/irmx80_2.4/dblank.pex
+Q98Q25HruSt00ThtWHglCw: Intel80/irmx80_4.0/dblank.pex
+----
+7j2s6SB1exbj4W9skN5J1w: Intel80/irmx80_2.4/cli.ext
+7j2s6SB1exbj4W9skN5J1w: Intel80/irmx80_4.0/cli.ext
+----
+Ig1I1pHvHJm9hgYErQq7YQ: Intel80/irmx80_2.4/numout.pex
+Ig1I1pHvHJm9hgYErQq7YQ: Intel80/irmx80_4.0/numout.pex
+----
+vxyjNWQe/P6so+9xq+cCSA: Intel80/ftrans_1.0/exsktx
+vxyjNWQe/P6so+9xq+cCSA: Intel80/usercode_8048.51/exsktx
+----
+uOIVLnSTJc689l850r1gxA: Intel86/irmx86/inc_6.0/ngttok.ext
+uOIVLnSTJc689l850r1gxA: Intel86/irmx86/nucleus_5.0/ngttok.ext
+----
+9xXG1Ff+nhpIN/5G5fU32Q: Intel86/irmx86/inc_6.0/uflinf.ext
+9xXG1Ff+nhpIN/5G5fU32Q: Intel86/irmx86/nucleus_5.0/uflinf.ext
+----
++ofz1LZWukjRvu3iPu5shA: Intel86/irmx86/inc_6.0/isgtfs.ext
++ofz1LZWukjRvu3iPu5shA: Intel86/irmx86/nucleus_5.0/isgtfs.ext
+----
+gw9jFtTsDwl0m1vSW/XkoA: Intel80/irmx80_2.4/adb830.lib
+gw9jFtTsDwl0m1vSW/XkoA: Intel80/irmx80_4.0/adb830.lib
+----
+hCdhbhec2M5YeD5BzOPEVQ: Intel86/irmx86/inc_6.0/iasted.ext
+hCdhbhec2M5YeD5BzOPEVQ: Intel86/irmx86/nucleus_5.0/iasted.ext
+----
+Dpuc1AaLBWvM0QmNKAOO8Q: Intel80/asm48_2.0/asxref
+Dpuc1AaLBWvM0QmNKAOO8Q: Intel80/asm80_2.0/asxref
+----
+9aL8oRqdX5qMj5LreTjQqg: Intel86/irmx86/inc_6.0/ufree.ext
+9aL8oRqdX5qMj5LreTjQqg: Intel86/irmx86/nucleus_5.0/ufree.ext
+----
+pnZDhzBlPSpVsQadBRR1+Q: Intel86/fort86.86_2.2/prog5.ftn
+pnZDhzBlPSpVsQadBRR1+Q: Intel86/fort86.86_3.0/prog5.ftn
+----
+bWcESBQISRcBTyLfkunJmA: Intel80/plm80_4.0/common.lit
+bWcESBQISRcBTyLfkunJmA: Intel80/remote_1.8/common.lit
+----
+rGHeEnqlvAi1LvuF8vUh3w: Intel86/irmx86/inc_6.0/nenint.ext
+rGHeEnqlvAi1LvuF8vUh3w: Intel86/irmx86/nucleus_5.0/nenint.ext
+----
+qEnCRa28r1aEiIlWO5O/uQ: Intel80/usercode_8085/baud24.obj
+GN2Ux37Y82EJcXW8s7RNlQ: Intel80/usercode_8085/baud96.obj
+----
+EaF7O0jmNxx+qbqrpGe20A: Intel80/isis_4.2w/idisk
+f4YQERjCliFApjPiCkLxWA: Intel80/isis_4.3w/idisk
+----
+WWuJX3akqPghznRmsiznSA: Intel86/irmx86/inc_6.0/nfrcdl.ext
+WWuJX3akqPghznRmsiznSA: Intel86/irmx86/nucleus_5.0/nfrcdl.ext
+----
+NB+w62njUH7MG/sYHzvbMw: Intel86/irmx86/inc_6.0/nexint.ext
+NB+w62njUH7MG/sYHzvbMw: Intel86/irmx86/nucleus_5.0/nexint.ext
+----
+qvwumCv83M3gNu9y2l+oFA: Intel80/isis_4.2w/delete
+5c63W74VDNJkJc5ZQ5Mh/Q: Intel80/isis_4.3w/delete
+----
+y+1D3IMFN5aqEMg3G2CkKg: Intel86/irmx86/nucleus_5.0/ctable.mac
+y+1D3IMFN5aqEMg3G2CkKg: Intel86/irmx86/nucleus_6.0/ctable.mac
+----
+qrm8lwI2fwI0OyTQqm3+wQ: Intel86/irmx86/inc_6.0/nstpri.ext
+qrm8lwI2fwI0OyTQqm3+wQ: Intel86/irmx86/nucleus_5.0/nstpri.ext
+----
+139BqZAgia1VQm9r0LuPQQ: Intel80/toolbox_1.0/csort2.src
+139BqZAgia1VQm9r0LuPQQ: Intel80/toolbox_1.0/csort.src
+----
+fmOCP15QgmTXifiXUTGdDw: Intel86/irmx86/patchutility_2.1/patch.a86
+fmOCP15QgmTXifiXUTGdDw: Intel86/irmx86/patchutility_2.3/patch.a86
+----
+fBaK0GeP+OqovkPlGslOhg: Intel86/irmx86/nucleus_5.0/ntable.mac
+fBaK0GeP+OqovkPlGslOhg: Intel86/irmx86/nucleus_6.0/ntable.mac
+----
++O/8+9ptfES9IEcWmT4Utg: Intel80/irmx80_2.4/resume.ext
++O/8+9ptfES9IEcWmT4Utg: Intel80/irmx80_4.0/resume.ext
+----
+RxZrwR41iFMLUO7NnkT1xg: Intel86/irmx86/inc_6.0/iaatfl.ext
+RxZrwR41iFMLUO7NnkT1xg: Intel86/irmx86/nucleus_5.0/iaatfl.ext
+----
+NS3QmHbaPYcOYkZunB0FZA: Intel86/fort86.86_2.2/prog2.ftn
+NS3QmHbaPYcOYkZunB0FZA: Intel86/fort86.86_3.0/prog2.ftn
+----
+5kLauQaQMt/i3au+BG9unA: Intel86/irmx86/inc_6.0/uread.ext
+5kLauQaQMt/i3au+BG9unA: Intel86/irmx86/nucleus_5.0/uread.ext
+----
+4m35ZuAokykG9IhREsBeCg: Intel80/isis_4.2w/copy
+mqyE9RtQTRLvdICwlxMHqg: Intel80/isis_4.3w/copy
+----
+mmNLyyOaHE2WDyGANNOdfg: Intel86/irmx86/inc_6.0/ildtdv.ext
+mmNLyyOaHE2WDyGANNOdfg: Intel86/irmx86/nucleus_5.0/ildtdv.ext
+----
+7NCDFItLtzn/J+MuMqbGqA: Intel86/irmx86/inc_6.0/ngtlev.ext
+7NCDFItLtzn/J+MuMqbGqA: Intel86/irmx86/nucleus_5.0/ngtlev.ext
+----
+iuy7xYuZY0htKiod2QWh/A: Intel86/irmx86/inc_6.0/isspec.ext
+iuy7xYuZY0htKiod2QWh/A: Intel86/irmx86/nucleus_5.0/isspec.ext
+----
+tRecVqAqOAhaQ3XVFd6EuQ: Intel86/fort86.86_3.0/8087.lib
+tRecVqAqOAhaQ3XVFd6EuQ: Intel86/pasc86.86_3.1/8087.lib
+----
+G/hP6KyNzxF/a88pIKnUdg: Intel80/isis_4.2w/dir
+w36lThDzdw9nEWtcoLdJig: Intel80/isis_4.3w/dir
+----
+hTRyEfPU3aPaykcbLI0dcw: Intel86/irmx86/inc_6.0/uwrite.ext
+hTRyEfPU3aPaykcbLI0dcw: Intel86/irmx86/nucleus_5.0/uwrite.ext
+----
+A1FxbHoq5L5ZVH3LcNy4ng: Intel80/usercode_8085/uread.txt
+A1FxbHoq5L5ZVH3LcNy4ng: Intel80/usercode_8085/uget.txt
+----
+iozgA3GrRQS70Pp7ucKCDg: Intel80/toolbox_1.0/sys2.lib
+iozgA3GrRQS70Pp7ucKCDg: Intel80/toolbox_2.0/sys.lib
+----
+jxlBPaXMUgSJiCbri+uwXA: Intel80/irmx80_2.4/std.mac
+jxlBPaXMUgSJiCbri+uwXA: Intel80/irmx80_4.0/std.mac
+----
+1VeJ/3dot2l2R3ERPrjZkg: Intel86/irmx86/inc_6.0/uspecl.ext
+1VeJ/3dot2l2R3ERPrjZkg: Intel86/irmx86/nucleus_5.0/uspecl.ext
+----
+E3ujBkckOnkFQDv/2L9LpQ: Intel80/ice86_1.2/ice86.ove
+E3ujBkckOnkFQDv/2L9LpQ: Intel80/ice88_1.2/ice88.ove
+E3ujBkckOnkFQDv/2L9LpQ: Intel80/incomplete_x.y/ice88.ove
+E3ujBkckOnkFQDv/2L9LpQ: Intel80/ice8549_1.0/insert.err
+----
+vSfR5migesMRMlol81haIw: Intel80/irmx80_2.4/exch.elt
+vSfR5migesMRMlol81haIw: Intel80/irmx80_4.0/exch.elt
+----
+r74Zrog9CCr2kaAV9yie3g: Intel80/cobol80_1.0/aa
+c45SjshjSOAMB8V7ctOjBQ: Intel80/cobol80_1.0/a
+----
+xqUTpLMjhLeVZmFJ8Q+46w: Intel86/irmx86/inc_6.0/uexit.ext
+xqUTpLMjhLeVZmFJ8Q+46w: Intel86/irmx86/nucleus_5.0/uexit.ext
+----
+ojmBTExszetbXwgU0Iqn5A: Intel86/irmx86/inc_6.0/uopen.ext
+ojmBTExszetbXwgU0Iqn5A: Intel86/irmx86/nucleus_5.0/uopen.ext
+----
+zC+vobU4sKv/C3won9/uFg: Intel86/irmx86/inc_6.0/igttim.ext
+zC+vobU4sKv/C3won9/uFg: Intel86/irmx86/nucleus_5.0/igttim.ext
+----
+8470fgiRRZmb9VPWj2Pb1w: Intel86/irmx86/inc_6.0/isttim.ext
+8470fgiRRZmb9VPWj2Pb1w: Intel86/irmx86/nucleus_5.0/isttim.ext
+----
+P0IBH6wIUxr2EsRi25eOeA: Intel80/ice51_1.3/ice51.ovs
+P0IBH6wIUxr2EsRi25eOeA: Intel80/ice51_2.0/ice51.ovs
+----
+ndEGWrNw1inYr11xGJ2Jvw: Intel86/irmx86/inc_6.0/idlusr.ext
+ndEGWrNw1inYr11xGJ2Jvw: Intel86/irmx86/nucleus_5.0/idlusr.ext
+----
+5h+hg+sjZjiucRUiEb4Oxg: Intel80/link_1.3/link.ovl
+5h+hg+sjZjiucRUiEb4Oxg: Intel80/usercode_8085/link.ovl
+----
+1VtfKW6ZAWBX8HDH6sUJcA: Intel86/irmx86/inc_6.0/nsutsk.ext
+1VtfKW6ZAWBX8HDH6sUJcA: Intel86/irmx86/nucleus_5.0/nsutsk.ext
+----
+MX5mpTjIXjMFzfQVIMGsoA: Intel86/irmx86/inc_6.0/ngtexh.ext
+MX5mpTjIXjMFzfQVIMGsoA: Intel86/irmx86/nucleus_5.0/ngtexh.ext
+----
+3ep4SdOpcxEv+KZDPwchDg: Intel80/irmx80_2.4/static.elt
+3ep4SdOpcxEv+KZDPwchDg: Intel80/irmx80_4.0/static.elt
+----
++pgUk4u46xN2rPjriAtUgg: Intel80/pds_1.0/syspds.lib
+M8zcJaj6ufnJ+GTmw1fftg: Intel80/pds_1.1/syspds.lib
+----
+XXKr9Scl2g3zBlgwcYVMyg: Intel86/irmx86/inc_6.0/ngttyp.ext
+XXKr9Scl2g3zBlgwcYVMyg: Intel86/irmx86/nucleus_5.0/ngttyp.ext
+----
+Qa6PRxg9WYvBd/xbzq+f7A: Intel80/irmx80_2.4/msg.elt
+Qa6PRxg9WYvBd/xbzq+f7A: Intel80/irmx80_4.0/msg.elt
+----
+RpikIFFG/f4U4LpcZRQA/A: Intel80/misc_x.y/export
+RpikIFFG/f4U4LpcZRQA/A: Intel80/usercode_8085/export
+----
+LivW652bgqYv+hqVGSbGkQ: Intel86/irmx86/lib_6.0/small/dqspecial.obj
+Q2TzS9YUzlSmd1F2ic2l7Q: Intel86/irmx86/lib_6.0/small/dqoverlay.obj
+6guQgWU42lHp+6pGuY9smA: Intel86/irmx86/lib_6.0/small/dqgettime.obj
+----
+wQXOsDioo6yxkFgNOgENgQ: Intel86/irmx86/inc_6.0/udetac.ext
+wQXOsDioo6yxkFgNOgENgQ: Intel86/irmx86/nucleus_5.0/udetac.ext
+----
+USutR5yBRcXufxiDBrzRIQ: Intel86/irmx86/lib_6.0/small/dqfree.obj
+MknlPpwgtVXHYUNlm947pw: Intel86/irmx86/lib_6.0/small/dqopen.obj
+gGc8DqVmFHcZuln05Rsfhg: Intel86/irmx86/lib_6.0/small/dqseek.obj
+----
+9+wNHG1zBboXaIJfSnMRIg: Intel86/irmx86/inc_6.0/uchext.ext
+9+wNHG1zBboXaIJfSnMRIg: Intel86/irmx86/nucleus_5.0/uchext.ext
+----
+1ZAhiCRlGpSePFXD6vz0FQ: Intel80/toolbox_2.0/system.lib
+1ZAhiCRlGpSePFXD6vz0FQ: Intel80/utils_2.2/system.lib
+1ZAhiCRlGpSePFXD6vz0FQ: Intel80/utils_2.2n/system.lib
+----
+oK3ayMu+nn5F4q5KQBSevA: Intel86/irmx86/inc_6.0/iexioj.ext
+oK3ayMu+nn5F4q5KQBSevA: Intel86/irmx86/nucleus_5.0/iexioj.ext
+----
+E76xRFJxHK68rUfZN+2dVQ: Intel86/irmx86/inc_6.0/iaopen.ext
+E76xRFJxHK68rUfZN+2dVQ: Intel86/irmx86/nucleus_5.0/iaopen.ext
+----
+1B8W823SV8pOPMvxvbb1eg: Intel86/fort86.86_3.0/eh87.lib
+1B8W823SV8pOPMvxvbb1eg: Intel86/pasc86.86_3.1/eh87.lib
+----
+62TeBan26r2YqEN66XXtmQ: Intel80/irmx80_2.4/unrslv.lib
+62TeBan26r2YqEN66XXtmQ: Intel80/irmx80_4.0/unrslv.lib
+----
+xW2aT8oQyktQLwyA4zTEGQ: Intel86/irmx86/inc_6.0/nalcmp.ext
+xW2aT8oQyktQLwyA4zTEGQ: Intel86/irmx86/nucleus_5.0/nalcmp.ext
+----
+1g/tWMYQ6GXJtADlx68qpg: Intel86/irmx86/inc_6.0/nsnuni.ext
+1g/tWMYQ6GXJtADlx68qpg: Intel86/irmx86/nucleus_5.0/nsnuni.ext
+----
+b59BaPpT/a8gefQ2pgJ34A: Intel86/irmx86/inc_6.0/ltksel.lit
+b59BaPpT/a8gefQ2pgJ34A: Intel86/irmx86/nucleus_5.0/ltksel.lit
+----
+fel5OeyZVIZdAImuEKst/A: Intel80/icu80_1.0/icu80.ddf
+fel5OeyZVIZdAImuEKst/A: Intel80/irmx80_2.4/icu80.ddf
+----
+1oGdrhHlS3DBeanJhVu+Qg: Intel86/irmx86/inc_6.0/ndsdln.ext
+1oGdrhHlS3DBeanJhVu+Qg: Intel86/irmx86/nucleus_5.0/ndsdln.ext
+----
+r4mj0COJ2NihpJYcGn+6oA: Intel86/irmx86/inc_6.0/uclose.ext
+r4mj0COJ2NihpJYcGn+6oA: Intel86/irmx86/nucleus_5.0/uclose.ext
+----
+3DfxV2G/S4sbnN64+UdgPg: Intel86/irmx86/inc_6.0/udelet.ext
+3DfxV2G/S4sbnN64+UdgPg: Intel86/irmx86/nucleus_5.0/udelet.ext
+----
+qEi+FWYCyQbarZfssrf2Rw: Intel86/pscope.86_1.1/lear.crt
+qEi+FWYCyQbarZfssrf2Rw: Intel80/aedit_1.0/lear.mac
+----
+YEV0WaS3loHaOF2Zke51jA: Intel86/fort86.86_2.2/prog3.ftn
+YEV0WaS3loHaOF2Zke51jA: Intel86/fort86.86_3.0/prog3.ftn
+----
+JxjQyyHg+AKK8U2pcfMT1A: Intel80/toolbox_1.0/util2.lib
+JxjQyyHg+AKK8U2pcfMT1A: Intel80/toolbox_2.0/util.lib
+----
+P8mRxc4xtoAJ7BK5/16PYA: Intel86/irmx86/inc_6.0/ugtcs.ext
+P8mRxc4xtoAJ7BK5/16PYA: Intel86/irmx86/nucleus_5.0/ugtcs.ext
+----
+ZD4Rc/x0wcSsxr/29IZXug: Intel86/irmx86/inc_6.0/nstpmn.ext
+ZD4Rc/x0wcSsxr/29IZXug: Intel86/irmx86/nucleus_5.0/nstpmn.ext
+----
+kDgG5iTs5kNrsmYSoCywnQ: Intel86/irmx86/inc_6.0/igtpfx.ext
+kDgG5iTs5kNrsmYSoCywnQ: Intel86/irmx86/nucleus_5.0/igtpfx.ext
+----
+yL0oeqnIFTcrQQa+1RWEzg: Intel86/irmx86/inc_6.0/nenabl.ext
+yL0oeqnIFTcrQQa+1RWEzg: Intel86/irmx86/nucleus_5.0/nenabl.ext
+----
+JnVnth+zkDvNt77gOkH8Hg: Intel86/irmx86/inc_6.0/istrun.ext
+JnVnth+zkDvNt77gOkH8Hg: Intel86/irmx86/nucleus_5.0/istrun.ext
+----
+C45xX36pf1wW4IZFREhl1w: Intel86/irmx86/inc_6.0/iagtde.ext
+C45xX36pf1wW4IZFREhl1w: Intel86/irmx86/nucleus_5.0/iagtde.ext
+----
+MVYYBbf/x/0YckxkbZEVtQ: Intel86/irmx86/lib_6.0/small/dqgetargument.obj
+6AllYyjxit4CnKby1DliuA: Intel86/irmx86/lib_6.0/small/dqgetsystemid.obj
+----
+fIerqlF2tIKEba2QfmM7vA: Intel80/ice86_2.0/diag86.ov0
+bcV2XJZEsoWA9A0qjl080Q: Intel80/ice88_2.2/diag88.ov0
+----
+obGiDjGC3ttZHEqinSu+Hg: Intel86/irmx86/inc_6.0/nrcuni.ext
+obGiDjGC3ttZHEqinSu+Hg: Intel86/irmx86/nucleus_5.0/nrcuni.ext
+----
+SXO7hvo1xxh6SpBqc5hTWg: Intel80/icu80_1.0/icu80.ov1
+SXO7hvo1xxh6SpBqc5hTWg: Intel80/irmx80_2.4/icu80.ov1
+----
+OQW2do8/K0YTgLKj3U5Hgg: Intel86/irmx86/inc_6.0/hsneor.ext
+OQW2do8/K0YTgLKj3U5Hgg: Intel86/irmx86/nucleus_5.0/hsneor.ext
+----
+jQyd+ew9RsXHs809pXXQFw: Intel80/usercode_8085/import.txt
+jQyd+ew9RsXHs809pXXQFw: Intel80/usercode_8085/usb.txt
+----
+9+8tRLW3pDUu/LMzC/yKqQ: Intel86/irmx86/inc_6.0/iaclos.ext
+9+8tRLW3pDUu/LMzC/yKqQ: Intel86/irmx86/nucleus_5.0/iaclos.ext
+----
+H8GjZ2FDNDP4Z00rPDSOKw: Intel86/irmx86/inc_6.0/hcrccn.ext
+H8GjZ2FDNDP4Z00rPDSOKw: Intel86/irmx86/nucleus_5.0/hcrccn.ext
+----
+wtSirZEQRBFzS1ycJRbfuw: Intel80/irmx80_2.4/copy
+wtSirZEQRBFzS1ycJRbfuw: Intel80/irmx80_4.0/copy
+wtSirZEQRBFzS1ycJRbfuw: Intel80/isis_4.0/copy
+wtSirZEQRBFzS1ycJRbfuw: Intel80/misc_x.y/copy
+----
+EHboQrY4mw1ZozWCEi+fzA: Intel80/irmx80_2.4/plm80.lib
+EHboQrY4mw1ZozWCEi+fzA: Intel80/irmx80_4.0/plm80.lib
+EHboQrY4mw1ZozWCEi+fzA: Intel80/isis_4.2w/plm80.lib
+EHboQrY4mw1ZozWCEi+fzA: Intel80/plm80.lib/plm80.lib
+EHboQrY4mw1ZozWCEi+fzA: Intel80/plm80_3.0/plm80.lib
+EHboQrY4mw1ZozWCEi+fzA: Intel80/toolbox_2.0/plm80.lib
+----
+nJE1SmqTBdQ1XBR9CPqLBA: Intel86/irmx86/inc_6.0/nluobj.ext
+nJE1SmqTBdQ1XBR9CPqLBA: Intel86/irmx86/nucleus_5.0/nluobj.ext
+----
+Se+JulKrD8pTgtLRKmiXSg: Intel80/irmx80_2.4/gentd.mac
+Se+JulKrD8pTgtLRKmiXSg: Intel80/irmx80_4.0/gentd.mac
+----
+VixIwZiNtcFl8G8oXJfZZQ: Intel86/irmx86/inc_6.0/uchac.ext
+VixIwZiNtcFl8G8oXJfZZQ: Intel86/irmx86/nucleus_5.0/uchac.ext
+----
+ciRyfDVJL+PdAxF+/d1jwA: Intel80/ice86_1.2/ice86.ov7
+Ghnz1EOzamOgu6OpM4XpQQ: Intel80/incomplete_x.y/ice88.ov7
+----
+OZAZV0sZF1qOfgbrc/9q7g: Intel80/irmx80_2.4/dlexch.ext
+OZAZV0sZF1qOfgbrc/9q7g: Intel80/irmx80_4.0/dlexch.ext
+----
+ccSVhZWqQBD85NMu0QNDcw: Intel86/irmx86/inc_6.0/ncrreg.ext
+ccSVhZWqQBD85NMu0QNDcw: Intel86/irmx86/nucleus_5.0/ncrreg.ext
+----
+C0ZsMoGb50T5iO0OYAF3eg: Intel80/immx800_3.0/r5pmm.ext
+C0ZsMoGb50T5iO0OYAF3eg: Intel80/immx800_3.0/r3pmm.ext
+----
+uLl4txPhIh1Pyahd9HMi6w: Intel86/fort86.86_3.0/87null.lib
+uLl4txPhIh1Pyahd9HMi6w: Intel86/pasc86.86_3.1/87null.lib
+----
+Tt2y/tdBGrAbQ+uRi5Ng3A: Intel86/irmx86/lib_6.0/small/dqdelete.obj
+qBy++B80RZzPTsSZNYvpJQ: Intel86/irmx86/lib_6.0/small/dqwrite.obj
+Gv7+9GnmHFJXMpr5/C0HEA: Intel86/irmx86/lib_6.0/small/dqattach.obj
+3oLC0q0459YdxMFaPWhb3g: Intel86/irmx86/lib_6.0/small/dqcreate.obj
+MEstXy8qvJodqz3XilhHEQ: Intel86/irmx86/lib_6.0/small/dqtrapcc.obj
+----
+jw6n92DAm+WrU/Hx2WKR+Q: Intel86/irmx86/lib_6.0/small/dqallocate.obj
+zGFQK5Tfy9p+Uw72uuEZRQ: Intel86/irmx86/lib_6.0/small/dqtruncate.obj
+----
+qPcCCIVFSP4KuK7VqgKWoA: Intel86/irmx86/inc_6.0/lsovly.ext
+qPcCCIVFSP4KuK7VqgKWoA: Intel86/irmx86/nucleus_5.0/lsovly.ext
+----
+FcrtRoodAIRielbMxHIxEg: Intel86/fort86.86_2.2/rtnull.lib
+WnaahbxtAT8Zpnhe0d5Qrg: Intel86/pasc86.86_3.0/rtnull.lib
+WnaahbxtAT8Zpnhe0d5Qrg: Intel86/pasc86.86_3.1/rtnull.lib
+----
+gN5HC03wgbBUnxKQd0ZCnA: Intel86/irmx86/inc_6.0/nctobj.ext
+gN5HC03wgbBUnxKQd0ZCnA: Intel86/irmx86/nucleus_5.0/nctobj.ext
+----
+7iGkDDPmHR/L/GIz+vg+BA: Intel86/fort86.86_2.2/prog1a.ftn
+7iGkDDPmHR/L/GIz+vg+BA: Intel86/fort86.86_3.0/prog1a.ftn
+----
+rRvum/Z6a1ytgxQMpzEKBw: Intel86/irmx86/inc_6.0/isrdmv.ext
+rRvum/Z6a1ytgxQMpzEKBw: Intel86/irmx86/nucleus_5.0/isrdmv.ext
+----
+6qCt3tDB3lbcFxjjwJuThA: Intel80/isis_4.2w/submit
+Wb/fLE9dAewrXkEP5W5dzA: Intel80/isis_4.3w/submit
+----
+kkeuMSatHh9ijSTtp9ya2g: Intel86/irmx86/inc_6.0/nstexh.ext
+kkeuMSatHh9ijSTtp9ya2g: Intel86/irmx86/nucleus_5.0/nstexh.ext
+----
+MhI7akScpX2mLY5OV6HkuA: Intel86/irmx86/inc_6.0/udctim.ext
+MhI7akScpX2mLY5OV6HkuA: Intel86/irmx86/nucleus_5.0/udctim.ext
+----
+YCgrWpw0H9nm4WaGQkRL9w: Intel80/irmx80_2.4/thmsg.elt
+YCgrWpw0H9nm4WaGQkRL9w: Intel80/irmx80_4.0/thmsg.elt
+----
+FjTyz70QYwwd1AzGA+xEOA: Intel80/pasc80_2.0/p80ext.lib
+FjTyz70QYwwd1AzGA+xEOA: Intel80/pasc80_2.2/p80ext.lib
+----
+vBKUkiO9QpEXprdOd8fExQ: Intel86/irmx86/inc_6.0/isgtcs.ext
+vBKUkiO9QpEXprdOd8fExQ: Intel86/irmx86/nucleus_5.0/isgtcs.ext
+----
+RVuGqcOZpnCcVYTFv/jhsw: Intel80/plm80_3.1/plm80.ov6
+RVuGqcOZpnCcVYTFv/jhsw: Intel80/plm80_4.0/plm80.ov6
+----
+sIZnY7+V1DGfWj9Kearmbw: Intel86/fort86.86_2.2/e8087
+sIZnY7+V1DGfWj9Kearmbw: Intel86/fort86.86_3.0/e8087
+sIZnY7+V1DGfWj9Kearmbw: Intel86/pasc86.86_3.0/e8087
+sIZnY7+V1DGfWj9Kearmbw: Intel86/pasc86.86_3.1/e8087
+----
+9Nyqk8Efr8iWFReV45/JMA: Intel86/irmx86/inc_6.0/useek.ext
+9Nyqk8Efr8iWFReV45/JMA: Intel86/irmx86/nucleus_5.0/useek.ext
+----
+i2xb+4xWFFAKheLFNpoiXA: Intel86/irmx86/inc_6.0/hdlccn.ext
+i2xb+4xWFFAKheLFNpoiXA: Intel86/irmx86/nucleus_5.0/hdlccn.ext
+----
+bXrbNXqzqcQEuYX79ohfLw: Intel80/pds_1.0/pconf
+bXrbNXqzqcQEuYX79ohfLw: Intel80/pds_1.1/pconf
+----
+q1KXixgKlP7iz7RGS0XXeg: Intel80/pasc80_2.0/p80run.lib
+q1KXixgKlP7iz7RGS0XXeg: Intel80/pasc80_2.2/p80run.lib
+----
+NnSrEdW7hPTElZjeuOR7FA: Intel86/asm86.86_2.0/large.lib
+NnSrEdW7hPTElZjeuOR7FA: Intel86/irmx86/lib_6.0/large.lib
+wd+UQtvU5u3ATgedmxmj0g: Intel86/irmx86/nucleus_5.0/large.lib
+----
+324NU3YjR7n8ZeHB84bgfg: Intel80/irmx80_2.4/thi830.lib
+324NU3YjR7n8ZeHB84bgfg: Intel80/irmx80_4.0/thi830.lib
+----
+kciYk2XnufU88STwqufUrg: Intel86/irmx86/inc_6.0/nsgint.ext
+kciYk2XnufU88STwqufUrg: Intel86/irmx86/nucleus_5.0/nsgint.ext
+----
+0jAJ/cuyE4JDf1SyGFVbhg: Intel80/isis_4.2w/edit
+SxR7LHlwmnklTVu45B56LQ: Intel80/isis_4.3w/edit
+----
+GW9SCN+nlXhnrMjDD+pE3w: Intel86/irmx86/inc_6.0/hsncor.ext
+GW9SCN+nlXhnrMjDD+pE3w: Intel86/irmx86/nucleus_5.0/hsncor.ext
+----
+02gJg+SeHUeheqCtMWuDIA: Intel86/irmx86/inc_6.0/iwtio.ext
+02gJg+SeHUeheqCtMWuDIA: Intel86/irmx86/nucleus_5.0/iwtio.ext
+----
+60y+MD5wTGlOGTQ90DOLhA: Intel86/irmx86/inc_6.0/ndlsem.ext
+60y+MD5wTGlOGTQ90DOLhA: Intel86/irmx86/nucleus_5.0/ndlsem.ext
+----
+EychsqWn8m+kRsSXqZLsVg: Intel86/irmx86/inc_6.0/utrunc.ext
+EychsqWn8m+kRsSXqZLsVg: Intel86/irmx86/nucleus_5.0/utrunc.ext
+----
+FhYG1SasRPB/We/WvFGXaA: Intel86/irmx86/inc_6.0/nstosx.ext
+FhYG1SasRPB/We/WvFGXaA: Intel86/irmx86/nucleus_5.0/nstosx.ext
+----
+mKjCGXJzGeDBcRQDE1B4QA: Intel86/irmx86/inc_6.0/ncrext.ext
+mKjCGXJzGeDBcRQDE1B4QA: Intel86/irmx86/nucleus_5.0/ncrext.ext
+----
+ZBxraIS0oOM/8/gGvhexfg: Intel80/irmx80_2.4/demo.m80
+ZBxraIS0oOM/8/gGvhexfg: Intel80/irmx80_4.0/demo.m80
+----
+zLNdtycfhotCd2Uw+BHlXQ: Intel86/fort86.86_3.0/dcon87.lib
+zLNdtycfhotCd2Uw+BHlXQ: Intel86/pasc86.86_3.1/dcon87.lib
+----
+nkob3XehZ8hSd99nE0tu/Q: Intel86/irmx86/inc_6.0/islucn.ext
+nkob3XehZ8hSd99nE0tu/Q: Intel86/irmx86/nucleus_5.0/islucn.ext
+----
+4N23qJpi0twHj0JQGOKUXw: Intel80/ftrans_1.0/faxjak.asm
+4N23qJpi0twHj0JQGOKUXw: Intel80/usercode_8048.51/faxjak.asm
+----
+Bj7Lo2QGt5eFl7YY3kBLnA: Intel80/irmx80_2.4/pdb830.lib
+Bj7Lo2QGt5eFl7YY3kBLnA: Intel80/irmx80_4.0/pdb830.lib
+----
+aP+s/fQxqkDiEiHLBvmhXw: Intel80/ice88_1.2/v.csd
+aP+s/fQxqkDiEiHLBvmhXw: Intel80/ice88_1.2/i.csd
+----
+OmhJ2uR/54go4DDC2jIrfg: Intel86/irmx86/inc_6.0/ndlseg.ext
+OmhJ2uR/54go4DDC2jIrfg: Intel86/irmx86/nucleus_5.0/ndlseg.ext
+----
+RI2Ft2zbtlmAJtukPDB+dQ: Intel86/irmx86/inc_6.0/nsnctl.ext
+RI2Ft2zbtlmAJtukPDB+dQ: Intel86/irmx86/nucleus_5.0/nsnctl.ext
+----
+7gxvWcaAIKEpwKyHtjotSA: Intel80/toolbox_1.0/unixio.lib
+7gxvWcaAIKEpwKyHtjotSA: Intel80/toolbox_2.0/unixio.lib
+----
+D7cIu/KhZH/10biLsobyjg: Intel86/irmx86/inc_6.0/lslioj.ext
+D7cIu/KhZH/10biLsobyjg: Intel86/irmx86/nucleus_5.0/lslioj.ext
+----
+mGdjq5Ti6TrXxnRVmLf6gg: Intel86/irmx86/inc_6.0/ncrcmp.ext
+mGdjq5Ti6TrXxnRVmLf6gg: Intel86/irmx86/nucleus_5.0/ncrcmp.ext
+----
+M4hkAsKK7YaTTp0qKFrpuA: Intel86/irmx86/inc_6.0/iadlfl.ext
+M4hkAsKK7YaTTp0qKFrpuA: Intel86/irmx86/nucleus_5.0/iadlfl.ext
+----
+6Qc43afDmLz6JFVl5b2gUw: Intel80/isis_4.2w/objhex
+Nv23TU1Gh2ejFRMW3oK69g: Intel80/isis_4.3w/objhex
+----
+3ZGUey1fiuzYQ4Tj6LJkaw: Intel80/usercode_8085/baud96.bak
+3ZGUey1fiuzYQ4Tj6LJkaw: Intel80/usercode_8085/baud24.a85
+----
+6HtcwBwzOQlae+yeTk7I+Q: Intel80/irmx80_2.4/msgtyp.elt
+6HtcwBwzOQlae+yeTk7I+Q: Intel80/irmx80_4.0/msgtyp.elt
+----
+ZG2IdUjFvVjEEcZCEkhB+w: Intel86/irmx86/inc_6.0/ncrsem.ext
+ZG2IdUjFvVjEEcZCEkhB+w: Intel86/irmx86/nucleus_5.0/ncrsem.ext
+----
+zEPoF/mqExIOPXEBCKJEyw: Intel86/irmx86/inc_6.0/iagted.ext
+zEPoF/mqExIOPXEBCKJEyw: Intel86/irmx86/nucleus_5.0/iagted.ext
+----
+VIcs2oFq+xV2q4rO8Gh2hw: Intel86/irmx86/inc_6.0/ndljob.ext
+VIcs2oFq+xV2q4rO8Gh2hw: Intel86/irmx86/nucleus_5.0/ndljob.ext
+----
+QUUsrS3fPUKc1ztKWBJ1QA: Intel86/irmx86/inc_6.0/nucobj.ext
+QUUsrS3fPUKc1ztKWBJ1QA: Intel86/irmx86/nucleus_5.0/nucobj.ext
+----
+PdVawOvbH+sSy8lXDbwUhw: Intel86/irmx86/inc_6.0/ugttim.ext
+PdVawOvbH+sSy8lXDbwUhw: Intel86/irmx86/nucleus_5.0/ugttim.ext
+----
+QnrFf6A35jGTh2nZ2+iDEA: Intel80/pstfs_1.2/pstfs.ove
+QnrFf6A35jGTh2nZ2+iDEA: Intel80/stfs_1.1/stfs.ove
+QnrFf6A35jGTh2nZ2+iDEA: Intel80/stfs_1.3/stfs.ove
+QnrFf6A35jGTh2nZ2+iDEA: Intel80/confid_2.0/conf.ove
+QnrFf6A35jGTh2nZ2+iDEA: Intel80/ice86_1.2/conf.ove
+QnrFf6A35jGTh2nZ2+iDEA: Intel80/ice88_2.2/conf.ove
+QnrFf6A35jGTh2nZ2+iDEA: Intel80/pds_1.0/pconf.ove
+QnrFf6A35jGTh2nZ2+iDEA: Intel80/pds_1.1/pconf.ove
+----
+J4PfDDo3foEBXeSFgjoWEA: Intel86/irmx86/inc_6.0/nrcctl.ext
+J4PfDDo3foEBXeSFgjoWEA: Intel86/irmx86/nucleus_5.0/nrcctl.ext
+----
+aIGw3BckE3rMzz/Z547hZA: Intel80/ftrans_1.0/gen01.asm
+aIGw3BckE3rMzz/Z547hZA: Intel80/usercode_8048.51/gen01.asm
+----
+IjPi7eEWRf3Z37F9KN8sfA: Intel86/irmx86/inc_6.0/ucreat.ext
+IjPi7eEWRf3Z37F9KN8sfA: Intel86/irmx86/nucleus_5.0/ucreat.ext
+----
+/JWeE2PHVQD6VUEf2wbmDQ: Intel86/irmx86/icu86.86_1.0/icu86.86
+LBEaqRSFqCQ3hDEIG2V8SQ: Intel86/irmx86/icu86.86_1.0/icu86.r86
+----
+edlM1SAKCwb4K8upG62M6g: Intel86/irmx86/inc_6.0/ugtarg.ext
+edlM1SAKCwb4K8upG62M6g: Intel86/irmx86/nucleus_5.0/ugtarg.ext
+----
+kYIMe/GHS+TJwKzbHGkb7g: Intel86/irmx86/inc_6.0/nacctl.ext
+kYIMe/GHS+TJwKzbHGkb7g: Intel86/irmx86/nucleus_5.0/nacctl.ext
+----
+ic6OIbyY5wt2Cd/DNjXdsg: Intel80/isis_4.2w/format
+jo8mV8ic5xDnDmkAv20HeA: Intel80/isis_4.3w/format
+----
+f91XVEsfPKAhLIC5be3pzQ: Intel80/irmx80_2.4/rmx830.lib
+f91XVEsfPKAhLIC5be3pzQ: Intel80/irmx80_4.0/rmx830.lib
+----
+Y3JzyaoXUZcQV47iEUuCFw: Intel86/irmx86/inc_6.0/hstpbf.ext
+Y3JzyaoXUZcQV47iEUuCFw: Intel86/irmx86/nucleus_5.0/hstpbf.ext
+----
+33PpN9ywVwJbIaHvLQ9qpw: Intel80/irmx80_2.4/8030.elt
+33PpN9ywVwJbIaHvLQ9qpw: Intel80/irmx80_4.0/8030.elt
+----
+2iCKAw/nFUWJH/a5et+YXQ: Intel80/osiris_3.0/compaq.mac
+2iCKAw/nFUWJH/a5et+YXQ: Intel80/osiris_3.0/vt52.mac
+2iCKAw/nFUWJH/a5et+YXQ: Intel80/osiris_3.0/aedit.mac
+----
+PAfyh686uq27+E2/1e6Y/Q: Intel86/irmx86/inc_6.0/isrnfl.ext
+PAfyh686uq27+E2/1e6Y/Q: Intel86/irmx86/nucleus_5.0/isrnfl.ext
+----
+34ft5xHUKNxsn5WxOxMAUQ: Intel86/irmx86/inc_6.0/ncrseg.ext
+34ft5xHUKNxsn5WxOxMAUQ: Intel86/irmx86/nucleus_5.0/ncrseg.ext
+----
+mdEV+gUDzJhhZmtFLUGf5Q: Intel86/irmx86/inc_6.0/icrioj.ext
+mdEV+gUDzJhhZmtFLUGf5Q: Intel86/irmx86/nucleus_5.0/icrioj.ext
+----
+VWoB5RwGvu4q/mtyVAQe6A: Intel86/irmx86/inc_6.0/isseek.ext
+VWoB5RwGvu4q/mtyVAQe6A: Intel86/irmx86/nucleus_5.0/isseek.ext
+----
+SNLqtyZ9EZ4fLWh7FtEEmQ: Intel86/irmx86/inc_6.0/ltkwrd.lit
+SNLqtyZ9EZ4fLWh7FtEEmQ: Intel86/irmx86/nucleus_5.0/ltkwrd.lit
+----
+1GcDm+gZ+vFqRLD265GROw: Intel80/toolbox_1.0/isis3.lib
+1GcDm+gZ+vFqRLD265GROw: Intel80/isis_4.2/system.lib
+1GcDm+gZ+vFqRLD265GROw: Intel80/isis_4.2w/system.lib
+1GcDm+gZ+vFqRLD265GROw: Intel80/isis_4.3/system.lib
+1GcDm+gZ+vFqRLD265GROw: Intel80/isis_4.3w/system.lib
+----
+jrHrVFVhnKZV82/b+JgiWA: Intel86/irmx86/inc_6.0/isclos.ext
+jrHrVFVhnKZV82/b+JgiWA: Intel86/irmx86/nucleus_5.0/isclos.ext
+----
+U/4wDkI7GLpxXp3XRdeHdw: Intel80/irmx80_2.4/crtab.mac
+U/4wDkI7GLpxXp3XRdeHdw: Intel80/irmx80_4.0/crtab.mac
+----
+0G2YfbZqzyqRX8Lk1uxXTA: Intel86/irmx86/extendedio_2.0/edevcf.mac
+0G2YfbZqzyqRX8Lk1uxXTA: Intel86/irmx86/extendedio_3.0/edevcf.mac
+----
+jU7MkDzZHETXwD5hgYgC9A: Intel80/irmx80_2.4/char.elt
+jU7MkDzZHETXwD5hgYgC9A: Intel80/irmx80_4.0/char.elt
+----
+QB+BRxdMgsyex7Y3IliF2w: Intel86/irmx86/inc_6.0/iagtpc.ext
+QB+BRxdMgsyex7Y3IliF2w: Intel86/irmx86/nucleus_5.0/iagtpc.ext
+----
+ODd+9dORpBAlgzofA6sAQQ: Intel80/pasc80_2.0/p80rar.lib
+ODd+9dORpBAlgzofA6sAQQ: Intel80/pasc80_2.2/p80rar.lib
+----
+T77eZABihodivq+tThLRIw: Intel86/irmx86/inc_6.0/ndsabl.ext
+T77eZABihodivq+tThLRIw: Intel86/irmx86/nucleus_5.0/ndsabl.ext
+----
+Al8UiJj6ECD+3AxwEnbZUg: Intel86/irmx86/inc_6.0/hgtchr.ext
+Al8UiJj6ECD+3AxwEnbZUg: Intel86/irmx86/nucleus_5.0/hgtchr.ext
+----
+ULSy2WCwMD7Yd2AOL9//Jw: Intel86/irmx86/inc_6.0/iaspec.ext
+ULSy2WCwMD7Yd2AOL9//Jw: Intel86/irmx86/nucleus_5.0/iaspec.ext
+----
+0LLiBsea+47ukW5ODfP0Fw: Intel86/irmx86/inc_6.0/iadlcn.ext
+0LLiBsea+47ukW5ODfP0Fw: Intel86/irmx86/nucleus_5.0/iadlcn.ext
+----
+hqdZffOoD8Efs3PyUrgk4Q: Intel80/isis_3.4/system.lib
+hqdZffOoD8Efs3PyUrgk4Q: Intel80/isis_4.0/system.lib
+----
+1B2M2Y8AsgTpgAmY7PhCfg: Intel80/asm51_2.1/.lst
+1B2M2Y8AsgTpgAmY7PhCfg: Intel80/cobol80_1.0/consol.int
+1B2M2Y8AsgTpgAmY7PhCfg: Intel80/insite/ad12/test79
+1B2M2Y8AsgTpgAmY7PhCfg: Intel80/insite/ad12/test.wrt
+1B2M2Y8AsgTpgAmY7PhCfg: Intel80/pasc80_2.2/scott.cod
+1B2M2Y8AsgTpgAmY7PhCfg: Intel80/cobol80_1.0/consol.lst
+1B2M2Y8AsgTpgAmY7PhCfg: Intel80/insite/ad12/test50
+1B2M2Y8AsgTpgAmY7PhCfg: Intel80/insite/ad12/prob.rrr
+1B2M2Y8AsgTpgAmY7PhCfg: Intel80/ipps_1.0/ipps.buf
+1B2M2Y8AsgTpgAmY7PhCfg: Intel80/pasc80_2.2/credt1.tmb
+----
+KRU9jEm1iatKUhkervhKiw: Intel86/irmx86/inc_6.0/ndlext.ext
+KRU9jEm1iatKUhkervhKiw: Intel86/irmx86/nucleus_5.0/ndlext.ext
+----
+8xoZ5eG/6KLw5KO0tsYbVA: Intel80/irmx80_2.4/xchadr.mac
+8xoZ5eG/6KLw5KO0tsYbVA: Intel80/irmx80_4.0/xchadr.mac
+----
+fFzR3Bb/GCZpxaxg7g3d0Q: Intel80/irmx80_2.4/dlimit.pex
+fFzR3Bb/GCZpxaxg7g3d0Q: Intel80/irmx80_4.0/dlimit.pex
+----
+CjvQl2tiSS0bzlCC3jy9XQ: Intel86/irmx86/icu86.86_1.0/icu86.862
+aHCbwPF78fZyNx7NsnTSVw: Intel86/irmx86/icu86.86_1.0/icu86.r82
+----
+yJpSySEr0sCbF3CGFGEOAw: Intel86/irmx86/bootstraploader_4.0/b206.inc
+yJpSySEr0sCbF3CGFGEOAw: Intel86/irmx86/bootstraploader_6.0/b206.inc
+----
+O7u/+zW3tH0IkptbFJUtRQ: Intel86/irmx86/inc_6.0/iawrit.ext
+O7u/+zW3tH0IkptbFJUtRQ: Intel86/irmx86/nucleus_5.0/iawrit.ext
+----
+sAxE7hKRRUbAsLy3cjzyRw: Intel80/irmx80_2.4/demo.lib
+sAxE7hKRRUbAsLy3cjzyRw: Intel80/irmx80_4.0/demo.lib
+----
+HLEY1qg1gUuzq9/yy5ol7A: Intel86/irmx86/inc_6.0/urenam.ext
+HLEY1qg1gUuzq9/yy5ol7A: Intel86/irmx86/nucleus_5.0/urenam.ext
+----
+gHqBaufZGK7Z/6bxEa34JA: Intel80/isis_4.1/upm.ov0
+gHqBaufZGK7Z/6bxEa34JA: Intel80/upm_3.1/upm.ov0
+----
+xcnTd4hj5mydFBpIVdA7eQ: Intel86/irmx86/inc_6.0/ndlcmp.ext
+xcnTd4hj5mydFBpIVdA7eQ: Intel86/irmx86/nucleus_5.0/ndlcmp.ext
+----
+JXLMkSQ1rWskeJMXOZFKzw: Intel80/osiris_3.0/del
+JXLMkSQ1rWskeJMXOZFKzw: Intel80/isis_4.3/delete
+----
+BaMd3dV0I/yySNpSL5hGBQ: Intel80/irmx80_2.4/task.elt
+BaMd3dV0I/yySNpSL5hGBQ: Intel80/irmx80_4.0/task.elt
+----
+tqYzmLcerFgZohb/0HaKzg: Intel80/toolbox_1.0/sort2.src
+tqYzmLcerFgZohb/0HaKzg: Intel80/toolbox_1.0/mgsort.src
+----
+P+l8j9h6hGzJx4LwFjsb9w: Intel86/irmx86/bootstraploader_4.0/b208.inc
+P+l8j9h6hGzJx4LwFjsb9w: Intel86/irmx86/bootstraploader_6.0/b208.inc
+----
+Eeu5jAMWgcO7QqGY+CBHhw: Intel86/irmx86/basicio_4.0/itable.inc
+Eeu5jAMWgcO7QqGY+CBHhw: Intel86/irmx86/basicio_4.1/itable.inc
+----
+0NPSMeo2pCI56ZWWF5kndQ: Intel80/usercode_8085/imgusb
+0NPSMeo2pCI56ZWWF5kndQ: Intel80/misc_x.y/uphold
+0NPSMeo2pCI56ZWWF5kndQ: Intel80/usb/uphold
+----
+5SPtpswJjjrlVfJuuY9nQQ: Intel86/irmx86/inc_6.0/noffsp.ext
+5SPtpswJjjrlVfJuuY9nQQ: Intel86/irmx86/nucleus_5.0/noffsp.ext
+----
+hsySLRChsCdIMDpfBSJXig: Intel80/irmx80_2.4/thdino.ext
+hsySLRChsCdIMDpfBSJXig: Intel80/irmx80_4.0/thdino.ext
+----
+jrtikXeEyjGNDmWxb13i0g: Intel80/insite/ad12/inad12.txt
+jrtikXeEyjGNDmWxb13i0g: Intel80/insite/ad12/ad12
+----
++E5FpFdn0mrO46LmFIX//A: Intel86/irmx86/inc_6.0/ugtsiz.ext
++E5FpFdn0mrO46LmFIX//A: Intel86/irmx86/nucleus_5.0/ugtsiz.ext
+----
+kOrxhCDiMH1lqFAgjSJ4uA: Intel80/isis_4.1/upm
+kOrxhCDiMH1lqFAgjSJ4uA: Intel80/upm_3.1/upm
+----
+X4lQh8zjFL4iJQnrqrFvbw: Intel86/pasc86.86_3.0/instal.csd
+X4lQh8zjFL4iJQnrqrFvbw: Intel86/pasc86.86_3.1/instal.csd
+----
+VyhCRUMoi8jkco2I31Va/g: Intel80/icu80_1.0/icu80.ov4
+VyhCRUMoi8jkco2I31Va/g: Intel80/irmx80_2.4/icu80.ov4
+----
+FaVdZ5lsN347oUdtpLkdow: Intel80/isis_4.2w/rename
+0LvNZIlPTuarGIy9TifSyw: Intel80/isis_4.3w/rename
+----
+YyJjMJ4A1LMCr9OQNdk73g: Intel80/isis_4.0/delete
+YyJjMJ4A1LMCr9OQNdk73g: Intel80/osiris_3.0/delete
+----
+Yfk51s0/JTb9jn1fcD2Kcg: Intel80/irmx80_2.4/dltask.ext
+Yfk51s0/JTb9jn1fcD2Kcg: Intel80/irmx80_4.0/dltask.ext
+----
+vyYgIxQSJYClkQ0z7T82ug: Intel86/irmx86/inc_6.0/iagtcs.ext
+vyYgIxQSJYClkQ0z7T82ug: Intel86/irmx86/nucleus_5.0/iagtcs.ext
+----
+sZIzPKCcbtHpb2H2RdBuFQ: Intel86/irmx86/inc_6.0/utrapc.ext
+sZIzPKCcbtHpb2H2RdBuFQ: Intel86/irmx86/nucleus_5.0/utrapc.ext
+----
+Rat3DvZzagMPXXIMSidXGQ: Intel86/irmx86/inc_6.0/ldwptr.lit
+Rat3DvZzagMPXXIMSidXGQ: Intel86/irmx86/nucleus_5.0/ldwptr.lit
+----
+ue7DgVLWqLVcnWGPvwfsAw: Intel86/irmx86/humaninterface_3.0/hi.030
+ue7DgVLWqLVcnWGPvwfsAw: Intel86/irmx86/humaninterface_3.0/hi.030~1
+----
+dvz4hA2v7FtVEIhtZdjq6Q: Intel86/irmx86/extendedio_2.0/ejobcf.mac
+dvz4hA2v7FtVEIhtZdjq6Q: Intel86/irmx86/extendedio_3.0/ejobcf.mac
+----
+EJnyPtoCGAQcXFXJ+eOPFg: Intel86/irmx86/inc_6.0/ncrjob.ext
+EJnyPtoCGAQcXFXJ+eOPFg: Intel86/irmx86/nucleus_5.0/ncrjob.ext
+----
+kA0p1l4ovilz6FzUCrgOKg: Intel80/ixref_1.1/ixref
+kA0p1l4ovilz6FzUCrgOKg: Intel80/plm86_1.1/ixref
+----
+LZrrMXWoQqoo6Cz8+neazw: Intel80/toolbox_1.0/cusp5.lib
+LZrrMXWoQqoo6Cz8+neazw: Intel80/toolbox_2.0/cusp5.lib
+----
+96S2DUuFm4i4kI9Q/FI+2Q: Intel80/irmx80_2.4/common.elt
+96S2DUuFm4i4kI9Q/FI+2Q: Intel80/irmx80_4.0/common.elt
+----
+4btggID/xd0zcR69vYaasA: Intel80/pasc80_2.0/p80iss.lib
+4btggID/xd0zcR69vYaasA: Intel80/pasc80_2.2/p80iss.lib
+----
+lEA72rouNqmLQyE18gaQng: Intel86/irmx86/inc_6.0/lalioj.ext
+lEA72rouNqmLQyE18gaQng: Intel86/irmx86/nucleus_5.0/lalioj.ext
+----
+I6kaYXWAPcjpKaUOzl9OLg: Intel86/irmx86/inc_6.0/ipatdv.ext
+I6kaYXWAPcjpKaUOzl9OLg: Intel86/irmx86/nucleus_5.0/ipatdv.ext
+----
+17ghTlvGlgZo1rysgrBZKg: Intel80/ice51_1.1/con51.ov3
+17ghTlvGlgZo1rysgrBZKg: Intel80/ice51_1.3/con51.ov3
+----
+8twmWkGpBQ4NeAEyh2PRjQ: Intel86/irmx86/inc_6.0/udcex.ext
+8twmWkGpBQ4NeAEyh2PRjQ: Intel86/irmx86/nucleus_5.0/udcex.ext
+----
++kEBlPtNEc+JP4RDq5hs2w: Intel80/asm86_2.0/note.txt
++kEBlPtNEc+JP4RDq5hs2w: Intel80/asm86_2.1/note.txt
+----
+p0JpydVHxOayRnJuBJxO9w: Intel80/irmx80_2.4/fsmgr.ext
+p0JpydVHxOayRnJuBJxO9w: Intel80/irmx80_4.0/fsmgr.ext
+----
+dDoEM+Jpy6zODp5e+Zp/Vg: Intel86/irmx86/inc_6.0/icrusr.ext
+dDoEM+Jpy6zODp5e+Zp/Vg: Intel86/irmx86/nucleus_5.0/icrusr.ext
+----
+1ctNTjL7QgjDH4q4kK9/Kg: Intel80/icu80_1.0/icu80.ov3
+1ctNTjL7QgjDH4q4kK9/Kg: Intel80/irmx80_2.4/icu80.ov3
+----
+drTprBYfyF+SE7ylu0Q6IQ: Intel86/irmx86/inc_6.0/iinusr.ext
+drTprBYfyF+SE7ylu0Q6IQ: Intel86/irmx86/nucleus_5.0/iinusr.ext
+----
+5wjYtE7yIb1ruJrD9NrxUA: Intel80/irmx80_2.4/seq.pex
+5wjYtE7yIb1ruJrD9NrxUA: Intel80/irmx80_4.0/seq.pex
+----
+NHws8bU7bji0o3BcLXPtpw: Intel86/irmx86/inc_6.0/iscrfl.ext
+NHws8bU7bji0o3BcLXPtpw: Intel86/irmx86/nucleus_5.0/iscrfl.ext
+----
+yQvAmq3WiQQaP6FveQWx8A: Intel80/isis_4.2w/attrib
+gJqtP/iJPd65mEu6A8szTQ: Intel80/isis_4.3w/attrib
+----
+qJjHdjYZjwSoPxzFP731tw: Intel86/irmx86/inc_6.0/iarnfl.ext
+qJjHdjYZjwSoPxzFP731tw: Intel86/irmx86/nucleus_5.0/iarnfl.ext
+----
+o3pdxUntvmDQpPAJyqUzVg: Intel80/pasc80_2.2/scott
+o3pdxUntvmDQpPAJyqUzVg: Intel80/pasc80_2.2/scott.bak
+----
+bNHc1AFGsenwNjNmrrj1cg: Intel80/irmx80_2.4/dio830.lib
+bNHc1AFGsenwNjNmrrj1cg: Intel80/irmx80_2.4/dio820.lib
+----
+7l/TpZdlL+tTo2eeFQznXA: Intel80/isis_4.2w/spindn
+u/Mv2fXyTX+qKxGH6b5P2Q: Intel80/isis_4.3w/spindn
+7l/TpZdlL+tTo2eeFQznXA: Intel80/stfs_1.1/spindn
+----
+8Nh5xlCcCm1dpBzIwUV89g: Intel80/irmx80_2.4/rdylst.ext
+8Nh5xlCcCm1dpBzIwUV89g: Intel80/irmx80_4.0/rdylst.ext
+----
+cWKOFP7nfQmzwg065SYvhA: Intel80/ftrans_1.0/ca004.asm
+cWKOFP7nfQmzwg065SYvhA: Intel80/usercode_8048.51/ca004.asm
+----
+yxoy7+2de6BS8Hz2MuSuLw: Intel86/fort86.86_3.0/cel87.lib
+yxoy7+2de6BS8Hz2MuSuLw: Intel86/pasc86.86_3.1/cel87.lib
+----
+r+Yj1j0yOmXjSet//fYOsA: Intel80/irmx80_2.4/tho830.lib
+r+Yj1j0yOmXjSet//fYOsA: Intel80/irmx80_4.0/tho830.lib
+----
+Z6E2ttFxXUiuzYtSt4JUkA: Intel80/toolbox_1.0/cusp2.lib
+Z6E2ttFxXUiuzYtSt4JUkA: Intel80/toolbox_2.0/cusp2.lib
+----
+D4AEoZzgiSlRsiJ0Q7Rz7Q: Intel80/asm48_4.0/asxref
+D4AEoZzgiSlRsiJ0Q7Rz7Q: Intel80/asm86_2.1/asxref
+----
+f68DCpZi/GnINB94qnp/uw: Intel86/pasc86.86_1.1/cel.lib
+f68DCpZi/GnINB94qnp/uw: Intel86/fort86.86_2.2/cel87.lib
+f68DCpZi/GnINB94qnp/uw: Intel86/pasc86.86_3.0/cel87.lib
+----
+x6Z6/gUdIsc9Dhoe4D/ZBA: Intel80/irmx80_2.4/exc830.013
+x6Z6/gUdIsc9Dhoe4D/ZBA: Intel80/irmx80_4.0/exc830.013
+----
+PP5WRk+Ej3yTRnpctJfvJg: Intel86/pscope.86_1.1/microb.crt
+PP5WRk+Ej3yTRnpctJfvJg: Intel80/aedit_1.0/microb.mac
+PP5WRk+Ej3yTRnpctJfvJg: Intel80/aedit_2.0/microb.mac
+PP5WRk+Ej3yTRnpctJfvJg: Intel80/credit_2.1/microb.mac
+----
+qoalHVH0K9hke5FrHXnc7g: Intel86/irmx86/inc_6.0/ncrtsk.ext
+qoalHVH0K9hke5FrHXnc7g: Intel86/irmx86/nucleus_5.0/ncrtsk.ext
+----
+4V1qLEZR4pEzJJ44NhX/vA: Intel80/pasc80_2.2/seekex.lst~1
+4V1qLEZR4pEzJJ44NhX/vA: Intel80/pasc80_2.2/seekex.bak
+----
+ABCO8sFBXMGhWcUIK9/CZA: Intel86/pscope.86_1.1/1510t.crt
+ABCO8sFBXMGhWcUIK9/CZA: Intel86/pscope.86_1.1/pscope.crt
+ABCO8sFBXMGhWcUIK9/CZA: Intel80/aedit_1.0/1510t.mac
+----
+o8Hj8bj1R9VJMnfFWOrrFA: Intel86/irmx86/inc_6.0/neinit.ext
+o8Hj8bj1R9VJMnfFWOrrFA: Intel86/irmx86/nucleus_5.0/neinit.ext
+----
+gQN5zeKjE/c1547xK8xSDA: Intel80/insite/ad12/test51
+gQN5zeKjE/c1547xK8xSDA: Intel80/insite/ad12/test78
+----
+F3NbF1XbC3CX0xidGff49A: Intel86/irmx86/inc_6.0/nsleep.ext
+F3NbF1XbC3CX0xidGff49A: Intel86/irmx86/nucleus_5.0/nsleep.ext
+----
+dlDKqB602KRodJ1qFM82qA: Intel86/irmx86/devicedrivers_2.0/xdrv.020
+tu+VIoXrqJeOwZiU1v1qgQ: Intel86/irmx86/crashanalyzer_1.0/scrs86.010
+----
+TD12mffzwij9xdELJTGFzA: Intel86/irmx86/inc_6.0/isdlfl.ext
+TD12mffzwij9xdELJTGFzA: Intel86/irmx86/nucleus_5.0/isdlfl.ext
+----
+xOHIoQ2r9c71P7krSrifFg: Intel86/irmx86/inc_6.0/istioj.ext
+xOHIoQ2r9c71P7krSrifFg: Intel86/irmx86/nucleus_5.0/istioj.ext
+----
+gqWG895YaqDGx+RyAJUWVg: Intel80/icu80_1.0/icu80.mcf
+gqWG895YaqDGx+RyAJUWVg: Intel80/irmx80_2.4/icu80.mcf
+----
+ysy3+ALQL3rLf+rcmwEm2g: Intel80/ice51_1.1/con51.ov1
+ysy3+ALQL3rLf+rcmwEm2g: Intel80/ice51_1.3/con51.ov1
+----
+et4XLw0tk6BIY262DwrOPA: Intel86/irmx86/inc_6.0/nwtint.ext
+et4XLw0tk6BIY262DwrOPA: Intel86/irmx86/nucleus_5.0/nwtint.ext
+----
+dk1v5EXukOi5kj9wI70vxA: Intel80/icu80_1.0/icu80.010
+dk1v5EXukOi5kj9wI70vxA: Intel80/irmx80_2.4/icu80.010
+----
+hUVUVoLhXh9y9F7pX2StDg: Intel86/irmx86/inc_6.0/laload.ext
+hUVUVoLhXh9y9F7pX2StDg: Intel86/irmx86/nucleus_5.0/laload.ext
+----
+pPl8PExd6CYteEdIkgshxA: Intel86/irmx86/inc_6.0/iacrdr.ext
+pPl8PExd6CYteEdIkgshxA: Intel86/irmx86/nucleus_5.0/iacrdr.ext
+----
+qZGklq+1fxDzRt+Id0Ezhg: Intel80/confid_2.0/conf
+qZGklq+1fxDzRt+Id0Ezhg: Intel80/ice86_1.2/conf
+qZGklq+1fxDzRt+Id0Ezhg: Intel80/ice86_2.0/conf
+----
+4uRMO8hg3fIhPwFp7BcVvg: Intel80/irmx80_2.4/suspnd.ext
+4uRMO8hg3fIhPwFp7BcVvg: Intel80/irmx80_4.0/suspnd.ext
+----
+ZwBXCX+XgmqK6C1XzLvbGg: Intel86/irmx86/inc_6.0/ndlmbx.ext
+ZwBXCX+XgmqK6C1XzLvbGg: Intel86/irmx86/nucleus_5.0/ndlmbx.ext
+----
+7VQFk0J4LDv23R8e8buPFg: Intel86/irmx86/inc_6.0/iatrun.ext
+7VQFk0J4LDv23R8e8buPFg: Intel86/irmx86/nucleus_5.0/iatrun.ext
+----
+RL1Atc4pX4rjU5+jAJ83BQ: Intel80/misc_x.y/baud24
+RL1Atc4pX4rjU5+jAJ83BQ: Intel80/usercode_8085/baud24
+rZH8JMlhMl9hvACVlCuLyg: Intel80/usercode_8085/baud96
+BuX5pNJvOBJYlEw1E5sRUw: Intel80/usercode_8085/baud19
+----
+5Y4XurLJxzgb2bdDzE7M3w: Intel86/irmx86/inc_6.0/ndlreg.ext
+5Y4XurLJxzgb2bdDzE7M3w: Intel86/irmx86/nucleus_5.0/ndlreg.ext
+----
+rYuoZ0JXlWc4REFenDVAeA: Intel86/irmx86/bootstraploader_4.0/b254.inc
+rYuoZ0JXlWc4REFenDVAeA: Intel86/irmx86/bootstraploader_6.0/b254.inc
+----
+cgTkNJTe3l4Y049UQh+YmQ: Intel86/irmx86/inc_6.0/ualloc.ext
+cgTkNJTe3l4Y049UQh+YmQ: Intel86/irmx86/nucleus_5.0/ualloc.ext
+----
+UY2mu5q27cbiaVXDDl7yiA: Intel86/misc86_x.y/xr1.86
+UY2mu5q27cbiaVXDDl7yiA: Intel86/misc86_x.y/xr1
+----
++SJ5Hg7SDeWVzU8nEdN3nQ: Intel80/isis_4.2w/hexobj
+Mbx0hrnoVynJ0bqkx2fM5A: Intel80/isis_4.3w/hexobj
+----
+1cXTHsta3Ebr3OnxD5RXmA: Intel86/irmx86/inc_6.0/isopen.ext
+1cXTHsta3Ebr3OnxD5RXmA: Intel86/irmx86/nucleus_5.0/isopen.ext
+----
+hWmAe0asz+plnRO+c+wi5g: Intel80/isis_4.3/isis.ov0
+hWmAe0asz+plnRO+c+wi5g: Intel80/ixref_1.3/isis.ov0
+----
+ZXZcoO7zA7EyloZpg7fuEA: Intel86/irmx86/bootstraploader_4.0/b204.inc
+ZXZcoO7zA7EyloZpg7fuEA: Intel86/irmx86/bootstraploader_6.0/b204.inc
+----
+wrdNhdCdZ1W7EpVSf7TjVA: Intel80/aedit_1.0/1510e.mac
+wrdNhdCdZ1W7EpVSf7TjVA: Intel86/pscope.86_1.1/1510e.crt
+----
+jWDFEmL9E3OP4GfaRtFZnw: Intel86/irmx86/inc_6.0/ipdtdv.ext
+jWDFEmL9E3OP4GfaRtFZnw: Intel86/irmx86/nucleus_5.0/ipdtdv.ext
+----
+ayKXy+AhxiPrE9CA7v8FkQ: Intel86/irmx86/inc_6.0/ncrmbx.ext
+ayKXy+AhxiPrE9CA7v8FkQ: Intel86/irmx86/nucleus_5.0/ncrmbx.ext
+----
+SyrAn7aCreiVRGGnIVA9Sg: Intel80/utils_2.2/objhex
+SyrAn7aCreiVRGGnIVA9Sg: Intel80/utils_2.2n/objhex
+----
