@@ -215,7 +215,6 @@
     </ClCompile>
     <ClCompile Include="flux.c" />
     <ClCompile Include="histogram.c" />
-    <ClCompile Include="ndpll.c" />
     <ClCompile Include="sectorManager.c" />
     <ClCompile Include="trackManager.c" />
     <ClCompile Include="util.c" />

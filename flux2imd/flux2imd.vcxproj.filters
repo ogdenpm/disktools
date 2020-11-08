@@ -57,9 +57,6 @@
     <ClCompile Include="version.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="ndpll.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="flux.h">
