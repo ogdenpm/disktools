@@ -43,11 +43,20 @@ unsigned diskSize;
 int sectorSize = 128;
 int binHdrBlk;
 
-format_t formats[4] = {
-    { 0},
-    {77, 1, 26, 4, 128, "00",  "1<6", 2},     // ISIS_SD
-    {77, 1, 52, 7, 128, "30",  "145", 4},    // ISIS_DD
-    {80, 2, 16, 0, 256, "2051", "14", 1}    // ISIS_PDS
+extern char path[];
+extern char *relPath;
+
+
+
+format_t formats[] = {
+    { 0}, {0},                                      // NOFORMAT
+    {77, 1, 26, -1, 128, "00",  "1<3", 2},  {0},    // ISIS1
+    {77, 1, 26, -1, 128, "00",  "1<3", 2},  {0},    // ISIS2
+    {77, 1, 26, 0, 128, "00",  "1<6", 2},           // ISIS3 SD
+    {77, 1, 52, 0, 128, "30",  "1H5", 4},           // ISIS3 DD
+    {77, 1, 26, 4, 128, "00",  "1<6", 2},           // ISIS4 SD
+    {77, 1, 52, 7, 128, "30",  "145", 4},           // ISIS4 DD
+    {0},  {80, 2, 16, -1, 256, "2051", "14", 1}     // ISISP
 };
 
 #pragma pack(push, 1)
@@ -112,8 +121,8 @@ word AllocSector() {
         ++bytePos;
 
     // find the lowest group with a free sector
-    if (diskType == ISIS_PDS) {
-        if (bytePos >= formats[ISIS_PDS].nCyl) {
+    if (Format(diskType) == ISISP) {
+        if (bytePos >= formats[diskType].nCyl) {
             fprintf(stderr, "track %d reached - disk full\n", bytePos);
         }
         for (bitPos = 0; bitMap[bytePos] & (1 << bitPos); bitPos++)
@@ -133,7 +142,7 @@ word AllocSector() {
 }
 
 void ReserveSector(word trkSec) {
-    if (diskType == ISIS_PDS)
+    if (Format(diskType) == ISISP)
         bitMap[BLKTRK(trkSec)] |= 1 << ((BLKSEC(trkSec) - 1) / 4);
     else {
         int lsec = BLKTRK(trkSec) * sPerCyl + BLKSEC(trkSec) - 1;
@@ -149,7 +158,7 @@ byte *GetSectorLoc(word trkSec) {
 void NewDataSector(word *hdr) {
     *hdr = AllocSector();
     memset(GetSectorLoc(*hdr), 0, sectorSize);        // clear out sector
-    if (diskType == ISIS_PDS) {                                                // record additional sectors of cluster
+    if (Format(diskType) == ISISP) {                             // record additional sectors of cluster
         hdr[1] = hdr[0] + 1;
         hdr[2] = hdr[0] + 2;
         hdr[3] = hdr[0] + 3;
@@ -164,7 +173,7 @@ word NewHdrSector(word trkSec) {
         ReserveSector(trkSec);
     word *hdr = (word *)GetSectorLoc(trkSec);
     memset(hdr, 0, sectorSize);
-    if (diskType == ISIS_PDS) {
+    if (Format(diskType) == ISISP) {
         hdr[2] = trkSec + 1;
         hdr[3] = trkSec + 2;
         hdr[4] = trkSec + 3;
@@ -178,9 +187,9 @@ word *NewHdrPtr(word trkSec) {
 
 void FormatDisk(int type, int formatCh) {
     if (formatCh < 0)
-        formatCh = type == ISIS_PDS ? ALT_FMTBYTE : FMTBYTE;
+        formatCh = Format(diskType) == ISISP ? ALT_FMTBYTE : FMTBYTE;
 
-    sectorSize = type == ISIS_PDS ? 256 : 128;
+    sectorSize = Format(diskType) == ISISP ? 256 : 128;
     unsigned diskSize = formats[type].nCyl * formats[type].nHead * formats[type].nSector * sectorSize ;
 
     if ((disk = (byte *)malloc(diskSize)) == NULL) {
@@ -193,10 +202,10 @@ void FormatDisk(int type, int formatCh) {
     sPerCyl = formats[type].nHead * formats[type].nSector;
 
 
-    bitMap = GetSectorLoc(type == ISIS_PDS ? ISISFRE_HDR + 1 : ISISMAP_HDR + 1);         // location of ISIS.(FRE/MAP) data
+    bitMap = GetSectorLoc(Format(diskType) == ISISP ? ISISFRE_HDR + 1 : ISISMAP_HDR + 1);         // location of ISIS.(FRE/MAP) data
     // make sure bitMap is clear
     memset(bitMap, 0, formats[type].bitMapSize * sectorSize);
-    if (type == ISIS_PDS)
+    if (Format(diskType) == ISISP)
         WriteVolLabels();
 }
 
@@ -254,7 +263,7 @@ direct_t *Lookup(char *name, bool autoName) {
         exit(1);
     }
     direct_t *firstFree = NULL;                     // used to mark new entry insert point
-    for (int i = 0; i < (diskType == ISIS_PDS ? CNTI3DIRSECTORS * 16: CNTDIRSECTORS * 8); i++)
+    for (int i = 0; i < (Format(diskType) == ISISP ? CNTI3DIRSECTORS * 16: CNTDIRSECTORS * 8); i++)
         if (directory[i].use != INUSE) {
             if (firstFree == NULL && autoName)
                 firstFree = &directory[i];
@@ -288,7 +297,7 @@ direct_t *MakeDirEntry(char *name, int attrib, int eofCnt, int blkCnt, int hdrBl
     return dir;
 }
 
-void CopyFile(char *isisName, char *srcName, int attrib) {
+bool CopyFile(char *isisName, int attrib) {
     direct_t *dir;
     int blkCnt = 0;
     int hdrIdx;
@@ -298,33 +307,46 @@ void CopyFile(char *isisName, char *srcName, int attrib) {
     FILE *fp;
     int curHdrBlk;
 
-    if (strcmp(srcName, "AUTO") == 0) {
+    if (strcmp(relPath, "AUTO") == 0) {
         if (dir = Lookup(isisName, false)) {
-            if (attrib != 0)
+            if (attrib >= 0)
                 dir->attrib = attrib;
         } else
             fprintf(stderr, "Out of directory space for file %s\n", isisName);
-        return;
-
+        return dir != NULL;
     }
-    if (strcmp(srcName, "ZERO") == 0) {     // empty file
+    if (strcmp(relPath, "ZERO") == 0) {     // empty file
         if ((dir = Lookup(isisName, false)) == NULL)  // create dir entry if it doesn't exist
             dir = MakeDirEntry(isisName, attrib, 0, 0, 0);
-        return;
+        else
+            fprintf(stderr, "Out of directory space for file %s\n", isisName);
+        return dir != NULL;
     }
-    if (strcmp(srcName, "ZEROHDR") == 0) {     // empty file with header
+    if (strcmp(relPath, "ZEROHDR") == 0) {     // empty file with header
         if ((dir = Lookup(isisName, false)) == NULL)  // create dir entry if it doesn't exist
             dir = MakeDirEntry(isisName, attrib, 128, 0, NewHdrSector(0));
-        return;
+        else
+            fprintf(stderr, "Out of directory space for file %s\n", isisName);
+        return dir != NULL;
     }
-    /* all ISIS system files except ISIS.CLI are given the right attributes in WriteDirectory
-    make sure it has the correct attributes */
-    if (_stricmp(isisName, "ISIS.CLI") == 0 && attrib == 0)
-        attrib = FMT | SYS | INV;
+    /* make sure that ISIS system files not generated in WriteDirectory are given default
+    * attributes unless overridden
+    */
+    if (attrib < 0)
+        if (strcmp(isisName, "ISIS.BIN") == 0 || 
+            strcmp(isisName, "ISIS.PDS") == 0 ||
+            strcmp(isisName, "ISIS.CLI") == 0 ||
+            strcmp(isisName, "ISIS.OV0") == 0 ||
+            strcmp(isisName, "ISIS.OV1") == 0 ||
+            strcmp(isisName, "ISIS.OV2") == 0 ||
+            strcmp(isisName, "ISISC.BIN") == 0)
 
-    if ((fp = fopen(srcName, "rb")) == NULL) {
-        fprintf(stderr, "%s can't find source file %s\n", isisName, srcName);
-        return;
+            attrib = (Format(diskType) == ISIS1 || Format(diskType) == ISIS2 ? WP : FMT) | SYS | INV;       // ISIS I & ISIS II 2.2 use WP rather than F
+        else
+            attrib = 0;
+
+    if ((fp = fopen(path, "rb")) == NULL) {
+        return false;
     }
     if ((dir = Lookup(isisName, false)) == NULL)  // create dir entry if it doesn't exist
         dir = MakeDirEntry(isisName, attrib, 0, 0, 0);
@@ -336,7 +358,7 @@ void CopyFile(char *isisName, char *srcName, int attrib) {
     hdr = (word *)GetSectorLoc(dir->hdrBlk);
     curHdrBlk = dir->hdrBlk;
     while (1) {
-        for (hdrIdx = 2; hdrIdx < (diskType == ISIS_PDS ? 125 : 64); hdrIdx++) {
+        for (hdrIdx = 2; hdrIdx < (Format(diskType) == ISISP ? 125 : 64); hdrIdx++) {
             if ((actual = (int)fread(buf, 1, sectorSize, fp)) == 0)
                 break;
             blkCnt++;
@@ -360,11 +382,40 @@ void CopyFile(char *isisName, char *srcName, int attrib) {
     if (blkCnt > dir->blkCnt) {
         dir->blkCnt = blkCnt;
         dir->eofCnt = (actual == 0) ? sectorSize : actual;
-        if (diskType == ISIS_PDS)
+        if (Format(diskType) == ISISP)
             dir->eofCnt--;
     }
     fclose(fp);
+    return true;
 }
+
+void CopyOsFiles(bool t0Only) {        // copies system files, (note if t0Only is true only isis.t0 is copied, primarily for ISIS PDS
+    strcpy(relPath, osMap[osType].osloc);
+    char *osFile = strchr(relPath, '\0');
+    strcpy(osFile, "isis.t0");
+    isisT0Seen = CopyFile("ISIS.T0", -1);
+    if (t0Only)
+        return;
+    strcpy(osFile, Format(diskType) == ISISP ? "isis.pds" : "isis.bin");
+    isisBinSeen = CopyFile(Format(diskType) == ISISP ? "ISIS.PDS" : "ISIS.BIN", -1);
+    strcpy(osFile, "isis.cli");
+    isisCliSeen = CopyFile("ISIS.CLI", -1);
+    if (osMap[osType].osflags & HASOV0) {
+        strcpy(osFile, "isis.ov0");
+        CopyFile("ISIS.OV0", FMT | SYS | INV);
+
+        if (osMap[osType].osflags & HASOV1) {
+            strcpy(osFile, "isis.ov1");
+            CopyFile("ISIS.OV1", FMT | SYS | INV);
+            strcpy(osFile, "isis.ov2");
+            CopyFile("ISIS.OV2", FMT | SYS | INV);
+            strcpy(osFile, "isisc.bin");
+            CopyFile("ISISC.BIN", FMT | SYS | INV);
+        }
+    }
+}
+
+
 
 // lay down the initial directory info
 // FormatDisk must have been called before
@@ -376,7 +427,7 @@ void WriteI2Directory() {
     // setup linkage for ISIS.LAB
 
     hdr = NewHdrPtr(ISISLAB_HDR);
-    if (diskType == ISIS_SD)
+    if (Density(diskType) == 0)
         SetLinks(hdr, 2, ISISLAB_SDSIZE, ISISLAB_HDR + 1);
     else {
         SetLinks(hdr, 2, ISISLAB_DDSIZE, ISISLAB_HDR + 1);
@@ -396,15 +447,16 @@ void WriteI2Directory() {
     MakeDirEntry("ISIS.DIR", FMT | INV, 128, CNTDIRSECTORS, ISISDIR_HDR);
     MakeDirEntry("ISIS.MAP", FMT | INV, 128, cntBitMapSectors, ISISMAP_HDR);
     MakeDirEntry("ISIS.T0", FMT | INV, 128, ISIST0_SIZE, ISIST0_HDR);
-    MakeDirEntry("ISIS.LAB", FMT | INV, 128, diskType == ISIS_SD ? ISISLAB_SDSIZE : ISISLAB_DDSIZE + ISISLAB_DDSIZEA, ISISLAB_HDR);
-    if (hasSystem) {
-        // finally setup empty linkage for ISIS.BIN
-        int binHdrBlk = diskType == ISIS_SD ? SDBINHDR : DDBINHDR;
-        NewHdrSector(binHdrBlk);
-        MakeDirEntry("ISIS.BIN", FMT | SYS | INV, 128, 0, binHdrBlk);
-    }
-    // make sure there is at least a non system boot file in ISIS.T0
+    MakeDirEntry("ISIS.LAB", FMT | INV, 128, Density(diskType) == 0 ? ISISLAB_SDSIZE : ISISLAB_DDSIZE + ISISLAB_DDSIZEA, ISISLAB_HDR);
+    // make sure there is a tleast a non system book file in ISIS.T0
     memcpy(GetSectorLoc(ISIST0_DAT), nsBoot, sizeof(nsBoot));
+    if (osType > 0) {
+        // finally setup empty linkage for ISIS.BIN
+        int binHdrBlk = Density(diskType) == 0 ? SDBINHDR : DDBINHDR;
+        NewHdrSector(binHdrBlk);
+        MakeDirEntry("ISIS.BIN", ((osMap[osType].osflags & USESWP )? WP : FMT) | SYS | INV, 128, 0, binHdrBlk);
+        CopyOsFiles(false);
+    }
 }
 
 
@@ -430,16 +482,16 @@ void WriteI3Directory() {
     memset(directory, 0, CNTI3DIRSECTORS * sectorSize);  // initialise to 0
     for (int i = 0; i < CNTI3DIRSECTORS * sectorSize / 16; i++)    // set the usage flags
         directory[i].use = NEVUSE;
-    MakeDirEntry("ISIS.DIR", INV, sectorSize - 1, CNTI3DIRSECTORS, ISIS3DIR_HDR);
-    MakeDirEntry("ISIS.FRE", INV, ISISFRE_LEN - 1, cntBitMapSectors, ISISFRE_HDR);
-    MakeDirEntry("ISIS.T0", INV, sectorSize - 1, ISIS3T0_SIZE, ISIS3T0_HDR);
+    MakeDirEntry("ISIS.DIR", FMT | INV, sectorSize - 1, CNTI3DIRSECTORS, ISIS3DIR_HDR);
+    MakeDirEntry("ISIS.FRE", FMT | INV, ISISFRE_LEN - 1, cntBitMapSectors, ISISFRE_HDR);
+    MakeDirEntry("ISIS.T0", FMT | INV, sectorSize - 1, ISIS3T0_SIZE, ISIS3T0_HDR);
     MakeDirEntry("ISIS.LAB", FMT | INV, sectorSize - 1, ISIS3LAB_SIZE, ISIS3LAB_HDR);
-
+    CopyOsFiles(osType == 0);
 }
 
 void WriteLabel() {
     // iniitlise the supplementary label info and write to image
-    if (diskType == ISIS_PDS) {
+    if (Format(diskType) == ISISP) {
         char *labelSector = GetSectorLoc(ISIS3LAB_HDR + 1);
         memset(label.leftOver, ' ', sizeof(label.leftOver));
         memcpy(labelSector, &label, sizeof(label) - sizeof(label.fmtTable));

@@ -33,13 +33,25 @@ typedef unsigned char byte;
 typedef unsigned short word;
 
 #define MAXLINE 512                     // maximum length of recipe line
-#define ROOT "F:/OneDrive/Intel/"       // my local copy of the repository - to use if recipe is not in .../Intel/diskindex/
 #define EXT ".imd"                      // default extension and hence format
 #define MAXCOMMENT	4096				// upper limit on comment length from source IMD
 
 // names for magic numbers
 // disk types
-enum { UNKNOWN = 0, ISIS_SD, ISIS_DD, ISIS_PDS, ISIS_IV };
+enum {SD = 0, DD = 1};
+// note the values below are the disk format not the OS
+// ISIS1 => isis 1.x, 2 => isis 2.x - note both same format
+// ISIS3 => isis 3.x, ISIS4 => isis 4.x & ISIS III
+// ISISP => isis pds
+// ISISU => not specified, defaults to ISIS4 if no OS provided
+enum {ISIS1 = 1, ISIS2, ISIS3, ISIS4, ISISP, ISISU};
+
+#define NOFORMAT 0
+
+
+// the OS versions
+enum {NONE, UNKNOWN, I11, II22, II34, II40, II41, II42, II42W, II43, II43W, PDS10, PDS11, TEST10, TEST11,  III20, III22};
+
 
 #define SDSECTORS   26  // sectors on a SD disk
 #define DDSECTORS   52  // sectors on a DD disk
@@ -125,9 +137,13 @@ typedef struct {
 
 #pragma pack(pop)
 
-extern byte diskType;
+extern uint8_t diskType;
+extern uint8_t osType;
 extern label_t label;
-extern bool hasSystem;
+
+#define Format(n)   ((n) >> 1)
+#define Density(n)  ((n) & 1)
+
 
 typedef struct {
     char *name;
@@ -149,10 +165,20 @@ typedef struct {
 } format_t;
 
 
+typedef struct {
+    char *osname;
+    char *osloc;
+    uint8_t osflags;
+} osMap_t;
+extern osMap_t osMap[];
+enum { USESWP = 1, HASOV0 = 2, HASOV1 = 4};
+
+extern bool isisBinSeen;
+extern bool isisT0Seen;
+extern bool isisCliSeen;
 
 
-
-extern format_t formats[4];
+extern format_t formats[];
 
 extern int sPerCyl;
 extern byte *disk;
@@ -165,7 +191,7 @@ extern int formatCh;
 #endif
 void WriteImgFile(char *fname, int diskType, char *interleaves, bool useSkew, char *comment);
 void InitFmtTable(byte t0Interleave, byte t1Interleave, byte interleave);
-void CopyFile(char *isisName, char *srcName, int attrib);
+bool CopyFile(char *isisName, int attrib);
 void FormatDisk(int type, int formatCh);
 void WriteVolLabels();
 void WriteI2Directory();

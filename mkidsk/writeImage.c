@@ -93,8 +93,8 @@ void WriteImgFile(char *fname, int diskType, char *interleaves, bool useSkew, ch
         exit(1);
     }
     
-    int bias = diskType == ISIS_SD || diskType == ISIS_DD ? 0 : -1;
-    int skew = useSkew ? formats[diskType].skew : 0;
+    int bias = Format(diskType) == ISISP ? -1 : 0;
+    int skew = useSkew ? formats[diskType].skew : -1;
     char *modeSize = formats[diskType].modeSize;
     int interleave = 1;
     int mode = 0;
@@ -114,6 +114,7 @@ void WriteImgFile(char *fname, int diskType, char *interleaves, bool useSkew, ch
     if (fmt == IMD)
         WriteIMDHdr(fp, comment);
 
+    int lastSlot = skew;
     for (int cyl = 0; cyl < formats[diskType].nCyl; cyl++) {
         for (int head = 0; head < formats[diskType].nHead; head++) {
             int spt = formats[diskType].nSector;
@@ -126,11 +127,13 @@ void WriteImgFile(char *fname, int diskType, char *interleaves, bool useSkew, ch
                 interleave = *interleaves++ - '0';
                 if (bias < 0)
                     bias = -interleave;
-            }  else
-                bias += skew;
+            } else if (skew < 0)
+                bias = 0;
+            else
+                bias = lastSlot + skew;
 
             byte smap[MAXSECTOR];
-            BuildSMap(smap, spt, interleave, bias);
+            lastSlot = BuildSMap(smap, spt, interleave, bias);
 
             if (fmt == IMD) {
                 putc(mode, fp);        // mode
