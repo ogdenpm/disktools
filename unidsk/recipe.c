@@ -130,6 +130,7 @@ struct {
     "7SzuQtZxju9XU/+ehbFOQ7W0tz8", "TEST 1.1",
     "yOeRj3n6yo8SYlu3Ne4L8Ci52BI", "OSIRIS 3.0",
     "JnbT/FfQLj4sVO/yJLIL8tyoGUU", "ISIS III(N) 2.0",
+    "w/DUEfiueTmA2LDRKSM4gXNXiIA", "ISIS III(N) 2.2",
     0, "NONE"
 };
 
