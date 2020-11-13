@@ -36,7 +36,9 @@ typedef struct {
 	char *attrib;
 	char *key;
 	bool inRepo;
+	bool changed;
 	char *loc;
+	char *tail;
 } recipe_t;
 
 
@@ -49,7 +51,6 @@ char *chkSpecial(recipe_t *r);
 bool parseRecipe(char *line, recipe_t *recipe);
 bool printRecipe(FILE *fp, recipe_t *recipe, bool showAlt);
 bool updateRecipe(recipe_t *r);
-void trim(char *s);
 
 #endif#
 

@@ -49,6 +49,11 @@ void showDuplicates() {
 	}
 }
 
+char *skipws(char *s) {
+	while (isblank(*s))
+		s++;
+	return s;
+}
 
 void reIndexFile(const char *path, bool showAlt) {
 	char tmpFile[10];
@@ -92,10 +97,10 @@ void reIndexFile(const char *path, bool showAlt) {
 			while ((c = getc(fpin)) != '\n' && c != EOF)
 				;
 		}
-		trim(line);
+		s = skipws(line);
 		if (state == FILES) {
-			if (line[0] == '#') {
-				if (strnicmp(line, "# also ^", 8) == 0)		// # also only count as single change (wiht recipe itself & any added #also
+			if (*s == '#') {
+				if (strnicmp(line, "# also ^", 8) == 0)		// # also only count as single change (with recipe itself & any added #also
 					recipeChanged = true;
 				else
 					fprintf(fpout, "%s\n", line);
@@ -104,11 +109,11 @@ void reIndexFile(const char *path, bool showAlt) {
 					changes++;
 					recipeChanged = false;
 				}
-				if (!parseRecipe(line, &recipe)) {
+				if (!parseRecipe(s, &recipe)) {
 					fprintf(stderr, "bad recipe line: %s\n", line);
 					fprintf(fpout, "%s\n", line);
 				} else {
-					recipeChanged = updateRecipe(&recipe);
+					recipeChanged = recipe.changed | updateRecipe(&recipe);
 					recipeChanged |= printRecipe(fpout, &recipe, showAlt | recipeChanged);
 					if (!recipe.inRepo && !chkSpecial(&recipe))
 						unresolved++;
