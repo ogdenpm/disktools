@@ -21,8 +21,8 @@
 /*
 DESCRIPTION
     Unpacks an isis .imd or .img file into the individual files.
-    Supports ISIS II SD, ISIS II DD, ISIS III and ISIS IV
-    For ISIS II and ISIS III a recipe file is generated to allow a sister
+    Supports ISIS I/II/III SD & DD, ISIS PDS and ISIS IV
+    For ISIS I/II/III and ISIS PDS a recipe file is generated to allow a sister
     application mkidsk to reconstruct the .imd or .img file
     Portions of the code are based on Dave Duffield's imageDisk sources
 
@@ -45,8 +45,6 @@ NOTES
 TODO
     Review the information generated for an ISIS IV disk to see if it is sufficient
     to allow recreation of the original .imd or .img file
-    Review the information generated for an ISIS III disk to see it is sufficient to
-    recreate the ISIS.LAB and ISIS.FRE files.
 */
 
 
@@ -926,7 +924,7 @@ bool isis2_3(dir_t *dptr)
     char *isisName = isDOS ? "DOS.DIR" : "ISIS.DIR";
 
 
-    printf("Looks like an ISIS %s disk\n", diskType == ISIS_PDS ? "PDS" : "I / II");
+    printf("Looks like an ISIS %s disk\n", diskType == ISIS_PDS ? "PDS" : "I / II / III");
 
     ok &= extractFile(dptr, 0);		// get the ISIS.DIR file, leaves filename in targetPath
     /* although processing of the header file could be done here

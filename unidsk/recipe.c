@@ -134,7 +134,7 @@ struct {
     0, "NONE"
 };
 
-char *osFormat[] = { "UNKNOWN", "ISIS II SD", "ISIS II DD", "ISIS PDS", "ISIS IV", "ISIS-DOS" };
+char *osFormat[] = { "UNKNOWN", "ISIS SD", "ISIS DD", "ISIS PDS", "ISIS IV", "ISIS-DOS" };
 char *suffixFormat = "-SDP4X";
 
 
@@ -300,11 +300,8 @@ void mkRecipe(char const *name, isisDir_t *isisDir, char *comment, int diskType,
             strcmp(dentry->name, "ISIS.FRE") == 0) {
             dbPath = "AUTO";
             na = true;
-        } else if (dentry->dirLen == 0) {
+        } else if (dentry->dirLen <= 0) {
             dbPath = "ZERO";
-            na = true;
-        } else if (dentry->dirLen < 0) {
-            dbPath = "ZEROHDR";        // zero but link block allocated
             na = true;
         } else if ((dbPath = findMatch(dentry->key, altname = dentry->name)) ||
             (dbPath = findMatch(dentry->key, altname = NULL)))
