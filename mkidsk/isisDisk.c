@@ -322,13 +322,6 @@ bool CopyFile(char *isisName, int attrib) {
             fprintf(stderr, "Out of directory space for file %s\n", isisName);
         return dir != NULL;
     }
-    if (strcmp(relPath, "ZEROHDR") == 0) {     // empty file with header
-        if ((dir = Lookup(isisName, false)) == NULL)  // create dir entry if it doesn't exist
-            dir = MakeDirEntry(isisName, attrib, 128, 0, NewHdrSector(0));
-        else
-            fprintf(stderr, "Out of directory space for file %s\n", isisName);
-        return dir != NULL;
-    }
     /* make sure that ISIS system files not generated in WriteDirectory are given default
     * attributes unless overridden
     */

@@ -157,7 +157,7 @@ typedef struct {
     uint8_t nCyl;
     uint8_t nHead;
     uint8_t nSector;
-    uint8_t skew;
+    int8_t skew;
     int allocSSize;         // space allocated per sector
     char *modeSize;         // encoded as per tInterleave, 2 chars 1st mode, 2nd size
     char *tInterLeave;

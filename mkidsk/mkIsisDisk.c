@@ -423,9 +423,9 @@ char *ParseIsisName(char *isisName, char *src) {
     while (isblank(*src))       // ignore leading blanks
         src++;
     for (int i = 0; i < 6 && isalnum(*src); i++)
-        *isisName++ = toupper(*src++);
-    if (*src == '.') {
         *isisName++ = *src++;
+    if (*src == '.') {
+        *isisName++ = toupper(*src++);
         for (int i = 0; i < 3 && isalnum(*src); i++)
             *isisName++ = toupper(*src++);
     }
@@ -534,6 +534,18 @@ char *skipws(char *s) {
     return s;
 }
 
+
+bool isIsisName(const char *name) {
+    int i;
+    for (i = 0; i < 6 && isalnum(*name); i++)
+        name++;
+    if (i && *name == '.') {
+        name++;
+        for (i = 0; i < 3 && isalnum(*name); i++)
+            name++;
+    }
+    return i && *name == 0;
+}
 void ParseFiles(FILE *fp) {
     char line[MAXLINE];
     char isisName[11];
@@ -569,7 +581,7 @@ void ParseFiles(FILE *fp) {
             if (*s != ',')
                 *isisName = 0;                              // force error message
         }
-        if (*isisName == '\0') {
+        if (!isIsisName(isisName)) {
             fprintf(stderr, "%s - Invalid ISIS name\n", line);
             continue;
         }
