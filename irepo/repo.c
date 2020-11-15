@@ -130,6 +130,17 @@ void GenIsisName(char *isisName, char *line) {
 	ParseIsisName(isisName, fname);     // generate the ISIS name
 }
 
+bool isIsisName(const char *name) {
+	int i;
+	for (i = 0; i < 6 && isalnum(*name); i++)
+		name++;
+	if (i && *name == '.') {
+		name++;
+		for (i = 0; i < 3 && isalnum(*name); i++)
+			name++;
+	}
+	return i && *name == 0;
+}
 
 // split the recipe line, all fields are optional except the location
 // if an optional field is present, all preceeding comma separators must be included
@@ -139,75 +150,81 @@ bool parseRecipe(char *line, recipe_t *recipe) {
 	int  commaCnt = 0;
 	strcpy(tmp, line);
 	char *s;
-	recipe->tail = recipe->attrib = recipe->key = "";
+	recipe->iname = recipe->tail = recipe->attrib = recipe->key = "";
 	if (s = strchr(tmp, '#')) {
 		recipe->tail = s + 1;
 		while (s > tmp && isblank(s[-1]))
 			s--;
 		*s = 0;
-	} else
-		recipe->tail = "";
-	s = tmp;
-	recipe->loc = strrchr(s, ',');
-
-	if (recipe->loc == NULL) {
-		recipe->loc = tmp;
-		GenIsisName(iname, recipe->loc);
-	} else {
-		if (*s != ',') {
-			s = ParseIsisName(iname, s);
-			commaCnt++;
-			if (*s != ',') {
-				*iname = 0;				// say no name
-				s = recipe->loc;		// skip rest of processing
-			}
-		} else
-			GenIsisName(iname, s);
-
-		if (s != recipe->loc) {
-			recipe->attrib = s + 1;
-			commaCnt++;
-			s = strchr(s + 1, ',');
-		}
-		if (s != recipe->loc) {
-			*s = 0;
-			recipe->key = s;
-			commaCnt++;
-			s = strchr(s + 1, ',');
-		}
-		if (recipe->loc != s)
-			return false;
-		*recipe->loc++ = 0;
 	}
-	if (!*iname)
+	char *fstart = tmp;
+	char *fend;
+
+	if (fend = strchr(fstart, ',')) {
+		recipe->iname = fstart;
+		*fend = 0;
+		fstart = fend + 1;
+	}
+	if (fend && (fend = strchr(fstart, ','))) {
+		recipe->attrib = fstart;
+		*fend = 0;
+		fstart = fend + 1;
+	}
+	if (fend && (fend = strchr(fstart, ','))) {
+		recipe->key = fstart;
+		*fend = 0;
+		fstart = fend + 1;
+	}
+	recipe->changed = fend == NULL;
+	recipe->loc = fstart;
+	if (strchr(fstart, ',')) {
+		fprintf(stderr, "Too many fields: %s\n", line);
 		return false;
-	strcpy(line, iname);
+	}
+	if (*recipe->iname == 0) {
+		GenIsisName(iname, recipe->loc);
+		recipe->iname = iname;
+		recipe->changed = true;
+	} else
+		strupr(recipe->iname);
+	if (!isIsisName(recipe->iname)) {
+		fprintf(stderr, "%s: %s\n", recipe->iname == iname ? "Cannot generate ISIS name" : "Invalid ISIS name", line);
+		return false;
+	}
+	if (*recipe->loc == '^') {
+		recipe->inRepo = true;
+		recipe->loc++;
+	} else
+		recipe->inRepo = false;
+	int locLen = strlen(recipe->loc);
+	if (locLen < 10)					// loc may be replaces with iname, make sure we allow 10 chars for it
+		locLen = 10;
+	int lineLen = strlen(recipe->iname) + strlen(recipe->attrib) + strlen(recipe->key) + locLen + 4;
+	if (lineLen >= MAXLINE) {
+		fprintf(stderr, "Expanded line too long: %s\n", line);
+		return false;
+	}
+	/* now reconstruct line with any added fields */
+	strcpy(line, recipe->iname);
 	recipe->altname = recipe->iname = line;
 	s = strchr(line, '\0') + 1;
-	if (*recipe->attrib) {
-		strcpy(s, recipe->attrib);
-		recipe->attrib = s ;
-		s = strchr(s, '\0') + 1;
-	}
-	if (*recipe->key) {
-		strcpy(s, recipe->key);
-		recipe->key = s;
-		s = strchr(s, '\0') + 1;
-	}
-	strcpy(s, recipe->loc);
-	recipe->loc = s + (recipe->inRepo = *s == '^');
-	recipe->changed = commaCnt != 3;
+	strcpy(s, recipe->attrib);
+	recipe->attrib = s;
+	s = strchr(s, '\0') + 1;
+	strcpy(s, recipe->key);
+	recipe->key = s;
+	s = strchr(s, '\0') + 1;
 
-	if (*recipe->tail) {
-		// add the tail, but note loc area is potentially overwritten with up to 11 chars
-		s = recipe->loc + (strlen(recipe->loc) > 11 ? strlen(recipe->loc) + 1 : 12);
-		if (s + strlen(recipe->tail) + 1 < line + MAXLINE - 2) {		// leave room for a space & # on output line
-			strcpy(s, " #");
-			strcat(s, recipe->tail);
-			recipe->tail = s;
-		} else
-			recipe->tail = "";
-	}
+	strcpy(s, recipe->loc);
+	recipe->loc = s;
+	s = line + lineLen;			// allow room for loc being replaced by iname
+
+	if (*recipe->tail && lineLen + 3 < MAXLINE) {
+		strcpy(s, " #");
+		strncat(s, recipe->tail, MAXLINE - lineLen - 4);
+	} else
+		*s = 0;
+	recipe->tail = s;
 	return true;
 
 }
@@ -215,8 +232,8 @@ bool parseRecipe(char *line, recipe_t *recipe) {
 // print the recipe line, along with alternates if requested
 // returns true if alternatives printed
 bool printRecipe(FILE *fp, recipe_t *recipe, bool showAlt) {
+//	printf("%s,%s,%s,%s%s%s\n", recipe->iname, recipe->attrib, recipe->key, recipe->inRepo ? "^" : "", recipe->loc, recipe->tail);
 	fprintf(fp, "%s,%s,%s,%s%s%s\n", recipe->iname, recipe->attrib, recipe->key, recipe->inRepo ? "^" : "", recipe->loc, recipe->tail);
-	printf("%s,%s,%s,%s%s%s\n", recipe->iname, recipe->attrib, recipe->key, recipe->inRepo ? "^" : "", recipe->loc, recipe->tail);
 
 
 	if (showAlt && recipe->inRepo) {

@@ -109,10 +109,9 @@ void reIndexFile(const char *path, bool showAlt) {
 					changes++;
 					recipeChanged = false;
 				}
-				if (!parseRecipe(s, &recipe)) {
-					fprintf(stderr, "bad recipe line: %s\n", line);
+				if (!parseRecipe(s, &recipe))
 					fprintf(fpout, "%s\n", line);
-				} else {
+				else {
 					recipeChanged = recipe.changed | updateRecipe(&recipe);
 					recipeChanged |= printRecipe(fpout, &recipe, showAlt | recipeChanged);
 					if (!recipe.inRepo && !chkSpecial(&recipe))
