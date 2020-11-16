@@ -383,14 +383,12 @@ bool CopyFile(char *isisName, int attrib) {
     return true;
 }
 
-void CopyOsFiles(bool t0Only) {        // copies system files, (note if t0Only is true only isis.t0 is copied, primarily for ISIS PDS
+void CopyOsFiles() {        // copies system files, (note if t0Only is true only isis.t0 is copied, primarily for ISIS PDS
     filePath = path;
     strcpy(relPath, osMap[osType].osloc);
     char *osFile = strchr(relPath, '\0');
     strcpy(osFile, "isis.t0");
     isisT0Seen = CopyFile("ISIS.T0", -1);
-    if (t0Only)
-        return;
     strcpy(osFile, Format(diskType) == ISISP ? "isis.pds" : "isis.bin");
     isisBinSeen = CopyFile(Format(diskType) == ISISP ? "ISIS.PDS" : "ISIS.BIN", -1);
     strcpy(osFile, "isis.cli");
@@ -450,7 +448,7 @@ void WriteI2Directory() {
         int binHdrBlk = Density(diskType) == 0 ? SDBINHDR : DDBINHDR;
         NewHdrSector(binHdrBlk);
         MakeDirEntry("ISIS.BIN", ((osMap[osType].osflags & USESWP )? WP : FMT) | SYS | INV, 128, 0, binHdrBlk);
-        CopyOsFiles(false);
+        CopyOsFiles();
     }
 }
 
@@ -481,7 +479,8 @@ void WriteI3Directory() {
     MakeDirEntry("ISIS.FRE", FMT | INV, ISISFRE_LEN - 1, cntBitMapSectors, ISISFRE_HDR);
     MakeDirEntry("ISIS.T0", FMT | INV, sectorSize - 1, ISIS3T0_SIZE, ISIS3T0_HDR);
     MakeDirEntry("ISIS.LAB", FMT | INV, sectorSize - 1, ISIS3LAB_SIZE, ISIS3LAB_HDR);
-    CopyOsFiles(osType == 0);
+    if (osType)
+        CopyOsFiles();
 }
 
 void WriteLabel() {

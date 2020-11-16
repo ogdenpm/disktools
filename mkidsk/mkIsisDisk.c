@@ -302,7 +302,7 @@ unsigned getDiskType(int formatIndex, int osIndex) {         // returns usable d
             return (diskFmt << 1) | density;   // update generic disk type
         }
     }
-    if ((diskFmt == ISISP) ^ (osType == PDS10 || osType == PDS11))  // PDS must have PDS os
+    if (osType != NONE && ((diskFmt == ISISP) ^ (osType == PDS10 || osType == PDS11)))  // PDS must not have non PDS os
         return NOFORMAT;
     if ((diskFmt & 1) && (osType == I11 || osType == II22))         // os versions don't support DD
         return NOFORMAT;
