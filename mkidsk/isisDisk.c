@@ -45,6 +45,7 @@ int binHdrBlk;
 
 extern char path[];
 extern char *relPath;
+extern char *filePath;
 
 
 
@@ -307,7 +308,7 @@ bool CopyFile(char *isisName, int attrib) {
     FILE *fp;
     int curHdrBlk;
 
-    if (strcmp(relPath, "AUTO") == 0) {
+    if (strcmp(filePath, "AUTO") == 0) {
         if (dir = Lookup(isisName, false)) {
             if (attrib >= 0)
                 dir->attrib = attrib;
@@ -315,7 +316,7 @@ bool CopyFile(char *isisName, int attrib) {
             fprintf(stderr, "Out of directory space for file %s\n", isisName);
         return dir != NULL;
     }
-    if (strcmp(relPath, "ZERO") == 0) {     // empty file
+    if (strcmp(filePath, "ZERO") == 0) {     // empty file
         if ((dir = Lookup(isisName, false)) == NULL)  // create dir entry if it doesn't exist
             dir = MakeDirEntry(isisName, attrib, 0, 0, 0);
         else
@@ -338,7 +339,7 @@ bool CopyFile(char *isisName, int attrib) {
         else
             attrib = 0;
 
-    if ((fp = fopen(path, "rb")) == NULL) {
+    if ((fp = fopen(filePath, "rb")) == NULL) {
         return false;
     }
     if ((dir = Lookup(isisName, false)) == NULL)  // create dir entry if it doesn't exist
@@ -383,6 +384,7 @@ bool CopyFile(char *isisName, int attrib) {
 }
 
 void CopyOsFiles(bool t0Only) {        // copies system files, (note if t0Only is true only isis.t0 is copied, primarily for ISIS PDS
+    filePath = path;
     strcpy(relPath, osMap[osType].osloc);
     char *osFile = strchr(relPath, '\0');
     strcpy(osFile, "isis.t0");

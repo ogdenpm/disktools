@@ -114,6 +114,8 @@ char comment[MAXCOMMENT];
 char source[MAXCOMMENT];
 char path[_MAX_PATH + 1];
 char *relPath = path;
+char *filePath;
+
 uint8_t diskType = NOFORMAT;
 uint8_t osType = NONE;
 label_t label;
@@ -136,29 +138,18 @@ struct {
     char *format;
     int disktype;
 } formatLookup[] = {
-    "ISIS SD", _DT(ISISU, SD),
+    "SD", _DT(ISISU, SD),
+    "ISIS II SD", _DT(ISISU, SD),
     "ISIS SD1", _DT(ISIS1, SD),
     "ISIS SD2", _DT(ISIS2, SD),
     "ISIS SD3", _DT(ISIS3, SD),
     "ISIS SD4", _DT(ISIS4, SD),
-    "ISIS DD", _DT(ISISU, DD),
+    "DD", _DT(ISISU, DD),
     "ISIS II DD", _DT(ISISU, DD),
     "ISIS DD3", _DT(ISIS3, DD),
     "ISIS DD4", _DT(ISIS4, DD),
-    "ISIS PDS", _DT(ISISP, DD),
     "PDS", _DT(ISISP, DD),
-    "ISIS I SD", _DT(ISIS1, SD),
-    "ISIS I SD1", _DT(ISIS1, SD),
-    "ISIS II SD", _DT(ISISU, SD),
-    "ISIS II SD2", _DT(ISIS2, SD),
-    "ISIS II SD3", _DT(ISIS3, SD),
-    "ISIS II SD4", _DT(ISIS4, SD),
-    "ISIS III SD", _DT(ISIS4, SD),
-    "ISIS III SD4", _DT(ISIS4, SD),
-    "ISIS II DD3", _DT(ISIS3, DD),
-    "ISIS II DD4", _DT(ISIS4, DD),
-    "ISIS III DD", _DT(ISIS4, DD),
-    "ISIS III DD4", _DT(ISIS4, DD),
+    "ISIS PDS", _DT(ISISP, DD),
     NULL, NOFORMAT
 };
 #undef _DT
@@ -178,7 +169,7 @@ struct {
     "ISIS II 4.2w", II42W,
     "ISIS II 4.3",  II43,
     "ISIS II 4.3w", II43W,
-    "PDS 1.0",      PDS10,          // update function chkCOmpatible if more pds variants added
+    "PDS 1.0",      PDS10,          // update function chkCompatible if more pds variants added
     "PDS 1.1",      PDS11,
     "TEST 1.0",     TEST10,
     "TEST 1.1",     TEST11,
@@ -305,7 +296,8 @@ unsigned getDiskType(int formatIndex, int osIndex) {         // returns usable d
                         diskFmt = ISIS2;        // could be ISIS1 but the same format anyway
                 } else
                     diskFmt = strncmp(label.fmtTable, "1H5", 3) == 0 ? ISIS3 : ISIS4;
-            } else
+            }
+            if (diskFmt == ISISU)
                 diskFmt = label.version[0] == '3' ? ISIS3 : ISIS4;
             return (diskFmt << 1) | density;   // update generic disk type
         }
@@ -476,30 +468,35 @@ void ParsePath(char *src) {
 
 
     if (!*src) {
-        strcpy(relPath, "*missing path");
+        filePath = "*missing path";
         return;
     }
 
     for (int i = 0; special[i]; i++) {
         if (strcmp(src, special[i]) == 0) {
-            strcpy(relPath, src);
+            filePath = src;
             return;
         }
     }
 
-    if (*src == '^') {               // repository file
-        if (relPath == path && warnRepo) {
-            fprintf(stderr, "Warning IFILEREPO not defined assuming local directory\n");
-            warnRepo = false;
-        }
-        src++;
-    }
-    *relPath = 0;
-    if (strlen(path) + strlen(src) >= _MAX_PATH) {
-        strcpy(path, "*path too long");
+    if (*src != '^') {
+        filePath = src;
         return;
     }
-    strcat(relPath, src);
+
+    // repository file
+    if (relPath == path && warnRepo) {
+        fprintf(stderr, "Warning IFILEREPO not defined assuming local directory\n");
+        warnRepo = false;
+    }
+    src++;
+    *relPath = 0;
+    if ((relPath - path) + strlen(src) >= _MAX_PATH) {
+        filePath = "*path too long";
+        return;
+    }
+    strcpy(relPath, src);
+    filePath = path;
 }
 
 void chkSystem()  {
@@ -519,6 +516,10 @@ void chkSystem()  {
 void GenIsisName(char *isisName, char *line) {
     char *s;
     char *fname = (s = strrchr(line, ',')) ? s + 1 : line;
+    if (strcmp(fname, "AUTO") == 0 || strcmp(fname, "ZERO") == 0) {
+        *isisName = 0;
+        return;
+    }
     if (s = strrchr(fname, '/'))
         fname = s + 1;
     if (s = strrchr(fname, '\\'))
@@ -526,6 +527,8 @@ void GenIsisName(char *isisName, char *line) {
     if (*fname == '^')
         fname++;
     ParseIsisName(isisName, fname);     // generate the ISIS name
+    if ((s = strchr(isisName, '.')) && s[1] == 0)   // don't auto generate name ending in  .
+        *s = 0;
 }
 
 char *skipws(char *s) {
@@ -595,11 +598,11 @@ void ParseFiles(FILE *fp) {
             attributes = 0;
 
         if (*s == ',' && strchr(s + 1, ','))                // checksum present or only location
-            s = strchr(s + 1, ',');
+            s = strchr(s + 1, ',') +1;
 
-        ParsePath(s + 1);
-        if (*relPath == '*') {
-            fprintf(stderr, "%s - skipped because %s\n", line, relPath + 1);
+        ParsePath(s);
+        if (*filePath == '*') {
+            fprintf(stderr, "%s - skipped because %s\n", line, filePath + 1);
             continue;
         } else if (strcmp(isisName, "ISIS.BIN") == 0) {
             if (!osType || (diskType >> 1) == ISISP) {
@@ -611,14 +614,14 @@ void ParseFiles(FILE *fp) {
             if (!osType || (diskType >> 1) != ISISP) {
                 fprintf(stderr, "ISIS.PDS not allowed for %s system disk - skipping\n", osMap[osType].osname);
                 continue;
-            } else if (strcmp(relPath, "AUTO") != 0)
+            } else if (strcmp(filePath, "AUTO") != 0)
                 isisBinSeen = true;
-        } else if (strcmp(isisName, "ISIS.T0") == 0 && strcmp(relPath, "AUTO") != 0)
+        } else if (strcmp(isisName, "ISIS.T0") == 0 && strcmp(filePath, "AUTO") != 0)
             isisT0Seen = true;
-        else if (strcmp(isisName, "ISIS.CLI") == 0 && strcmp(relPath, "AUTO") != 0)
+        else if (strcmp(isisName, "ISIS.CLI") == 0 && strcmp(filePath, "AUTO") != 0)
             isisCliSeen = true;
         if (!CopyFile(isisName, attributes))
-            fprintf(stderr, "%s can't find source file %s\n", isisName, path);
+            fprintf(stderr, "%s can't find source file %s\n", isisName, filePath);
 
     }
     chkSystem();
