@@ -126,7 +126,7 @@ struct {
     "6zffO/tlxHVojxlqs2BQvu31814", "PDS 1.0",
     "kr87fI+DkuGXQec3i2IG7S+8usI", "PDS 1.1",
     "DJ5TiAs5F4yNGlp7fzUjT/k5Zsk", "TEST 1.0",
-    "KAlydjlWEQlAsNq8a4KYcyx0UZg", "TEST 1.0",      // same code different padding at end
+    "KAlydjlWEQlAsNq8a4KYcyx0UZg", "TEST 1.0",      // same executable code different padding at end
     "7SzuQtZxju9XU/+ehbFOQ7W0tz8", "TEST 1.1",
     "yOeRj3n6yo8SYlu3Ne4L8Ci52BI", "OSIRIS 3.0",
     "JnbT/FfQLj4sVO/yJLIL8tyoGUU", "ISIS III(N) 2.0",
@@ -134,7 +134,7 @@ struct {
     0, "NONE"
 };
 
-char *osFormat[] = { "UNKNOWN", "ISIS SD", "ISIS DD", "ISIS PDS", "ISIS IV", "ISIS-DOS" };
+char *osFormat[] = { "UNKNOWN", "SD", "DD", "PDS", "ISIS IV", "ISIS-DOS" };
 char *suffixFormat = "-SDP4X";
 
 
@@ -214,8 +214,8 @@ void getRecipeInfo(isisDir_t *isisDir, int diskType, bool isOK) {
         StrEncodeNCat(recipeInfo.crlf, label.crlf, 2);
 
     if (*label.fmtTable)
-        if (diskType == ISIS_SD && strncmp(label.fmtTable, "1<6", 3) ||  // nonstandard interleave suffix
-            diskType == ISIS_DD && strncmp(label.fmtTable, "145", 3))
+        if (diskType == ISIS_SD && strncmp(label.fmtTable, "1<6", 3) || // not 3.4+ SD
+            diskType == ISIS_DD && strncmp(label.fmtTable, "145", 3))   // not 4.0+ DD
             strncpy(recipeInfo.interleave, label.fmtTable, 3);
 
 }
