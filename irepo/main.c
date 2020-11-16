@@ -49,7 +49,11 @@ void showDuplicates() {
 	}
 }
 
-char *skipws(char *s) {
+char *trim(char *s) {
+	char *t = strchr(s, '\0');
+	while (t > s && isblank(t[-1]))
+		t--;
+	*t = 0;
 	while (isblank(*s))
 		s++;
 	return s;
@@ -97,7 +101,8 @@ void reIndexFile(const char *path, bool showAlt) {
 			while ((c = getc(fpin)) != '\n' && c != EOF)
 				;
 		}
-		s = skipws(line);
+
+		s = trim(line);
 		if (state == FILES) {
 			if (*s == '#') {
 				if (strnicmp(line, "# also ^", 8) == 0)		// # also only count as single change (with recipe itself & any added #also

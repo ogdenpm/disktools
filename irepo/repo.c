@@ -121,6 +121,10 @@ char *ParseIsisName(char *isisName, char *src) {
 void GenIsisName(char *isisName, char *line) {
 	char *s;
 	char *fname = (s = strrchr(line, ',')) ? s + 1 : line;
+	if (strcmp(fname, "AUTO") == 0 || strcmp(fname, "ZERO") == 0) {
+		*isisName = 0;
+		return;
+	}
 	if (s = strrchr(fname, '/'))
 		fname = s + 1;
 	if (s = strrchr(fname, '\\'))
@@ -128,6 +132,9 @@ void GenIsisName(char *isisName, char *line) {
 	if (*fname == '^')
 		fname++;
 	ParseIsisName(isisName, fname);     // generate the ISIS name
+	if ((s = strchr(isisName, '.')) && s[1] == 0)   // don't auto generate name ending in  .
+		*s = 0;
+
 }
 
 bool isIsisName(const char *name) {
@@ -157,6 +164,7 @@ bool parseRecipe(char *line, recipe_t *recipe) {
 			s--;
 		*s = 0;
 	}
+
 	char *fstart = tmp;
 	char *fend;
 
