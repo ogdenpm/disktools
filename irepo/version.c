@@ -22,6 +22,7 @@
 
 #include <stdio.h>
 #include <stdbool.h>
+#include <limits.h>
 #include "Generated/version.h"
 
 // use the following function declaration in the main code
