@@ -200,12 +200,13 @@ osMap_t osMap[] = {
     "ISIS II 4.2w", "Intel80/isis_ii/4.2w/", HASOV0,
     "ISIS II 4.3", "Intel80/isis_ii/4.3/", HASOV0,
     "ISIS II 4.3w", "Intel80/isis_ii/4.3w/", HASOV0,
-    "ISIS III(N) 2.0", "Intel80/isis_iii(n)/2.0/", HASOV0 + HASOV1,
-    "ISIS III(N) 2.2", "Intel80/isis_iii(n)/2.2/", HASOV0 + HASOV1,
     "ISIS PDS 1.0", "Intel80/pds/1.0/", 0,
     "ISIS PDS 1.1", "Intel80/pds/1.1/", 0,
     "TEST 1.0", "Intel80/confid/1.0/", 0,
     "TEST 1.1", "Intel80/confid/1.1/", 0,
+    "ISIS III(N) 2.0", "Intel80/isis_iii(n)/2.0/", HASOV0 + HASOV1,
+    "ISIS III(N) 2.2", "Intel80/isis_iii(n)/2.2/", HASOV0 + HASOV1,
+
 };
 
 
