@@ -110,7 +110,10 @@ void writeImdFile(char *fname) {
             if (trackPtr->status & TS_CYL) {
                 logFull(D_WARNING, "cylinder map needed for track %02d/%d\n", trackPtr->cylinder, trackPtr->side);
                 for (int i = 0; i < trackPtr->fmt->spt; i++)
-                    putc(trackPtr->sectors[i].idam.cylinder, fp);
+                    if (trackPtr->sectors[i].status & SS_IDAMGOOD)
+                        putc(trackPtr->sectors[i].idam.cylinder, fp);
+                    else
+                        putc(trackPtr->altCylinder, fp);
             }
             if (trackPtr->status & TS_SIDE) {
                 logFull(D_WARNING, "head map needed for track %02d/%d\n", trackPtr->cylinder, trackPtr->side);

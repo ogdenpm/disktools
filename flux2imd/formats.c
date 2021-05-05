@@ -233,7 +233,7 @@ formatInfo_t formatInfo[] = {
 
        {"DD8"        , 0, 0 , 0,  E_MFM8,      0, crcStd,    dd8Patterns,      0,      0,   0,   0, 1000, "01234", "8\" DD MFM & M2FM **"},
        {"MFM8-52x128", 0, 1, 52,  E_MFM8, O_SIZE, crcStd,    dd8Patterns, 0xcdb4,     138, 182, 195, 1000, "01234", "8\" DD 52 x 128 sectors"},    // needs checking with real disk
-       {"MFM8-26x256", 1, 1, 26,  E_MFM8,      0, crcStd,    dd8Patterns, 0xcdb4,     138, 182, 368, 1000, "01234", "8\" DD 26 x 256 sectors"},
+       {"MFM8-26x256", 1, 1, 26,  E_MFM8, O_SIZE, crcStd,    dd8Patterns, 0xcdb4,     138, 182, 368, 1000, "01234", "8\" DD 26 x 256 sectors"},
        {"M2FM8-INTEL", 0, 1, 52, E_M2FM8,      0, crcStd, ddM2FMPatterns,      0,     75, 111, 195, 1000, "01234", "8\" Intel M2FM DD 52 x 128 sectors"},    // U
        {"M2FM8-HP"   , 1, 0, 30, E_M2FM8,   O_HP, crcRev,   ddHPPatterns, 0xffff,     92, 123, 332, 1000, "01234", "8\" HP DD 30 x 256 sectors"},   // U
        {"TI",     1, 0, 26, E_MFM8,    O_TI, crcStd,   ddTIPatterns, 0xffff,     131, 169, 392, 1000, "34012", "8\" TI 26 x 288 sectors"},
