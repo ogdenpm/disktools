@@ -291,11 +291,17 @@ TRACK *load_track(FILE *fp)
         if (h & 0x80) {
             if (fread(t->Cmap, 1, n, fp) != n)
                 error("EOF in Cylinder Map");
-            if (issame(t->Cmap, n)) {
-                t->Cyl = t->Cmap[0];
-                t->Hflag &= 0x7f;
-                h &= 0x7f;
+            if (!issame(t->Cmap, n)) {
+                for (int i = 0; i < n; i++)
+                    if (t->Cmap[i]) {
+                        t->Cmap[0] = t->Cmap[i];
+                        break;     
+                    }
+                fprintf(stderr, "WARNING: mixed cylinder head mapping not supported. Mapping all of cylinder %d to %d\n", t->Cyl, t->Cmap[0]);
             }
+            t->Cyl = t->Cmap[0];
+            t->Hflag &= 0x7f;
+            h &= 0x7f;
         }
         else
             memset(t->Cmap, t->Cyl, n);
