@@ -346,8 +346,7 @@ TRACK *load_track(FILE *fp)
     return t;
 }
 
-void load_imd(FILE *fp)
-{
+void load_imd(FILE *fp) {
     TRACK *t;
     int c;
     int i = 0;
@@ -356,8 +355,7 @@ void load_imd(FILE *fp)
         if (c == EOF) {
             fprintf(stderr, "EOF in comment\n");
             exit(1);
-        }
-        else if (c != '\r') {
+        }         else if (c != '\r') {
             putchar(c);
             if (i < MAXCOMMENT)
                 comment[i++] = c;
@@ -377,17 +375,20 @@ void load_imd(FILE *fp)
                 printf("track duplicate %d/%d - info different\n", t->Cyl, t->Head);
             free_track(t);
             continue;
-        }
-        else
+        }         else
             disk[t->Cyl][t->Head] = t;
     }
-    switch (disk[1][0]->Nsec) {
-    case 26: diskType = ISIS_SD; break;
-    case 52: diskType = ISIS_DD; break;
-    case 16: diskType = disk[0][0] && disk[0][0]->Size == 256 ? ISIS_DOS : ISIS_PDS; break;
-    case 8: diskType = ISIS_IV; break;
-    default: diskType = UNKNOWN;
-    }
+
+    if (disk[1][0] == NULL && disk[2][0] == NULL)
+        diskType = UNKNOWN;
+    else
+        switch (disk[1][0] ? disk[1][0]->Nsec : disk[2][0]->Nsec) {
+        case 26: diskType = ISIS_SD; break;
+        case 52: diskType = ISIS_DD; break;
+        case 16: diskType = disk[0][0] && disk[0][0]->Size == 256 ? ISIS_DOS : ISIS_PDS; break;
+        case 8: diskType = ISIS_IV; break;
+        default: diskType = UNKNOWN;
+        }
 }
 
 struct {
