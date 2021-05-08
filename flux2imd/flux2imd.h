@@ -43,3 +43,8 @@ void displayHist(int levels);
 // writeImage.c
 void writeImdFile(char *fname);
 void analyse(char *opt);
+
+typedef struct {
+    int cyl;
+    int head;
+} TrackId;

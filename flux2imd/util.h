@@ -37,7 +37,7 @@
 #define sOpt    8
 
 // current file for log prefix
-extern char curFile[];
+extern char logPrefix[];
 
 enum {
     ALWAYS = 0, D_ECHO = 1, D_FLUX = 2, D_DETECT = 4, D_PATTERN = 8,
@@ -61,3 +61,4 @@ int logBasic(char* fmt, ...);
 bool extMatch(const char* fname, const char* ext);
 const char* fileName(const char* fname);
 void createLogFile(const char *fname);
+void setLogPrefix(const char *container, const char *element);

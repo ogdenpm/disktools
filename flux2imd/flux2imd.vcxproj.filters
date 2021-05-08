@@ -57,6 +57,9 @@
     <ClCompile Include="version.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="container.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="flux.h">
@@ -84,6 +87,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="flux2imd.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="container.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

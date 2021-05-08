@@ -30,7 +30,7 @@
 #include <string.h>
 #include "util.h"
 
-extern char curFile[];
+char logPrefix[_MAX_FNAME * 2 + 3];      // fname[item];
 unsigned debug;
 FILE *logFp = NULL;  
 
@@ -90,17 +90,17 @@ void logFull(int level, char *fmt, ...) {
 
     if (level >= D_WARNING) {
         if (logFp != stdout) {
-            fprintf(logFp, "%s - %s: ", curFile, prefix[level - D_WARNING]);
+            fprintf(logFp, "%s - %s: ", logPrefix, prefix[level - D_WARNING]);
             vfprintf(logFp, fmt, args);
         }
-        fprintf(stderr, "%s - %s: ", curFile, prefix[level - D_WARNING]);
+        fprintf(stderr, "%s - %s: ", logPrefix, prefix[level - D_WARNING]);
         vfprintf(stderr, fmt, args);
     }
     else if (level ==  0 || (debug & level)) {
-        fprintf(logFp, "%s%s", curFile, *fmt ? " - " : ""); // don't use - separator if no string to emit
+        fprintf(logFp, "%s%s", logPrefix, *fmt ? " - " : ""); // don't use - separator if no string to emit
         vfprintf(logFp, fmt, args);
         if ((debug & D_ECHO) && logFp != stdout) {
-            printf("%s%s", curFile, *fmt ? " - " : "");
+            printf("%s%s", logPrefix, *fmt ? " - " : "");
             vprintf(fmt, args);
         }
     }
@@ -136,4 +136,11 @@ void* xmalloc(size_t size) {
         exit(1);
     }
     return ptr;
+}
+
+
+void setLogPrefix(const char *container, const char *element) {
+    strcpy(logPrefix, fileName(container));
+    if (element && *element)
+        sprintf(strchr(logPrefix, 0), "[%s]", fileName(element));
 }
