@@ -60,6 +60,12 @@
     <ClCompile Include="container.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="stdflux.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="scp.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="flux.h">
@@ -90,6 +96,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="container.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="stdflux.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="scp.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

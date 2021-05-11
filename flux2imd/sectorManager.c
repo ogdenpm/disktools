@@ -35,6 +35,7 @@
 #include "trackManager.h"
 #include "flux.h"
 #include "util.h"
+#include "stdflux.h"
 
 static int prevSlot = -1;
 static unsigned curSpacing;
@@ -76,7 +77,7 @@ static unsigned slotAt(int pos, bool isIdam) {
 
     if (prevSlot < 0 || pos + POSJITTER < (isIdam ? prevIdamPos : prevDataPos)) {       // initialise either explicit or due to seek from start
         curSpacing = curFormat->spacing;
-        if (cntHardSectors())
+        if (getHsCnt())
             minSpacing = maxSpacing = curSpacing;
         else {
             minSpacing = curFormat->spacing * 97 / 100;     // +/- 3%

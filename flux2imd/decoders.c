@@ -35,6 +35,8 @@
 #include "formats.h"
 #include "trackManager.h"
 #include "util.h"
+#include "stdflux.h"
+
 
 static void invert(uint16_t *data, int len) {
     while (len-- > 0)
@@ -103,13 +105,16 @@ static uint8_t conflicts[32] = {
     4, 68, 36, 255, 20, 255, 52, 255, 12, 76, 44, 255, 28, 255, 60, 255
 };
 
+
+int32_t fromTs = 0;
+
 static uint16_t hs8Sync(unsigned cylinder, unsigned slot) {
     int matchType;
 
     makeHS8Patterns(cylinder, slot);
 
     matchType = matchPattern(30);
-    if (curFormat->options == 0 && conflicts[slot] == cylinder && matchType == LSI_SECTOR && getByteCnt() > 12)
+    if (curFormat->options == 0 && conflicts[slot] == cylinder && matchType == LSI_SECTOR && getByteCnt(fromTs) > 12)
         matchType = matchPattern(2);
     return matchType;
 
@@ -154,14 +159,19 @@ static void hs5GetTrack(int cylinder, int side) {
 
     bool done = false;
 
-    int cntSlot = cntHardSectors();
+    int cntSlot = getHsCnt();
     int sectorSize = 128 << curFormat->sSize;
 
     initTrack(cylinder, side);
     resetTracker();
     
     for (int profile = 0; !done && retrain(profile); profile++) {
-        for (int i = 0; (slot = seekBlock(i)) >= 0; i++) {
+        seekIndex(0);
+        fromTs = peekTs();
+        for (int i = 0; (slot = seekIndex(i)) != EODATA; i++) {
+            if (slot < 0)
+                continue;
+            fromTs = peekTs();
             if (!sectorStatus[slot] || (profile == 0 && (debug & D_NOOPTIMISE))) {
                 retrain(0);
                 if (cntSlot != 10)
@@ -213,6 +223,7 @@ static void hs5GetTrack(int cylinder, int side) {
             idam.sectorId = (curFormat->options == O_NSI) ? nsiMap[side][slot] : slot;
             addIdam(-slot, &idam);
     }
+    setOnIndex(NULL);
 }
 
 // only up to 32 sector 8" hard sector format supported
@@ -223,13 +234,15 @@ static void hs8GetTrack(int cylinder, int side) {
     int matchType;
 
     bool done = false;
-
     initTrack(cylinder, 0);
     resetTracker();
 
-    int cntSlot = cntHardSectors();
+    int cntSlot = getHsCnt();
     for (int profile = 0; !done; profile++) {
-        for (int i = 0; (slot = seekBlock(i)) >= 0; i++) {
+        for (int i = 0; (slot = seekIndex(i)) != EODATA; i++) {
+            if (slot < 0)
+                continue;
+            fromTs = peekTs();
             if (sectorStatus[slot] && profile != 0 && !(debug & D_NOOPTIMISE))        // skip known good sectors unless D_NOOPTIMISE specified
                 continue;
             uint16_t rawData[138];      // sector + cylinder + 128 bytes + 4 links + 2 CRC + 2 postamble
@@ -241,7 +254,7 @@ static void hs8GetTrack(int cylinder, int side) {
             }
 
             if (matchType = hs8Sync(cylinder, slot)) {
-                dataPos = getByteCnt();
+                dataPos = getByteCnt(fromTs);
                     if (curFormat->options == O_LSI && matchType == ZDS_SECTOR) {    // LSI & ZDS on same track assume all ZDS
                         DBGLOG(D_DECODER, "@%d:%d ZDS sector after LSI sector, rescan assuming ZDS\n", slot, dataPos);
                         setFormat("ZDS");
@@ -270,7 +283,7 @@ static void hs8GetTrack(int cylinder, int side) {
                     addSectorData(-slot, result, 136, rawData + 2);
                 }
 
-                DBGLOG(D_DECODER, "@%d-%d %s sector %d%s\n", dataPos, getByteCnt(), matchType == LSI_SECTOR ? "LSI" : "ZDS",
+                DBGLOG(D_DECODER, "@%d-%d %s sector %d%s\n", dataPos, getByteCnt(fromTs), matchType == LSI_SECTOR ? "LSI" : "ZDS",
                     slot, result == 1 ? "" : " bad crc");
                 sectorStatus[slot] |= result;
             } else
@@ -281,7 +294,7 @@ static void hs8GetTrack(int cylinder, int side) {
                 while ((val = getByte()) >= 0)
                     logBasic(" %02X", val);
                 logBasic("\n");
-                DBGLOG(D_DECODER, "@%u end of sector %d\n", getByteCnt());
+                DBGLOG(D_DECODER, "@%u end of sector %d\n", getByteCnt(fromTs));
             }
 
         }
@@ -301,6 +314,7 @@ static void hs8GetTrack(int cylinder, int side) {
         idam.sectorId = (curFormat->options != O_NSI) ? slot : (lsiInterleave[slot] + cylinder * 8) % 32;
         addIdam(-slot, &idam);
     }
+    setOnIndex(NULL);
     finaliseTrack();
 }
 
@@ -311,6 +325,7 @@ static void ssGetTrack(int cylinder, int side, char *usrfmt) {
 
     idam_t idam;
     unsigned sectorLen;
+
     uint16_t rawData[1024 + 3];       // allow for 1024 byte sector + 2 byte CRC + Address Marker
 
     unsigned idamPos = 0;
@@ -322,9 +337,14 @@ static void ssGetTrack(int cylinder, int side, char *usrfmt) {
     unsigned sSize = curFormat->sSize;
 
     bool done = false;
+    int itype;
     int profile;
     for (profile = 0; !done; profile++) {
-        for (int i = 1; !done && (seekBlock(i) >= 0); i++) {
+        for (int i = 0; !done && (itype = seekIndex(i)) != EODATA; i++) {
+            if (itype == SODATA)
+                continue;
+
+            fromTs = peekTs();
             if (!retrain(profile)) {
                 done = true;
                 break;
@@ -337,11 +357,11 @@ static void ssGetTrack(int cylinder, int side, char *usrfmt) {
                 switch (matchType) {
                 case M2FM_INDEXAM:
                 case INDEXAM:           // to note start of track
-                    indexPos = getByteCnt();
+                    indexPos = getByteCnt(fromTs);
                     DBGLOG(D_DECODER, "@%d index\n", indexPos);
                     break;
                 case TI_IDAM:
-                    idamPos = getByteCnt();
+                    idamPos = getByteCnt(fromTs);
                     result = getData(matchType, rawData, 9);
                     if (result == 1) {
                         idam.cylinder = (rawData[2] & 0x7f);
@@ -359,7 +379,7 @@ static void ssGetTrack(int cylinder, int side, char *usrfmt) {
                 case IDAM:
                 case M2FM_IDAM:
                 case HP_IDAM:
-                    idamPos = getByteCnt();
+                    idamPos = getByteCnt(fromTs);
                     result = getData(matchType, rawData, matchType == HP_IDAM ? 5 : 7);
                     if (result == 1) {           // valid so ok
                         idam.cylinder = (uint8_t)rawData[1];
@@ -379,7 +399,7 @@ static void ssGetTrack(int cylinder, int side, char *usrfmt) {
                         }
                         //chkSptChange(idamPos, true);
 
-                        DBGLOG(D_DECODER, "@%d-%d idam %d/%d/%d sSize %d\n", idamPos, getByteCnt(), idam.cylinder, idam.side, idam.sectorId, sSize);
+                        DBGLOG(D_DECODER, "@%d-%d idam %d/%d/%d sSize %d\n", idamPos, getByteCnt(fromTs), idam.cylinder, idam.side, idam.sectorId, sSize);
                         addIdam(idamPos, &idam);
                     } else
                         logFull(D_DECODER, "@%d idam %s\n", idamPos, result < 0 ? "premature end\n" : "bad crc\n");
@@ -388,7 +408,7 @@ static void ssGetTrack(int cylinder, int side, char *usrfmt) {
                 case DATAAM:
                 case M2FM_DATAAM:
                 case HP_DATAAM:
-                    dataPos = getByteCnt();
+                    dataPos = getByteCnt(fromTs);
 
                     sectorLen = matchType == TI_DATAAM ? 288 : 128 << sSize;
                     result = getData(matchType, rawData, sectorLen + 3);
@@ -397,14 +417,14 @@ static void ssGetTrack(int cylinder, int side, char *usrfmt) {
                             invert(rawData + 1, sectorLen);
                         addSectorData(dataPos, result, sectorLen + 2, rawData + 1);     // add data after address mark
                         savedData = true;
-                        DBGLOG(D_DECODER, "@%d-%d data len %d%s\n", dataPos, getByteCnt(), sectorLen, result == 1 ? "" : " bad crc");
+                        DBGLOG(D_DECODER, "@%d-%d data len %d%s\n", dataPos, getByteCnt(fromTs), sectorLen, result == 1 ? "" : " bad crc");
                     } else
                         logFull(D_DECODER, "@%d premature end of sector\n", dataPos);
                     break;
                 case DELETEDAM:
                 case M2FM_DELETEDAM:
                 case HP_DELETEDAM:
-                    logFull(ALWAYS, "@%d Deleted AM\n", getByteCnt());
+                    logFull(ALWAYS, "@%d Deleted AM\n", getByteCnt(fromTs));
                     sectorLen = 128 << sSize;
                     getData(matchType, rawData, sectorLen + 3);
                     break;
@@ -415,7 +435,7 @@ static void ssGetTrack(int cylinder, int side, char *usrfmt) {
                 savedData = false;
                 i = 0;
             } else {
-                DBGLOG(D_DECODER, "@%d end of track\n", getByteCnt());
+                DBGLOG(D_DECODER, "@%d end of track\n", getByteCnt(fromTs));
                 done = checkTrack(profile);
             }
         }
@@ -423,17 +443,23 @@ static void ssGetTrack(int cylinder, int side, char *usrfmt) {
     finaliseTrack();
 }
 
-bool flux2Track(int cylinder, int head, char *usrfmt) {
+bool flux2Track(char *usrfmt) {
     char *fmt = NULL;
     int maxSlot = 0;
     int hs;
+    int cylinder = getCyl();
+    int head = getHead();
+    if (cylinder < 0 && head < 0) {
+        logFull(D_WARNING, "Unspecified Cylinder / Head not yet supported\n");
+        return false;
+    }
     logCylHead(cylinder, head);
 
     if (!setInitialFormat(getFormat(usrfmt, cylinder, head))) {
         logFull(D_ERROR, "Could not determine encoding\n");
         return false;
     }
-    if ((hs = cntHardSectors()) > 0) {
+    if ((hs = getHsCnt()) > 0) {
         if (hs == 16 || hs == 10)
             hs5GetTrack(cylinder, head);
         else if (hs == 32)

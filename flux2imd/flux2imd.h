@@ -30,7 +30,7 @@
 
 // decoders.c
 void assumeIMD();
-bool flux2Track(int cylinder, int side, char *usrfmt);
+bool flux2Track(char *usrfmt);
 bool noIMD();
 
 // display.c

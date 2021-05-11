@@ -216,14 +216,20 @@
     <ClCompile Include="decoders.c" />
     <ClCompile Include="display.c" />
     <ClCompile Include="formats.c" />
-    <ClCompile Include="flux2imd.c" />
+    <ClCompile Include="flux2imd.c">
+      <IntrinsicFunctions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</IntrinsicFunctions>
+      <InlineFunctionExpansion Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Default</InlineFunctionExpansion>
+      <WholeProgramOptimization Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</WholeProgramOptimization>
+    </ClCompile>
     <ClCompile Include="dpll.c">
       <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <ClCompile Include="flux.c" />
     <ClCompile Include="histogram.c" />
+    <ClCompile Include="scp.c" />
     <ClCompile Include="sectorManager.c" />
+    <ClCompile Include="stdflux.c" />
     <ClCompile Include="trackManager.c" />
     <ClCompile Include="util.c" />
     <ClCompile Include="version.c" />
@@ -237,7 +243,9 @@
     <ClInclude Include="dpll.h" />
     <ClInclude Include="flux.h" />
     <ClInclude Include="miniz.h" />
+    <ClInclude Include="scp.h" />
     <ClInclude Include="sectorManager.h" />
+    <ClInclude Include="stdflux.h" />
     <ClInclude Include="trackManager.h" />
     <ClInclude Include="util.h" />
     <ClInclude Include="zip.h" />

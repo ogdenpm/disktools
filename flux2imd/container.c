@@ -17,35 +17,29 @@ static TrackId trackId;
 
 typedef struct {
     bool (*open)(const char *fname);
-    TrackId *(*load)();
+    bool (*load)();
     bool (*close)();
 } IOFunc;
 
-
-
 static bool rawOpen(const char *fname);
-static TrackId *rawLoad();
+static bool rawLoad();
 static bool rawClose();
 static bool zipOpen(const char *fname);
-static TrackId *zipLoad();
+static bool zipLoad();
 static bool zipClose();
 bool scpOpen(const char *fname);
-TrackId *scpLoad();
+bool scpLoad();
 bool scpClose();
 static bool errOpen(const char *fname);
-
-static TrackId *getTrackId(const char *fname);
+static bool updateCylHead(const char *name);
 
 
 static IOFunc io = { NULL, NULL, NULL };
 
-
-
-
-static const IOFunc rawFuncs = {&rawOpen, &rawLoad, &rawClose};
-static const IOFunc zipFuncs = {&zipOpen, &zipLoad, &zipClose};
-static const IOFunc scpFuncs = {&errOpen, NULL, NULL};
-static const IOFunc errFuncs = {&errOpen, NULL, NULL };
+static const IOFunc rawFuncs = { &rawOpen, &rawLoad, &rawClose };
+static const IOFunc zipFuncs = { &zipOpen, &zipLoad, &zipClose };
+static const IOFunc scpFuncs = { &scpOpen, &scpLoad, &scpClose};
+static const IOFunc errFuncs = { &errOpen, NULL, NULL };
 
 
 
@@ -71,15 +65,14 @@ bool openFluxFile(const char *fname) {
     } else
         logFull(D_WARNING, "missing extent\n");
 
-    bool isOk =  io.open(fname);
+    bool isOk = io.open(fname);
     if (!isOk)
         io = errFuncs;
     return isOk;
 }
 
-
-TrackId *loadFluxStream() {
-    return io.load ? io.load() : NULL;
+bool loadFluxStream() {
+    return io.load ? io.load() : false;
 }
 
 bool closeFluxFile() {
@@ -90,19 +83,16 @@ bool closeFluxFile() {
     return result;
 }
 
-
 // handler for invalid files
 static bool errOpen(const char *fname) {
     return false;
 }
 
-
-
 // data variables for raw files
 static FILE *rawfp;
 static bool rawEof = false;
 static const char *rawName;
-static size_t rawBufSize = 0;
+static uint32_t rawBufSize = 0;
 static uint8_t *rawBuf;
 
 static bool rawOpen(const char *fname) {
@@ -115,9 +105,9 @@ static bool rawOpen(const char *fname) {
     return rawfp != NULL;
 }
 
-static TrackId *rawLoad() {
+static bool rawLoad() {
     if (rawEof)
-        return NULL;
+        return false;
     rawEof = true;                       // only one attempt at loading
 
     // work out size of file to load
@@ -128,10 +118,10 @@ static TrackId *rawLoad() {
     rawBuf = (uint8_t *)xmalloc(rawBufSize);
     if (fread(rawBuf, rawBufSize, 1, rawfp) != 1) {
         logFull(D_ERROR, "Failed to load file\n");
-        return NULL;
+        return false;
     }
-    loadFlux(rawBuf, rawBufSize);         // load in the flux data from buffer extracted from zip file
-    return getTrackId(rawName);
+    return loadKryoFlux(rawBuf, rawBufSize) && updateCylHead(rawName);         // load in the flux data from buffer extracted from zip file
+
 }
 
 static bool rawClose() {
@@ -140,14 +130,13 @@ static bool rawClose() {
     return true;
 }
 
-
 // data variables for zip files
 static struct zip_t *zip;
 static bool zipEof = true;
 static int zipReadCnt = 0;
 static int zipEntriesCnt = 0;
 static const char *zipName;
-static size_t zipBufSize = 0;
+static uint32_t zipBufSize = 0;
 static uint8_t *zipBuf;
 
 static bool zipOpen(const char *fname) {
@@ -165,8 +154,7 @@ static bool zipOpen(const char *fname) {
     return zip != 0;
 }
 
-
-static TrackId *zipLoad() {
+static bool zipLoad() {
     while (zipReadCnt < zipEntriesCnt) {
         if (zipBuf) {
             free(zipBuf);
@@ -180,38 +168,29 @@ static TrackId *zipLoad() {
         if (!extMatch(entryName, ".raw"))
             logFull(ALWAYS, "Skipping as non .raw file\n");
         else {
-            zipBufSize = (size_t)zip_entry_size(zip);
+            zipBufSize = (uint32_t)zip_entry_size(zip); // breaks if zip files entries > 4G !!!!
             zipBuf = (uint8_t *)xmalloc(zipBufSize);
             memset(zipBuf, 0, zipBufSize);
             if (zip_entry_noallocread(zip, (void *)zipBuf, zipBufSize) < 0)
                 logFull(D_ERROR, "Failed to load\n");
-            else {
-                loadFlux(zipBuf, zipBufSize);         // load in the flux data from buffer extracted from zip file
-                return getTrackId(entryName);
-            }
-
+            else if (loadKryoFlux(zipBuf, zipBufSize))         // load in the flux data from buffer extracted from zip file
+                return updateCylHead(entryName);
         }
     }
-    return NULL;
+    return false;
 }
-
-
-
-
 
 static bool zipClose() {
     zip_close(zip);
     free(zipBuf);
     return true;
-
 }
 
+static bool updateCylHead(const char *name) {
+    int cyl, head;
+    char *s = strrchr(name, '\0') - 8;
 
-static TrackId *getTrackId(const char *fname) {
-
-    char *s = strrchr(fname, '\0') - 8;
-
-    if (s < fname|| sscanf(s, "%2d.%1d.", &trackId.cyl, &trackId.head) != 2)
-        trackId.cyl = trackId.head = -1;
-    return &trackId;
+    if (s < name || sscanf(s, "%2d.%1d.", &cyl, &head) != 2)
+        cyl = head = -1;
+    return true;        // simplifies use after loadKryoFlux
 }

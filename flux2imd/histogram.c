@@ -30,8 +30,9 @@
 #include "flux2imd.h"
 #include "flux.h"
 #include "util.h"
+#include "stdflux.h"
 
-#define HIST_MAX_US    10          // max uS for histogram
+#define HIST_MAX_US    10        // max uS for histogram
 #define HIST_SLOTS_PER_US    8   // slots per uS
 #define HIST_SLOTS   (HIST_MAX_US * HIST_SLOTS_PER_US)
 
@@ -41,18 +42,21 @@ void displayHist(int levels)
     uint32_t maxHistCnt = 0;
     int maxHistVal = 0;
     uint32_t outRange = 0;
-    int val;
-    int prevFlux = 0;
-    int newFlux;
+    int32_t val;
+    int32_t prevTs = 0;
+    int32_t newTs;
 
-    // load the histogram data
-    for (int i = 0; seekBlock(i) >= 0; i++, prevFlux = 0) {
-        while ((newFlux = getNextFlux()) >= 0) {
-            val = newFlux - prevFlux;
-            prevFlux = newFlux;
+    seekIndex(0);               // to start of data
+    int scnt = 0;
+    int icnt = 0;
+    while ((newTs = getTs()) != EODATA) {
+        if (newTs >= 0) {        // ignore index markers
+            scnt++;
+            val = newTs - prevTs;
+            prevTs = newTs;
             if (val > maxHistVal)
                 maxHistVal = val;
-            val = (val * HIST_SLOTS_PER_US + 500) / 1000 ; // scale to slots with rounding
+            val = (val * HIST_SLOTS_PER_US + 500) / 1000; // scale to slots with rounding
             if (val > HIST_SLOTS)
                 outRange++;
             else if (++histogram[val] > maxHistCnt)

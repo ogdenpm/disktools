@@ -40,6 +40,7 @@
 #include "util.h"
 #include "zip.h"
 #include "container.h"
+#include "stdflux.h"
 
 void showVersion(FILE *fp, bool full);
 
@@ -53,20 +54,14 @@ static int options;
 static char *userfmt;       // user specified format
 static char *aopt;          // user specified analysis format
 
-static bool loadFile(char *name);
-static bool loadZipFile(struct zip_t *zip);
-static bool getTrackId(const char *fname, int *pCyl, int *pHead);
-
-
 
 
 
 static void decodeFile(char *name) {
-    TrackId *pTrack;
 
     if (openFluxFile(name)) {
         bool singleTrack = extMatch(name, ".raw");
-        while (pTrack = loadFluxStream()) {
+        while (loadFluxStream()) {
             if (histLevels)
                 displayHist(histLevels);
             if (aopt)
@@ -74,8 +69,8 @@ static void decodeFile(char *name) {
                     analyse(aopt);
                 else
                     logFull(D_WARNING, "-a only supported for single .raw files\n");
-            else if (flux2Track(pTrack->cyl, pTrack->head, getFormat(userfmt, pTrack->cyl, pTrack->head)))
-                displayTrack(pTrack->cyl, pTrack->head, options | (singleTrack || noIMD() ? gOpt : 0));
+            else if (flux2Track(getFormat(userfmt, getCyl(), getHead())))
+                displayTrack(getCyl(), getHead(), options | (singleTrack || noIMD() ? gOpt : 0));
 
         }
         displayDefectMap();

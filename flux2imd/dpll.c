@@ -32,7 +32,7 @@
 #include "flux.h"
 #include "util.h"
 #include "trackManager.h"
-
+#include "stdflux.h"
 
 static uint32_t ctime, etime;       // clock time and end of cell time
 static nominalCellSize = 1; 
@@ -136,7 +136,7 @@ int getBit() {
     pattern <<= 1;
 
     while (ctime < etime) {					// get next transition in a cell
-        if ((ctime = getNextFlux()) < 0)
+        if ((ctime = getTs()) < 0)
             return ctime;
     }
 
@@ -176,12 +176,12 @@ int getBit() {
     return 1;
 }
 
-unsigned getBitCnt() {
-    return getBitPos(nominalCellSize);
+int32_t getBitCnt(int32_t fromTs) {
+    return (peekTs() - fromTs) / nominalCellSize;
 }
 
-unsigned getByteCnt() {
-    return getBitCnt() / 16;
+int32_t getByteCnt(int32_t fromTs) {
+    return getBitCnt(fromTs) / 16;
 }
 
 bool retrain(int profile) {
@@ -201,11 +201,11 @@ bool retrain(int profile) {
     fCnt = aifCnt = adfCnt = pcCnt = 0; // reset the dpll
     up = false;
 
-    int flux = getNextFlux();           // prime dpll with firstr sample
-    double rpm = getRPM();
-    cellSize = (uint32_t)(nominalCellSize * (rpm < 320.0 ? 300.0 : 360.0) / rpm);
+    while ((ctime = getTs()) < 0)
+        if (ctime == EODATA)
+            return false;               // prime dpll with first sample
+    cellSize = nominalCellSize;
 
-    ctime = flux > 0 ? flux : 0;
     etime = ctime + cellSize / 2;       // assume its the middle of a cel
 
     adaptState = INIT;

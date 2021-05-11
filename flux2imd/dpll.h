@@ -32,8 +32,8 @@ extern uint64_t pattern;
 extern uint16_t bits65_66;
 
 int getBit();               // get next bit or -1 if end of flux stream
-unsigned getBitCnt();       // support function to return number of bits processed
-unsigned getByteCnt();      // support function to return number of bytes processed
+int32_t getBitCnt(int32_t fromTs);       // support function to return number of bits processed
+int32_t getByteCnt(int32_t fromTs);      // support function to return number of bytes processed
 bool retrain(int profile);  // reset the dpll using specified profile
 
 

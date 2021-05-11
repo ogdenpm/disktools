@@ -32,6 +32,7 @@
 #include "formats.h"
 #include "trackManager.h"
 #include "util.h"
+#include "stdflux.h"
 
 static int encoding = 0;
 
@@ -48,7 +49,7 @@ void analyse(char *opt) {
     strncat(afmt, opt, 14);
     setFormat(afmt);
 
-    int limit = cntHardSectors() ? cntHardSectors() : 1;
+    int limit = getHsCnt() ? getHsCnt() : 1;
     int i;
     int bit;
     unsigned bitCnt = 0;
@@ -64,7 +65,8 @@ void analyse(char *opt) {
     default: mask = 0; break;
     }
     logBasic("bitPos   bitCnt  Pattern  Clk  Normal  Inverted  Flipped  InvFlip  |  bitPos   bitCnt  Pattern  Clk  Normal  Inverted  Flipped  InvFlip");
-    for (i = 0; i < limit && seekBlock(i) >= 0; i++) {
+
+    for (i = 1; i < limit + 1 && seekIndex(i) != EODATA; i++) {
             retrain(0);
             while ((bit = getBit()) >= 0) {
                 bitCnt++;
@@ -72,7 +74,7 @@ void analyse(char *opt) {
                 data[bitCnt & 1] = data[bitCnt & 1] * 2 + bit;
                 suspect[bitCnt & 1] = suspect[bitCnt & 1] * 2 + (((pattern & 2) == 2) ^ ((pattern & mask) == 0));
                 flipped = flip32(data[bitCnt & 1]);
-                logBasic("%s%6d %5d.%d: %08X  %02X%s %08X %08X %08X %08X", (bitCnt & 1) ? "\n" : "  |  ", getBitCnt(), bitCnt/16, (bitCnt % 16 / 2), pattern, 
+                logBasic("%s%6d %5d.%d: %08X  %02X%s %08X %08X %08X %08X", (bitCnt & 1) ? "\n" : "  |  ", getBitCnt(0), bitCnt/16, (bitCnt % 16 / 2), pattern, 
                     data[(bitCnt - 1) & 1] & 0xff, (suspect[bitCnt & 1] & 0xff) ? "*" : " ", data[bitCnt & 1], ~data[bitCnt & 1] & 0xffffffff,
                     flipped, ~flipped & 0xffffffff);
             }

@@ -34,6 +34,7 @@
 #include "formats.h"
 #include "flux.h"
 #include "util.h"
+#include "stdflux.h"
 
 // initial patterns for DD disks
 
@@ -228,6 +229,7 @@ formatInfo_t formatInfo[] = {
        {"MFM5"       , 1, 1, 16,  E_MFM5, O_SIZE, crcStd,  ddMFMPatterns, 0xcdb4,    163, 207, 378, 2000, "01234", "5 1/4\" DD **"},
        {"MFM5-16x256", 1, 1, 16,  E_MFM5,      0, crcStd,  ddMFMPatterns, 0xcdb4,    160, 204, 378, 2000, "01234", "5 1/4\" DD 16 x 256 sectors"},   // U spc=375 works for both seen variants
        {"MFM5-10x512", 2, 1, 10,  E_MFM5,  O_SPC, crcStd,  ddMFMPatterns, 0xcdb4,     66,  72, 593, 2000, "01234", "5 1/4\" DD 10 x 512 sectors **"},
+       {"MFM5-9x512" , 2, 1,  9,  E_MFM5,  O_SPC, crcStd,  ddMFMPatterns, 0xcdb4,    154, 198, 652, 2000, "01234", "5 1/4\" DD 9 x 512 sectors"},   // U
        {"MFM5-8x512" , 2, 1,  8,  E_MFM5,      0, crcStd,  ddMFMPatterns, 0xcdb4,    166, 211, 689, 2000, "01234", "5 1/4\" DD 8 x 512 sectors"},   // U
        {"WREN"       , 2, 1, 10,  E_MFM5, O_UINV, crcStd,  ddMFMPatterns, 0xcdb4,     66,  72, 593, 2000, "01234", "5 1/4\" Wren DD 10 x 512 sectors"},
 
@@ -241,6 +243,7 @@ formatInfo_t formatInfo[] = {
        {"DD5H"       , 1, 0, 16,  E_MFM5H,      0, crcStd,    dd5HPatterns, 0xcdb4,    155, 200, 368, 2000, "01234", "** 5 1/4\" DD hard sectors"},    // only used to probe 
        {"MTECH"      , 1, 0, 16,  E_MFM5H,O_MTECH,   crc8, mtech5Patterns, 0xffff,	    0,   0,  0, 2000, "34012", "Mtech 5 1/4\" DD 16 x 256 hard sectors" },
        {"NSI-DD"  , 2, 1, 10,  E_MFM5H,   O_NSI, crcNSI, nsi5DPatterns, 0xffff,	    0,   0,  0, 2000, "34012", "NSI 5 1/4\" DD 10 x 512 hard sectors"},
+       {"HD35-18x512", 2, 1, 18,  E_MFM5,  0, crcStd,  ddMFMPatterns, 0xcdb4,     66,  72, 593, 1000, "01234", "3 1/2\" HD 18 x 512 sectors **"},
        {"\x80""FM5"    , 0, 1, 16,  E_FM5,         0, NULL,  sdPatterns,          0,      0,   0,  0, 4000, "01234", NULL},
        {"\x80""MFM5"   , 0, 1, 16,  E_MFM5,        0, NULL,  dd8Patterns,          0,      0,   0,  0, 2000, "01234", NULL},
        {"\x80""FM8"    , 0, 1, 16,  E_FM8,         0, NULL,  sdPatterns,          0,      0,   0,  0, 2000, "01234", NULL},
@@ -357,7 +360,8 @@ static formatInfo_t *lookupFormat(char* fmtName) {
 static char *probe() {
     int matchType;
     int firstMatch = 0;     // 1 MFM or FM, 2 M2FM, 3 Intel M2FM, 4 HP M2FM, 5 TI
-    int limit = cntHardSectors() > 0 ? 100 : 1200;
+    int limit = getHsCnt() > 0 ? 100 : 1200;
+    int32_t fromTs = peekTs();
     retrain(0);
     do {
         // 1200 byte search from previous pattern should be enough to find at least one more pattern
@@ -401,13 +405,13 @@ static char *probe() {
             firstMatch = 5;
             break;
         case MTECH_SECTOR:
-            if (cntHardSectors() != 16)
+            if (getHsCnt() != 16)
                 break;
-            return getByteCnt() > 50 ? NULL: "MTECH";
+            return getByteCnt(fromTs) > 50 ? NULL: "MTECH";
         case NSI_SECTOR:
-            if (cntHardSectors() != 10)
+            if (getHsCnt() != 10)
                 break;
-            if (getByteCnt() > 50)
+            if (getByteCnt(fromTs) > 50)
                 return NULL;
             return curFormat->encoding == E_MFM5H ? "NSI-DD" : "NSI-SD";
         }
@@ -590,12 +594,12 @@ int matchPattern(int searchLimit) {
         // speed optimisation, don't consider pattern until at least a byte seen (16 data/clock)
         if (++addedBits >= 16) {
             if (debug & D_PATTERN)              // avoid costly processing unless necessary
-                logBasic("%6u: %s %016llX %s\n", getBitCnt(), bin64Str(pattern), pattern, decodePattern64());
+                logBasic("%6u: %s %016llX %s\n", getBitCnt(0), bin64Str(pattern), pattern, decodePattern64());
             // see if we have a pattern match
             for (p = curFormat->patterns; p->mask; p++) {
                 if (((pattern ^ p->match) & p->mask) == 0 && chkPattern(p->mask)) {
                         if (debug & D_ADDRESSMARK)      // avoid costly processing unless necessary
-                            logBasic("%u: %016llX %016llX %016llX %s %s\n", getBitCnt(), pattern,
+                            logBasic("%u: %016llX %016llX %016llX %s %s\n", getBitCnt(0), pattern,
                                 p->match, p->mask, decodePattern64(), getName(p->am));
                         return p->am; 
                 }
@@ -614,7 +618,7 @@ void setFormat(char* fmtName) {
 }
 
 bool setInitialFormat(char *fmtName) {
-    int hs = cntHardSectors();
+    int hs = getHsCnt();
     formatInfo_t *fmt = NULL;
 
     if (fmtName && (fmt = lookupFormat(fmtName))) {
@@ -649,20 +653,28 @@ bool setInitialFormat(char *fmtName) {
             DBGLOG(D_DETECT, "Trying %s\n", testFmt);
             setFormat(testFmt);
 
-            for (int i = 0; !fmtName && i < blks && seekBlock(i) >= 0; i++)        // try the MFM formats
-                fmtName = probe();
-            if (!fmtName) {
-                if (diskSize == 8)
-                    testFmt = hs > 0 ? "SD8H" : "SD8";
-                else
-                    testFmt = hs > 0 ? "SD5H" : "SD5";
+            int baseIndex;
+            int16_t itype;
+            for (baseIndex = 0;  (itype = seekIndex(baseIndex)) == SODATA; baseIndex++)
+                ;
 
-                DBGLOG(D_DETECT, "Trying %s\n", testFmt);
-                setFormat(testFmt);
+            if (itype != EODATA) {
 
-                for (int i = 0; !fmtName && i < blks && seekBlock(i) >= 0; i++)        // try the MFM formats
+                for (int i = 0; !fmtName && i < blks && seekIndex(i + baseIndex) != EODATA; i++)        // try the MFM formats
                     fmtName = probe();
+                if (!fmtName) {
+                    if (diskSize == 8)
+                        testFmt = hs > 0 ? "SD8H" : "SD8";
+                    else
+                        testFmt = hs > 0 ? "SD5H" : "SD5";
 
+                    DBGLOG(D_DETECT, "Trying %s\n", testFmt);
+                    setFormat(testFmt);
+
+                    for (int i = 1; !fmtName && i <= blks && seekIndex(i + baseIndex) != EODATA; i++)        // try the MFM formats
+                        fmtName = probe();
+
+                }
             }
         }
     }
