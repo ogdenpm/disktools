@@ -63,7 +63,7 @@ static uint8_t *sectorToUint8(track_t* trackPtr, uint8_t slot) {
     return sectorBytes;
 }
 
-static void WriteIMDHdr(FILE* fp, char* fname) {
+static void WriteIMDHdr(FILE* fp, const char* fname) {
     struct tm* dateTime;
     time_t curTime;
 
@@ -77,7 +77,7 @@ static void WriteIMDHdr(FILE* fp, char* fname) {
 // E_FM5, E_FM5H, E_FM8, E_FM8H, E_MFM5, E_MFM5H, E_MFM8, E_MFM8H, E_M2FM8
 static uint8_t imdModes[] = { 2, 2, 0, 0, 5, 5, 3, 3, 3 };
 
-void writeImdFile(char *fname) {
+void writeImdFile(const char *fname) {
     FILE *fp;
     track_t *trackPtr;
     char imdFile[_MAX_PATH + 1];

@@ -45,7 +45,7 @@
 void showVersion(FILE *fp, bool full);
 
 _declspec(noreturn) void usage();
-void writeImdFile(char* fname);
+void writeImdFile(const char* fname);
 
 
 
@@ -56,10 +56,9 @@ static char *aopt;          // user specified analysis format
 
 
 
+static void decodeFile(const char *name) {
 
-static void decodeFile(char *name) {
-
-    if (openFluxFile(name)) {
+   if (openFluxFile(name)) {
         bool singleTrack = extMatch(name, ".raw");
         while (loadFluxStream()) {
             if (histLevels)
@@ -69,17 +68,17 @@ static void decodeFile(char *name) {
                     analyse(aopt);
                 else
                     logFull(D_WARNING, "-a only supported for single .raw files\n");
-            else if (flux2Track(getFormat(userfmt, getCyl(), getHead())))
+            else if (flux2Track(userfmt))
                 displayTrack(getCyl(), getHead(), options | (singleTrack || noIMD() ? gOpt : 0));
-
         }
+   
         displayDefectMap();
         closeFluxFile();
 
         if (!singleTrack && !noIMD())
             writeImdFile(name);
         removeDisk();
-    }
+   }
 }
 
 

@@ -36,7 +36,7 @@
 #include "trackManager.h"
 #include "util.h"
 #include "stdflux.h"
-
+static void ssDumpTrack(char *usrfmt);
 
 static void invert(uint16_t *data, int len) {
     while (len-- > 0)
@@ -455,7 +455,7 @@ bool flux2Track(char *usrfmt) {
     }
     logCylHead(cylinder, head);
 
-    if (!setInitialFormat(getFormat(usrfmt, cylinder, head))) {
+    if (!setInitialFormat(getFormat(usrfmt))) {
         logFull(D_ERROR, "Could not determine encoding\n");
         return false;
     }
@@ -469,6 +469,7 @@ bool flux2Track(char *usrfmt) {
             return false;
         }
     } else
+        // ssDumpTrack(usrfmt);
         ssGetTrack(cylinder, head, usrfmt);
     return true;
 }
@@ -476,4 +477,131 @@ bool flux2Track(char *usrfmt) {
 
 bool noIMD() {
     return curFormat->options & O_NOIMD;
+}
+
+
+int32_t indexHole = 0;
+bool noIndex(int16_t itype) {
+    if (itype == SSSTART)
+     indexHole = getByteCnt(0);
+    return true;
+}
+
+
+
+extern uint32_t cellSize;
+static void ssDumpTrack(char *usrfmt) {
+
+    unsigned matchType;
+    int result;
+
+    idam_t idam;
+    unsigned sectorLen;
+
+    uint16_t rawData[1024 + 3];       // allow for 1024 byte sector + 2 byte CRC + Address Marker
+
+    unsigned idamPos = 0;
+    unsigned dataPos = 0;
+    unsigned indexPos = 0;
+    unsigned gapStart = 0;
+
+    unsigned syncStart = 0;
+
+    bool savedData = false;
+    int sSize = 0;
+
+    setOnIndex(&noIndex);
+
+    bool lock = false;
+    seekIndex(0);                   // to start of track images
+    retrain(0);
+    while ((matchType = matchPattern2(lock)) >= 0) {
+        if ((indexHole || matchType != GAP) && gapStart) {
+            printf("%d: GAP %d bytes - %d\n", gapStart, getByteCnt(0) - gapStart, cellSize);
+            gapStart = 0;
+        }
+        if ((indexHole || matchType != SYNC) && syncStart) {
+            printf("%d: SYNC %d bytes - %d\n", syncStart, getByteCnt(0) - syncStart, cellSize);
+            syncStart = 0;
+        }
+        if (indexHole) {
+            printf("%d: index Hole - %d\n", indexHole, cellSize);
+            indexHole = 0;
+        }
+        switch (matchType) {
+        case GAP:
+            if (!gapStart)
+                gapStart = getByteCnt(0) - 1;
+            break;
+        case SYNC:
+            if (!syncStart)
+                syncStart = getByteCnt(0) - 1;
+
+            break;
+        case M2FM_INDEXAM:
+        case INDEXAM:           // to note start of track
+            indexPos = getByteCnt(0);
+            printf("%d: index AM - %d\n", indexPos, cellSize);
+            break;
+        case TI_IDAM:
+            idamPos = getByteCnt(0);
+            result = getData(matchType, rawData, 9);
+            if (result == 1) {
+                idam.cylinder = (rawData[2] & 0x7f);
+                idam.side = (rawData[1] >> 3) & 0xf;
+                idam.sSize = 2;         // treat as 256 byte sector
+                idam.sectorId = rawData[4] & 0xff;
+                printf("%d: TI IDAM - head=%d, cyl=%d, sector=%d - %d\n", idamPos, (rawData[1] & 0xff) >> 3, rawData[2] & 0x7f, rawData[4] & 0xff, cellSize);
+            } else
+                printf("%d: TI IDAM (crc error) - %02X % 02X % 02X % 02X % 02X % 02X - %d\n", idamPos,
+                        rawData[1] & 0xff, rawData[2] & 0xff, rawData[3] & 0xff, rawData[4] & 0xff, rawData[5] & 0xff, rawData[6] & 0xff, cellSize);
+            break;
+        case IDAM:
+        case M2FM_IDAM:
+        case HP_IDAM:
+            idamPos = getByteCnt(0);
+            result = getData(matchType, rawData, matchType == HP_IDAM ? 5 : 7);
+            if (result == 1) {           // valid so ok
+                idam.cylinder = (uint8_t)rawData[1];
+                if (matchType == HP_IDAM) {
+                    idam.sectorId = (uint8_t)rawData[2];
+                    idam.side = 0;
+                    idam.sSize = 1;
+                } else {
+                    idam.side = (uint8_t)rawData[2];
+                    idam.sectorId = (uint8_t)rawData[3];
+                    sSize = idam.sSize = (uint8_t)rawData[4] & 0xf;
+                }
+                printf("%d-%d: idam %d/%d/%d sSize %d - %d\n", idamPos, getByteCnt(fromTs), idam.cylinder, idam.side, idam.sectorId, sSize, cellSize);
+            } else
+                printf("%d: idam %s - %d\n", idamPos, result < 0 ? "premature end\n" : "bad crc\n", cellSize);
+            break;
+        case TI_DATAAM:
+        case DATAAM:
+        case M2FM_DATAAM:
+        case HP_DATAAM:
+            dataPos = getByteCnt(0);
+
+            sectorLen = matchType == TI_DATAAM ? 288 : 128 << sSize;
+            result = getData(matchType, rawData, sectorLen + 3);
+            if (result >= 0) {
+                printf("%d-%d: data len %d%s - %d\n", dataPos, getByteCnt(0), sectorLen, result == 1 ? "" : " bad crc", cellSize);
+            } else
+                printf("%d: premature end of sector - %d\n", dataPos, cellSize);
+            break;
+        case DELETEDAM:
+        case M2FM_DELETEDAM:
+        case HP_DELETEDAM:
+            printf("%d: Deleted AM - %d\n", getByteCnt(0), cellSize);
+            sectorLen = 128 << sSize;
+            getData(matchType, rawData, sectorLen + 3);
+            break;
+        case 0:
+        {
+            int n = decode(pattern);
+            printf("Data %02X\n", n);
+            break;
+        }
+        }
+    }
 }

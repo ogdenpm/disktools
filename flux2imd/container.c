@@ -8,6 +8,7 @@
 #include "util.h"
 #include "zip.h"
 #include "flux.h"
+#include "stdflux.h"
 
 #ifdef _MSC_VER
 #define stricmp _stricmp
@@ -46,10 +47,9 @@ static const IOFunc errFuncs = { &errOpen, NULL, NULL };
 bool openFluxFile(const char *fname) {
     const char *s;
 
-    if (io.close) {
+    if (io.close)
         io.close();
-        io = errFuncs;
-    }
+    io = errFuncs;
     setLogPrefix(fname, NULL);
     createLogFile(NULL);            // revert to stdout for general errors
 
@@ -71,8 +71,13 @@ bool openFluxFile(const char *fname) {
     return isOk;
 }
 
+
 bool loadFluxStream() {
-    return io.load ? io.load() : false;
+    if (io.load && io.load()) {
+        getCellWidth();
+        return true;
+    }
+    return false;
 }
 
 bool closeFluxFile() {
@@ -190,7 +195,7 @@ static bool updateCylHead(const char *name) {
     int cyl, head;
     char *s = strrchr(name, '\0') - 8;
 
-    if (s < name || sscanf(s, "%2d.%1d.", &cyl, &head) != 2)
-        cyl = head = -1;
+    if (s >= name && sscanf(s, "%2d.%1d.", &cyl, &head) == 2)
+        setCylHead(cyl, head);
     return true;        // simplifies use after loadKryoFlux
 }

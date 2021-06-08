@@ -143,9 +143,10 @@ pattern_t mtech5Patterns[] = {
 };
 
 pattern_t ddTIPatterns[] = {
+    { 0xffff, 0xAAAA, GAP},
     {0xffffffff, 0x11112244, TI_IDAM},
     {0xffffffff, 0x11112245, TI_DATAAM},
-    {0xffffffff, 0x11111111, SYNC},
+    {0xffff, 0x1111, SYNC},
     {0}
 };
 
@@ -348,7 +349,7 @@ static bool crcStd(uint16_t* buf, int len) {
     return crc == 0;
 }
 
-static formatInfo_t *lookupFormat(char* fmtName) {
+static formatInfo_t *lookupFormat(const char* fmtName) {
     formatInfo_t* p;
     for (p = formatInfo; p->name; p++) {
         if (_stricmp(p->name, fmtName) == 0)
@@ -610,14 +611,45 @@ int matchPattern(int searchLimit) {
 }
 
 
-void setFormat(char* fmtName) {
+
+int matchPattern2(bool lock) {
+    pattern_t *p;
+    static pattern_t *pMatch = 0;
+
+    bool chkMatch = pattern && pMatch == NULL;
+
+    int i;
+
+    for (i = 0; i < 16 && getBit() >= 0; i++) {
+        if (!lock && (chkMatch || i == 15)) {
+            if (debug & D_PATTERN)              // avoid costly processing unless necessary
+                logBasic("%6u: %s %016llX %s\n", getBitCnt(0), bin64Str(pattern), pattern, decodePattern64());
+            // see if we have a pattern match
+            for (p = curFormat->patterns; p->mask; p++) {
+                if (((pattern ^ p->match) & p->mask) == 0) {
+                    if (debug & D_ADDRESSMARK)      // avoid costly processing unless necessary
+                        logBasic("%u(%d): %016llX %016llX %016llX %s %s\n", getBitCnt(0), i + 1, pattern,
+                                 p->match, p->mask, decodePattern64(), getName(p->am));
+                    pMatch = p;
+                    return p->am;
+                }
+            }
+        }
+    }
+    pMatch = NULL;
+    return i == 16 ? 0 : -1;
+}
+
+
+void setFormat(const char* fmtName) {
     curFormat = lookupFormat(fmtName);
     if (!curFormat)
         logFull(D_FATAL, "Attempt to select unknown format %s\n", *fmtName == 0x80 ? fmtName + 1 : fmtName);
 
 }
 
-bool setInitialFormat(char *fmtName) {
+
+bool setInitialFormat(const char *fmtName) {
     int hs = getHsCnt();
     formatInfo_t *fmt = NULL;
 
@@ -689,9 +721,11 @@ bool setInitialFormat(char *fmtName) {
 
 
 
-char *getFormat(const char *userfmt, int cyl, int head) {
+const char *getFormat(const char *userfmt) {
     const char *s;
     int i;
+    int cyl = getCyl();
+    int head = getHead();
     static char format[32]; // used to hold current format
     int score = 0;          // 0 no match, 1 match any, 2 match head, 3 match cylinder, 4 match both
     int tscore;             // current test score

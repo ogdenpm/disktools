@@ -41,7 +41,7 @@ void displayTrack(int cylinder, int side, unsigned options);
 void displayHist(int levels);
 
 // writeImage.c
-void writeImdFile(char *fname);
+void writeImdFile(const char *fname);
 void analyse(char *opt);
 
 typedef struct {

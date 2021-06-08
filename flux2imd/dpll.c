@@ -36,7 +36,7 @@
 
 static uint32_t ctime, etime;       // clock time and end of cell time
 static nominalCellSize = 1; 
-static uint32_t cellSize;           // width of a cell
+uint32_t cellSize;           // width of a cell
 static int fCnt, aifCnt, adfCnt, pcCnt; // dpll paramaters
 static bool up; 
 static uint32_t maxCell;            //  bounds on cell width
