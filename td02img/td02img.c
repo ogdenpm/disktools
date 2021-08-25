@@ -30,7 +30,11 @@
 #include <stdarg.h>
 #include <ctype.h>
 #include "version.h"
+#ifdef AUTOVER
 #include "Generated/gitVersion.h"
+#else
+#include "version.in"
+#endif
 
 typedef unsigned char byte;
 
