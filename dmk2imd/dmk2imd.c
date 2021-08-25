@@ -24,8 +24,11 @@
 #include <stdarg.h>
 #include <string.h>
 #include <ctype.h>
+#ifdef AUTOVER
 #include "Generated/gitVersion.h"
-
+#else
+#include "version.in"
+#endif
 
 #define	A1A1A1	0xCDB4			// CRC of: 0xA1, 0xA1, 0xA1
 
