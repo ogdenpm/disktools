@@ -21,7 +21,11 @@
 #include <ctype.h>
 #include <time.h>
 #include "version.h"
+#ifdef AUTOVER
 #include "Generated/gitVersion.h"
+#else
+#include "version.in"
+#endif
 
 unsigned char
 *ptr,				// General parse pointer
