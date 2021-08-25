@@ -24,7 +24,11 @@
 #include <ctype.h>
 #include <string.h>
 #include <conio.h>
+#ifdef AUTOVER
 #include "Generated/gitVersion.h"
+#else
+#include "version.in"
+#endif
 
 #define	TSIZE	32768				// Max size of track
 #define abort   error
