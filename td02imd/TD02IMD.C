@@ -30,7 +30,11 @@
 #include <malloc.h>
 #include <string.h>
 #include <ctype.h>
+#ifdef AUTOVER
 #include "Generated/gitVersion.h"
+#else
+#include "version.in"
+#endif
 
 typedef unsigned char byte;
 
