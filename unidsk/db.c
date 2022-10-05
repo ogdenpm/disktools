@@ -217,7 +217,7 @@ char *nextLoc() {
 
 
 // load in the database, if rebuild is true regenerate
-// will abort if IFILEREPO is not defined called functions will abort if it is invalid
+// will warn if IFILEREPO is not defined called functions will abort if it is invalid
 #ifdef _REBUILD
 void openDb(bool rebuild) {
 #else
@@ -228,8 +228,8 @@ void openDb() {
 
     char *s = getenv("IFILEREPO");
     if (!s) {
-        fprintf(stderr, "IFILEREPO not defined\n");
-        exit(1);
+        fprintf(stderr, "Warning IFILEREPO not defined, repository look up disabled\n\n");
+        return;
     }
     strcpy(repoPath, s);
     s = repoPath;
@@ -328,7 +328,8 @@ static void loadDb(char *fpart) {
 
     if ((fp = fopen(repoPath, "rt")) == NULL) {
         fprintf(stderr, "cannot locate catalog at %s\n", repoPath);
-        exit(1);
+        fprintf(stderr, "set IFILEREPO to point to the repository directory\n\n");
+        return;
     }
 
     char line[MAXLINE];
