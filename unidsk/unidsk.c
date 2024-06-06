@@ -55,13 +55,21 @@ TODO
 #include <stdarg.h>
 #include <assert.h>
 #include <string.h>
+#include <ctype.h>
+#ifdef _MSC_VER
 #include <direct.h>
+#define mkdir(p, mode) _mkdir(p)
+#else
+#include <unistd.h>
+#include <errno.h>
+#include <sys/stat.h>
+#endif
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include "unidsk.h"
+#include "showVersion.h"
 
-void showVersion(FILE *fp, bool full);
 
 char targetPath[_MAX_PATH];
 
@@ -104,7 +112,7 @@ typedef struct {
     unsigned char Cmap[MAXSECTOR + 1];		// Cylinder numbering map
     unsigned char Hmap[MAXSECTOR + 1];		// Head numbering map
     uint64_t Smissing;      // bit set if sector is missing
-    byte *buf;				// de interlaced track buffer
+    uint8_t *buf;				// de interlaced track buffer
 } TRACK;	// Sector type flags
 
 int maxCylinder;
@@ -131,45 +139,45 @@ int heads = 1;
 
 #pragma pack(push, 1)
 typedef struct {
-    word	flags;
-    byte	type;
-    byte	gran;
-    word	owner;
-    dword	crTime;
-    dword	accessTime;
-    dword	modTime;
-    dword	totalSize;
-    dword	totalBlocks;
+    uint16_t	flags;
+    uint8_t	type;
+    uint8_t	gran;
+    uint16_t	owner;
+    uint32_t	crTime;
+    uint32_t	accessTime;
+    uint32_t	modTime;
+    uint32_t	totalSize;
+    uint32_t	totalBlocks;
     struct {
-        word	numBlocks;
-        byte	blkPtr[3];
+        uint16_t	numBlocks;
+        uint8_t	blkPtr[3];
     } ptr[8];
-    dword	thisSize;
-    word	reserverdA;
-    word	reserverdB;
-    word	idCount;
+    uint32_t	thisSize;
+    uint16_t	reserverdA;
+    uint16_t	reserverdB;
+    uint16_t	idCount;
     struct {
-        byte	access;
-        word	id;
+        uint8_t	access;
+        uint16_t	id;
     } accessor[3];
-    word	parent;
-    byte	aux[3];
+    uint16_t	parent;
+    uint8_t	aux[3];
 } fnode_t;
 
 typedef struct {
-    byte status;
+    uint8_t status;
     char name[6];
     char ext[3];
-    byte attributes;
-    byte lastblksize;
-    word blocks;
-    byte sector;
-    byte track;
+    uint8_t attributes;
+    uint8_t lastblksize;
+    uint16_t blocks;
+    uint8_t sector;
+    uint8_t track;
 } dir_t;
 
 typedef struct {
-    byte sector;
-    byte track;
+    uint8_t sector;
+    uint8_t track;
 } linkage_t;
 
 typedef struct {
@@ -186,7 +194,7 @@ struct {
 /*
 * Display error message and exit
 */
-error(char *fmt, ...)
+_Noreturn void fatal(char *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
@@ -253,28 +261,28 @@ TRACK *load_track(FILE *fp)
     t = (TRACK *)calloc(1, sizeof(TRACK));
     t->Mode = m;
     if ((t->Cyl = getc(fp)) == EOF)
-        error("EOF at Cylinder");
+        fatal("EOF at Cylinder");
     if ((h = getc(fp)) == EOF)
-        error("EOF at Head");
+        fatal("EOF at Head");
     t->Head = h & 0x0F;
     if (t->Head == 1)
         heads = 2;
     t->Hflag = (h & 0xF0);
     if ((t->Nsec = n = getc(fp)) == EOF)
-        error("EOF at Nsec");
+        fatal("EOF at Nsec");
     if ((t->Size = s = getc(fp)) == EOF)
-        error("EOF at Size");
+        fatal("EOF at Size");
     if (t->Cyl >= MAXCYLINDER)
-        error("Cylinder value %d out of range 0-%d\n", t->Cyl, MAXCYLINDER - 1);
+        fatal("Cylinder value %d out of range 0-%d\n", t->Cyl, MAXCYLINDER - 1);
 
     if (m > 5)
-        error("Mode value %d out of range 0-5\n", m);
+        fatal("Mode value %d out of range 0-5\n", m);
 
     if ((h & 0x0F) >= MAXHEAD)
-        error("Head value %d out of range 0-%d\n", h, MAXHEAD - 1);
+        fatal("Head value %d out of range 0-%d\n", h, MAXHEAD - 1);
 
     if (s > 6) {
-        error("Size value %d out of range 0-6\n", s);
+        fatal("Size value %d out of range 0-6\n", s);
         t->Size = 0;
     }
 
@@ -282,7 +290,7 @@ TRACK *load_track(FILE *fp)
 
     if (n) {
         if (fread(t->Smap, 1, n, fp) != n)
-            error("EOF in Sector Map");
+            fatal("EOF in Sector Map");
         t->startSec = 255;
         for (i = 0; i < n; i++)
             if (t->Smap[i] < t->startSec)
@@ -290,7 +298,7 @@ TRACK *load_track(FILE *fp)
 
         if (h & 0x80) {
             if (fread(t->Cmap, 1, n, fp) != n)
-                error("EOF in Cylinder Map");
+                fatal("EOF in Cylinder Map");
             if (!issame(t->Cmap, n)) {
                 for (int i = 0; i < n; i++)
                     if (t->Cmap[i]) {
@@ -308,13 +316,13 @@ TRACK *load_track(FILE *fp)
 
         if (h & 0x40) {
             if (fread(t->Hmap, 1, n, fp) != n)
-                error("EOF in Head Map");
+                fatal("EOF in Head Map");
         }
         else
             memset(t->Hmap, h, n);
     }
     assert(t != NULL);
-    if ((t->buf = (byte *)calloc(s * t->Nsec, 1)) == NULL) {
+    if ((t->buf = (uint8_t *)calloc(s * t->Nsec, 1)) == NULL) {
         fprintf(stderr, "alloc track buf - out of memory\n");
         exit(1);
     }
@@ -323,14 +331,14 @@ TRACK *load_track(FILE *fp)
     t->Smissing = ~0ULL;
     for (i = 0; i < n; ++i) {
         if ((c = getc(fp)) == EOF)
-            error("EOF at sector %d/%d flag", i, t->Smap[i]);
+            fatal("EOF at sector %d/%d flag", i, t->Smap[i]);
 
         if (c & 1) {
             if (fread(transferBuf, 1, s, fp) != s)
-                error("EOF in sector %d/%d data", i, t->Smap[i]);
+                fatal("EOF in sector %d/%d data", i, t->Smap[i]);
         } else if (c) {
             if ((h = getc(fp)) == EOF)
-                error("EOF in sector %d/%d compress data", i, t->Smap[i]);
+                fatal("EOF in sector %d/%d compress data", i, t->Smap[i]);
             memset(transferBuf, h, s);
         }
         if (c && (t->startSec > t->Smap[i] || t->Smap[i] >= n + t->startSec))
@@ -361,7 +369,7 @@ void load_imd(FILE *fp) {
                 comment[i++] = c;
         }
     }
-    while (t = load_track(fp)) {
+    while ((t = load_track(fp))) {
         if (t->Cyl > MAXCYLINDER || t->Head > MAXHEAD) {
             fprintf(stderr, "Cyl %d, Head %d not supported\n", t->Cyl, t->Head);
             free(t);
@@ -393,19 +401,21 @@ void load_imd(FILE *fp) {
 
 struct {
     int size;
-    byte diskType;
-    byte tracks;
-    byte heads;
-    byte t0spt;
+    uint8_t diskType;
+    uint8_t tracks;
+    uint8_t heads;
+    uint8_t t0spt;
     int t0SSize;
-    byte spt;
+    uint8_t spt;
     int sSize;
 } diskSizes[] = {
-    256256, ISIS_SD, 77, 1, 26, 128, 26, 128,
-    512512, ISIS_DD, 77, 1, 52, 128, 52, 128,
-    653312, ISIS_PDS, 80, 2, 16, 128, 16, 256,
-    327680, ISIS_DOS, 80, 1, 16, 256, 16, 256,  // requires img in true linear order
-    653184, ISIS_IV, 80, 2, 15, 128, 8, 512   // currently unreliable
+// clang-format off
+    { 256256, ISIS_SD, 77, 1, 26, 128, 26, 128 },
+    { 512512, ISIS_DD, 77, 1, 52, 128, 52, 128 },
+    { 653312, ISIS_PDS, 80, 2, 16, 128, 16, 256 },
+    { 327680, ISIS_DOS, 80, 1, 16, 256, 16, 256 }, // requires img in true linear order
+    { 653184, ISIS_IV, 80, 2, 15, 128, 8, 512 }    // currently unreliable
+// clang-format on
 };
 #define DISKOPT (sizeof(diskSizes) / sizeof(diskSizes[0]))
 
@@ -458,7 +468,7 @@ void load_img(FILE *fp) {
     maxCylinder = diskSizes[diskopt].tracks - 1;
 }
 
-byte *getTS(int track, int sector)
+uint8_t *getTS(int track, int sector)
 {
     TRACK *p;
     int head = 0;
@@ -496,7 +506,7 @@ byte *getTS(int track, int sector)
     return p->buf + sector * p->Size + offset;
 }
 
-byte *getBlock(int blk)
+uint8_t *getBlock(int blk)
 {
     int logicalCylinder, offset;
     int t00cnt, t10cnt;
@@ -522,30 +532,30 @@ byte *getBlock(int blk)
         return NULL;
 }
 
-int readWord(byte *p)
+int readWord(uint8_t *p)
 {
     return p[0] + p[1] * 256;
 }
 
-int readBlockNumber(byte *p)
+int readBlockNumber(uint8_t *p)
 {
     return p[0] + p[1] * 0x100 + p[2] * 0x10000;
 }
 
-int readDWord(byte *p)
+int readDWord(uint8_t *p)
 {
     return readWord(p) + readWord(p + 2) * 0x10000;
 }
 
-byte *getFileLoc(fnode_t *fn, unsigned pos)
+uint8_t *getFileLoc(fnode_t *fn, unsigned pos)
 {
     int i, n;
-    byte *p;
+    uint8_t *p;
 
 #pragma pack(push, 1)
     typedef struct {
-        byte nblocks;
-        byte blockNum[3];
+        uint8_t nblocks;
+        uint8_t blockNum[3];
     } indirect_t;
 #pragma pack(pop)
     indirect_t *indirect;
@@ -573,7 +583,7 @@ byte *getFileLoc(fnode_t *fn, unsigned pos)
     return p + pos % volGran;
 }
 
-int iRead(int fd, byte *buf, int pos, int count);
+int iRead(int fd, uint8_t *buf, int pos, int count);
 
 int iOpen(int node)
 {
@@ -586,7 +596,7 @@ int iOpen(int node)
         if (!ifiles[i].inuse) {
             if (!ifiles[i].fn)
                 ifiles[i].fn = (fnode_t *)malloc(fnodeSize);
-            iRead(0, (byte *)ifiles[i].fn, node * fnodeSize, fnodeSize);
+            iRead(0, (uint8_t *)ifiles[i].fn, node * fnodeSize, fnodeSize);
             ifiles[i].inuse = 1;
             return i;
         }
@@ -594,12 +604,12 @@ int iOpen(int node)
     return -1;
 }
 
-int iRead(int fd, byte *buf, int pos, int count)
+int iRead(int fd, uint8_t *buf, int pos, int count)
 {
     fnode_t *fn;
     int n = 0;
     int delta;
-    byte *p;
+    uint8_t *p;
 
     if (fd < 0 || NIFILES <= fd || !ifiles[fd].inuse)
         return 0;
@@ -637,7 +647,7 @@ void dumpfile(int fd, char *filename)
     FILE *fout;
     int cnt;
     int pos = 0;
-    byte buf[READCHUNK];
+    uint8_t buf[READCHUNK];
 
     if ((fout = fopen(filename, "wb")) == NULL) {
         fprintf(stderr, "can't create %s\n", filename);
@@ -655,7 +665,7 @@ void dumpfile(int fd, char *filename)
     fclose(fout);
 }
 
-dumpdirectory(int directory, char *dirPath)       // note recover not yet implemented
+void dumpdirectory(int directory, char *dirPath)       // note recover not yet implemented
 {
     char path[_MAX_PATH];
     fnode_t *fn;
@@ -664,15 +674,17 @@ dumpdirectory(int directory, char *dirPath)       // note recover not yet implem
     int fd;
 #pragma pack(push, 1)
     struct {
-        word fnode;
+        uint16_t fnode;
         char name[14];
     } dentry;
 #pragma pack(pop)
 
-    while (iRead(directory, (byte *)&dentry, pos, sizeof(dentry)) == sizeof(dentry)) {
+    while (iRead(directory, (uint8_t *)&dentry, pos, sizeof(dentry)) == sizeof(dentry)) {
         if (dentry.fnode != 0) {
             strcpy(path, dirPath);
-            strncat_s(path, sizeof(path), dentry.name, 14);
+            if (strlen(dirPath) + 14 >= sizeof(path))
+                fatal("Name too long %s%.14s", dirPath, dentry.name);
+            strncat(path, dentry.name, 14);
             fd = iOpen(dentry.fnode);
             if (fd < 0)
                 fprintf(stderr, "can't read fnode %d - %s\n", dentry.fnode, path);
@@ -692,10 +704,10 @@ dumpdirectory(int directory, char *dirPath)       // note recover not yet implem
                 }
 
                 s = path;
-                while (s = strchr(s, '?'))
+                while ((s = strchr(s, '?')))
                     *s = '_';
                 if (fn->type == 6) {
-                    if (_mkdir(path) == -1 && errno != EEXIST) {
+                    if (mkdir(path, 0666) == -1 && errno != EEXIST) {
                         fprintf(stderr, "can't create directory %s\n", path);
                     }
                     else {
@@ -712,12 +724,12 @@ dumpdirectory(int directory, char *dirPath)       // note recover not yet implem
     }
 }
 
-byte fnode0[16] = { 5, 0, 0, 1 };
+uint8_t fnode0[16] = { 5, 0, 0, 1 };
 int fnode0Loc[] = { 0x30a00, 0x40000, 0 };
 
 void isis4()
 {
-    byte *p;
+    uint8_t *p;
     int fd;
     //	fnode_t *fn;
     //	int offset;
@@ -820,7 +832,7 @@ bool extractFile(dir_t *dptr, int dirSlot)
     char filename[16];
     char isisName[11];
     FILE *fout;
-    byte *p;
+    uint8_t *p;
     int blk, blkIdx;
     isisLinkage_t *links = (isisLinkage_t *)&(dptr->blocks);	// trick to pick next block from directory info
     int prevTrk, prevSec;
@@ -831,20 +843,22 @@ bool extractFile(dir_t *dptr, int dirSlot)
     else
         sprintf(isisName, "%.6s", dptr->name);
 
-    if (!*isisName)        
+    if (!*isisName) {
         if (dptr->status != 0)  // ignore missing name if deleted file
             return true;
         else {
             fprintf(stderr, "Missing file name for ISIS.DIR entry %d\n", dirSlot);
             return false;
         }
+    }
 
     if (dptr->status != 0)
         sprintf(filename, "#%d_%s", dirSlot, isisName);          // mark recovered file
     else
         strcpy(filename, isisName);
 
-    _strlwr(filename);
+    for (char *s = filename; *s; s++)
+        *s = tolower(*s);
 
     if ((fout = fopen(filename, "wb")) == NULL) {
         fprintf(stderr, "can't create %s\n", filename);
@@ -914,7 +928,7 @@ bool extractFile(dir_t *dptr, int dirSlot)
     dirIdx++;
     if (dptr->status != 0) {         // deleted file
         if (rdErrorCnt || size == 0)
-            _unlink(filename);
+            unlink(filename);
         else
             recoveredFiles++;
         return true;
@@ -959,7 +973,7 @@ bool isis2_3(dir_t *dptr)
     return ok;
 }
 
-byte *chkIsisDir(byte *p) {
+uint8_t *chkIsisDir(uint8_t *p) {
 
     for (int i = 0; i < 4; i++, p += sizeof(dir_t))
         if (memcmp(p, "\0ISIS\0\0DIR", 10) == 0)
@@ -971,33 +985,33 @@ byte *chkIsisDir(byte *p) {
     return NULL;
 }
 
-char const *GetFileName(char const *path) {
-    char const *name;
-    while (name = strpbrk(path, "/\\:"))
-        path = name + 1;
+
+char const *basename(char const *path) {
+    char *s;
+#ifdef _WIN32
+    if (path[0] && path[1] == ':') // skip leading device
+        path += 2;
+#endif
+    while ((s = strpbrk(path, DIRSEP))) // skip all directory components
+        path = s + 1;
     return path;
 }
 
 
-void main(int argc, char **argv) {
-    byte *p;
+
+int main(int argc, char **argv) {
+    uint8_t *p;
     FILE *fp;
     char targetPath[_MAX_PATH];
-    char dir[_MAX_DIR];
-    char drive[_MAX_DRIVE];
-    char fname[_MAX_FNAME];
-    char ext[_MAX_EXT];
     bool local = false;
     bool ok;
 
-    if (argc == 2 && _stricmp(argv[1], "-v") == 0) {
-        showVersion(stdout, argv[1][1] == 'V');
-        exit(0);
-    }
+    CHK_SHOW_VERSION(argc, argv);
+    
     while (argc > 2) {
-        if (_stricmp(argv[1], "-l") == 0)
+        if (stricmp(argv[1], "-l") == 0)
             local = true;
-        else if (_stricmp(argv[1], "-d") == 0)
+        else if (stricmp(argv[1], "-d") == 0)
             debug = true;
         else
             break;
@@ -1019,35 +1033,33 @@ void main(int argc, char **argv) {
     if (!local)
         openDb();
 
-    if (_splitpath_s(*argv, drive, _MAX_DRIVE, dir, _MAX_DIR, fname, _MAX_FNAME, ext, _MAX_EXT) != 0) {
-        fprintf(stderr, "invalid file name %s\n", argv[1]);
-        exit(1);
-    }
-
-    if (_stricmp(ext, ".imd") == 0)
+    strcpy(targetPath, *argv);
+    char const *fileName = basename(targetPath);
+    char *ext      = strrchr(fileName, '.');
+    if (ext && stricmp(ext, ".imd") == 0)
         load_imd(fp);
-    else if (_stricmp(ext, ".img") == 0)
+    else if (ext && (stricmp(ext, ".img") == 0 || stricmp(ext, ".bin") == 0))
         load_img(fp);
-    else {
-        fprintf(stderr, "expecting .img or .imd extension\n");
-        exit(1);
-    }
+    else
+        fatal("Expecting .img, .bin or .imd extension\n");
     fclose(fp);
     isDOS = diskType == ISIS_DOS;
 
     /* make a directory path from the name*/
-    _makepath_s(targetPath, _MAX_PATH, drive, dir, fname, NULL);        // create a directory name with filename - extension
-    _mkdir(targetPath);
-    _chdir(targetPath);                                                 // move to new directory for simple file creation
+    *ext = '\0';
+    mkdir(targetPath, 0666);
+    if (chdir(targetPath)) // move to new directory for simple file creation
+        fatal("Can't write data to %s\n", targetPath);
+
     // because there are example disks (i.e. I have seen one) where ISIS.DIR is not in
     // the correct place, look through 4 entries to see if it exists
 
     if ((p = getTS(1, 2)) && (p = chkIsisDir(p))) {                         // ISIS-II
         ok = isis2_3((dir_t *)p);
-        mkRecipe(GetFileName(*argv), isisDir, comment, diskType, ok);
+        mkRecipe(basename(*argv), isisDir, comment, diskType, ok);
     } else if ((p = getTS(0x27, 2)) && (p = chkIsisDir(p))) {               // ISIS-PDS
         ok = isis2_3((dir_t *)p);
-        mkRecipe(GetFileName(*argv), isisDir, comment, diskType, ok);
+        mkRecipe(basename(*argv), isisDir, comment, diskType, ok);
     } else 
         isis4();
     if (!local)

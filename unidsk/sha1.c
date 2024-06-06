@@ -34,8 +34,8 @@
  /*
   *  Define the SHA1 circular left shift macro
   */
-#define SHA1CircularShift(bits,word) \
-                (((word) << (bits)) | ((word) >> (32-(bits))))
+#define SHA1CircularShift(bits,uint16_t) \
+                (((uint16_t) << (bits)) | ((uint16_t) >> (32-(bits))))
 
   /* Local Function Prototyptes */
 void SHA1PadMessage(SHA1Context *);

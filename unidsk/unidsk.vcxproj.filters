@@ -27,9 +27,6 @@
     <ClCompile Include="repo.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="version.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="db.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -44,10 +41,5 @@
     <ClInclude Include="db.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <ResourceCompile Include="version.rc">
-      <Filter>Resource Files</Filter>
-    </ResourceCompile>
   </ItemGroup>
 </Project>

@@ -32,6 +32,7 @@
 #ifdef _REBUILD
 #include "dirent.h"
 #endif
+#include "unidsk.h"
 #include "db.h"
 
 
@@ -50,12 +51,12 @@ typedef struct _key {
     struct _key *hchain;
     struct _loc *nchain;        // start of chain of locs with same key
     Key key;
-} key_t;
+} udkey_t;
 
 typedef struct _loc {
     struct _loc *hchain;
     struct _loc *nchain;        // next loc with same key
-    key_t *pKey;                // points to key entry for this location
+    udkey_t *pKey;                // points to key entry for this location
     char loc[1];
 } loc_t;
 
@@ -63,13 +64,13 @@ static char repoPath[_MAX_PATH];  // contains the path of the current file being
 const char *repoFile;
 bool dbIsOpen = false;
 
-static key_t *keyHashTable[HashSize];
+static udkey_t *keyHashTable[HashSize];
 static loc_t *locHashTable[HashSize];
 
 
 
 static void loadDb(char *fpart);
-static key_t *lookupKey(const KeyPtr key);
+static udkey_t *lookupKey(const KeyPtr key);
 static loc_t *lookupLoc(const char *loc);
 #ifdef _REBUILD
 static void rebuildDb(char *fpart, ...);
@@ -80,7 +81,7 @@ static void saveDb(char *fpart);
 #define BLOCKSIZE 0x10000       // chunk size to load files in for sha1 calculation
 
 static int keyIterI = -1;
-static key_t *keyIter;
+static udkey_t *keyIter;
 static loc_t *locIter;
 
 // public functions
@@ -93,8 +94,8 @@ void closeDb() {
             lq = lp->hchain;
             free(lp);
         }
-        key_t *cq;
-        for (key_t *cp = keyHashTable[i]; cp; cp = cq) {
+        udkey_t *cq;
+        for (udkey_t *cp = keyHashTable[i]; cp; cp = cq) {
             cq = cp->hchain;
             free(cp);
         }
@@ -107,14 +108,14 @@ void closeDb() {
 
 KeyPtr firstKey() {
     for (keyIterI = 0; keyIterI < HashSize; keyIterI++)
-        if (keyIter = keyHashTable[keyIterI])
+        if ((keyIter = keyHashTable[keyIterI]))
             return keyIter->key;
     keyIterI = -1;
     return NULL;
 }
 
 char *firstLoc(KeyPtr key) {
-    key_t *kp;
+    udkey_t *kp;
     if (!key || !(kp = lookupKey(key)))
         return NULL;
     locIter = kp->nchain;
@@ -130,7 +131,7 @@ int getFileKey(const char *fname, KeyPtr key) {
     FILE *fp;
     SHA1Context ctx;
     int flen = 0;
-    if (fp = fopen(fname, "rb")) {
+    if ((fp = fopen(fname, "rb"))) {
         int len = BLOCKSIZE;
         // generate the SHA1 key
         SHA1Reset(&ctx);
@@ -203,7 +204,7 @@ KeyPtr nextKey() {
     if (keyIterI < 0)
         return NULL;
     for (keyIterI++;keyIterI < HashSize; keyIterI++)
-        if (keyIter = keyHashTable[keyIterI])
+        if ((keyIter = keyHashTable[keyIterI]))
             return keyIter->key;
     keyIterI = -1;
     return NULL;
@@ -233,7 +234,7 @@ void openDb() {
     }
     strcpy(repoPath, s);
     s = repoPath;
-    while (s = strchr(s, '\\'))     // convert to unit format
+    while ((s = strchr(s, '\\')))     // convert to unit format
         *s++ = '/';
     char *fpart = strchr(repoPath, '\0');               // fpart is where file name is added onto repoPath
     while (fpart != repoPath && fpart[-1] == '/')       // first make sure we don't have a trailing /
@@ -256,7 +257,7 @@ void openDb() {
 
 
 
-__declspec(noreturn) void outOfMemory() {
+_Noreturn void outOfMemory() {
     fprintf(stderr, "Out of memory\n");
     exit(1);
 }
@@ -272,8 +273,8 @@ unsigned hash(const char *s) {      // generate hash value from string
 }
 
 
-static key_t *lookupKey(const KeyPtr key) {
-    for (key_t *hp = keyHashTable[hash(key)]; hp; hp = hp->hchain)
+static udkey_t *lookupKey(const KeyPtr key) {
+    for (udkey_t *hp = keyHashTable[hash(key)]; hp; hp = hp->hchain)
         if (strcmp(hp->key, key) == 0)
             return hp;
     return NULL;
@@ -297,9 +298,9 @@ void insertItem(const KeyPtr key, const char *loc) {
         return;
     }
     // first install in the checksum based hash lists
-    key_t *kp = lookupKey(key);
+    udkey_t *kp = lookupKey(key);
     if (!kp) {
-        if ((kp = malloc(sizeof(key_t))) == NULL)
+        if ((kp = malloc(sizeof(udkey_t))) == NULL)
             outOfMemory();
         strcpy(kp->key, key);
         unsigned hval = hash(key);
@@ -355,7 +356,7 @@ static void loadDb(char *fpart) {
             continue;
         }
         *s = 0;
-        for (loc = s + 1; s = strchr(loc, ':'); loc = s + 1) {
+        for (loc = s + 1; (s = strchr(loc, ':')); loc = s + 1) {
             if (s != loc) {             // ignore blank entries
                 *s = 0;
                 insertItem(key, loc);

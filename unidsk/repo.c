@@ -28,7 +28,7 @@
 #include "unidsk.h"
 
 
-typedef unsigned char byte;
+typedef unsigned char uint8_t;
 bool cacheValid = false;
 
 #define HashSize    4409        // 600th prime
@@ -48,7 +48,7 @@ const char *fileName(const char *loc) {
     const char *s = strrchr(loc, '/');
     if (s)
         loc = s + 1;
-    if (s = strrchr(loc, '\\'))
+    if ((s = strrchr(loc, '\\')))
         return s + 1;
     return loc;
 }
@@ -80,8 +80,8 @@ char *mkIname(const char *loc) {
 int cmpIname(const char *loc, const char *iname) {
     const char *fname = mkIname(loc);
 
-    if (_stricmp(iname, fname) == 0)
-        return strlen(fileName(loc)) - strlen(iname) + 1;
+    if (stricmp(iname, fname) == 0)
+        return (int)(strlen(fileName(loc)) - strlen(iname) + 1);
     return 0;
 }
 
@@ -96,7 +96,7 @@ char *findMatch(const KeyPtr key, const char *iname) {
     char *loc = firstLoc(key);
 
     char *candidate = NULL;
-    int clen;
+    int clen        = 0; // avoid compiler warning
     // for unidsk we name have a recovered file and the first char is #, skip this
     if (iname && *iname == '#')
         iname++;

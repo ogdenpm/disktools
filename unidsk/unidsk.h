@@ -50,10 +50,20 @@ TODO
 */
 
 #include <stdbool.h>
+#include <stdint.h>
 #include "db.h"
-typedef unsigned char byte;
-typedef unsigned short word;
-typedef unsigned __int32 dword;
+
+#ifdef unix
+#include <limits.h>
+#define _MAX_PATH PATH_MAX
+#define DIRSEP    "/"
+#define stricmp   strcasecmp
+#endif
+
+#ifdef _WIN32
+#define DIRSEP "/\\"
+#endif
+
 
 #define	TSIZE	32768				// Max size of track
 
@@ -83,7 +93,7 @@ enum { UNKNOWN, ISIS_SD, ISIS_DD, ISIS_PDS, ISIS_IV, ISIS_DOS, ZXENIX, CPM };
 typedef struct {
     char name[12];      // isis name + optional # prefix for recovered files
     char fname[16];     // name file saved as - isis name + possibly #nnn_ prefix
-    byte attrib;
+    uint8_t attrib;
     int dirLen;         // dir record of file size or it no header block -eofcnt
     int actLen;         // bytes saved
     char key[ChecksumSize + 20];   // base 64 encoding of SHA1, allow extra room for error messages
@@ -92,11 +102,11 @@ typedef struct {
 
 #pragma pack(push, 1)
 typedef struct {
-    byte name[9];
-    byte version[2];
-    byte leftOver[38];
-    byte crlf[2];
-    byte fmtTable[77];
+    uint8_t name[9];
+    uint8_t version[2];
+    uint8_t leftOver[38];
+    uint8_t crlf[2];
+    uint8_t fmtTable[77];
 } label_t;
 #pragma pack(pop)
 
