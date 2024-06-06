@@ -86,19 +86,16 @@ bool SameCh(uint8_t *sec, int len) {
 
 void WriteImgFile(char *fname, int diskType, char *interleaves, bool useSkew, char *comment) {
     FILE *fp;
-    char *fmtExt;
-    int fmt;
+    int fmt = stricmp(strrchr(fname, '.'), ".img") == 0 ? IMG : IMD;
 
     if ((fp = fopen(fname, "wb")) == NULL) {
-        fprintf(stderr, "cannot create %s\n", fname);
+        fprintf(stderr, "Cannot create %s\n", fname);
         exit(1);
     }
-    
+
     int skew = interleaves && useSkew ? formats[diskType].skew : -1;
     char *modeSize = formats[diskType].modeSize;
-    int interleave = 1;
-    int mode = 0;
-    int sSize = 0;
+
 
     if (!interleaves) {
         interleaves = "1";
@@ -106,14 +103,15 @@ void WriteImgFile(char *fname, int diskType, char *interleaves, bool useSkew, ch
         interleaves = formats[diskType].tInterLeave;
 
  //   BuildSMap(interleaves);
-    fmtExt = strrchr(fname, '.');
-    fmt = stricmp(fmtExt, ".img") == 0 ? IMG : IMD;
 
     if (fmt == IMD)
         WriteIMDHdr(fp, comment);
 
     int lastSlot = -skew;
     int bias;
+    int interleave = 1;
+    int mode       = 0;
+    int sSize      = 0;
     for (int cyl = 0; cyl < formats[diskType].nCyl; cyl++) {
         for (int head = 0; head < formats[diskType].nHead; head++) {
             int spt = formats[diskType].nSector;
@@ -122,16 +120,15 @@ void WriteImgFile(char *fname, int diskType, char *interleaves, bool useSkew, ch
                 mode = *modeSize++ - '0';
                 sSize = *modeSize++ - '0';
             }
-            if (*interleaves) {
+            if (fmt == IMG)
+                bias       = -interleave;
+            else if (*interleaves) {
                 interleave = *interleaves++ - '0';
-                bias = Format(diskType) == ISISP || fmt == IMG ? -interleave : 0;
+                bias = Format(diskType) == ISISP ? -interleave : 0;
             } else if (skew < 0)
-                bias = Format(diskType) == ISISP || fmt == IMG ? -interleave : 0;
-            else {
+                bias = Format(diskType) == ISISP ? -interleave : 0;
+            else
                 bias = lastSlot + skew;
-                if (fmt == IMG)
-                    bias -= interleave;
-            }
 
             uint8_t smap[MAXSECTOR];
             lastSlot = BuildSMap(smap, spt, interleave, bias);

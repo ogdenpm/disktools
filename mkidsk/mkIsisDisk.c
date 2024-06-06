@@ -335,7 +335,7 @@ void ParseRecipeHeader(FILE *fp) {
         appendTo = NULL;
 
         if ((s = strchr(line, '\n'))) {
-            while (--s != line && isblank(*s)) // trim
+            while (--s != line && (isblank(*s) || *s == '\r')) // trim
                 ;
             s[1] = 0;
         } else if (strlen(line) == MAXLINE - 1) {
@@ -563,8 +563,8 @@ void ParseFiles(FILE *fp) {
                 continue;
             }
         }
-        if ((s = strchr(line, '#')) || (s = strchr(line, '\n'))) { // trim trailing blanks
-            while (--s != line && isblank(*s))
+        if ((s = strchr(line, '#')) ||  (s = strchr(line, '\n'))) { // trim trailing blanks
+            while (--s != line && (*s == '\r' || isblank(*s)))
                 ;
             s[1] = 0;
         }
@@ -647,7 +647,8 @@ void usage() {
            "-i[xyz]    apply interleave. xyz forces the interleave for track 0, 1, 2-76 for ISIS I "
            "& ISIS II disks\n"
            "           x,y & z are as per ISIS.LAB i.e. interleave + '0'\n"
-           "-t         apply inter track skew\n");
+           "-t         apply inter track skew\n"
+           "Note for .img files interleave and skew are ignored\n");
 }
 
 int main(int argc, char **argv) {
