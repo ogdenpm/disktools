@@ -127,8 +127,11 @@ void WriteImgFile(char *fname, int diskType, char *interleaves, bool useSkew, ch
                 bias = Format(diskType) == ISISP || fmt == IMG ? -interleave : 0;
             } else if (skew < 0)
                 bias = Format(diskType) == ISISP || fmt == IMG ? -interleave : 0;
-            else
+            else {
                 bias = lastSlot + skew;
+                if (fmt == IMG)
+                    bias -= interleave;
+            }
 
             uint8_t smap[MAXSECTOR];
             lastSlot = BuildSMap(smap, spt, interleave, bias);
