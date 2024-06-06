@@ -58,7 +58,7 @@ LINKER ?= gcc
 all: $(TARGET) | $(INSTALLDIR)
 	cp -p $(TARGET) $(INSTALLDIR)
 
-publish: distclean mkversion
+publish: distclean mkversion 
 	$(MAKE)
 
 # check version and force timestamp change so build
@@ -78,7 +78,7 @@ clean:
 	rm -f *.o
 
 distclean: clean
-	rm -f $(TARGET)
+	rm -f $(TARGET) _version.h
 
 rebuild: distclean
 	$(MAKE)
