@@ -40,7 +40,7 @@ enum {
 
 int BuildSMap(uint8_t *smap, int nSector, int interleave, int bias)
 {
-    int slot = bias - interleave;
+    int slot = bias;
     memset(smap, 0, nSector * sizeof(uint8_t));
     for (int i = 1; i <= nSector; i++) {
         slot = (slot + interleave) % nSector;
@@ -124,9 +124,9 @@ void WriteImgFile(char *fname, int diskType, char *interleaves, bool useSkew, ch
             }
             if (*interleaves) {
                 interleave = *interleaves++ - '0';
-                bias = Format(diskType) == ISISP ? -interleave : 0;
+                bias = Format(diskType) == ISISP || fmt == IMG ? -interleave : 0;
             } else if (skew < 0)
-                bias = Format(diskType) == ISISP ? -interleave : 0;
+                bias = Format(diskType) == ISISP || fmt == IMG ? -interleave : 0;
             else
                 bias = lastSlot + skew;
 
