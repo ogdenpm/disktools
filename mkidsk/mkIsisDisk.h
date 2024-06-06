@@ -29,8 +29,14 @@
 #include <stdbool.h>
 #include <ctype.h>
 
-typedef unsigned char byte;
-typedef unsigned short word;
+
+#ifdef unix
+#include <limits.h>
+#define _MAX_PATH   PATH_MAX
+#define stricmp strcasecmp
+#endif
+
+
 
 #define MAXLINE 512                     // maximum length of recipe line
 #define EXT ".imd"                      // default extension and hence format
@@ -118,21 +124,21 @@ enum {NONE, UNKNOWN, I11, II22, II34, II40, II41, II42, II42W, II43, II43W, PDS1
 
 #pragma pack(push, 1)
 typedef struct {
-    byte use;
-    byte file[6];
-    byte ext[3];
-    byte attrib;
-    byte eofCnt;
-    word blkCnt;
-    word hdrBlk;
+    uint8_t use;
+    uint8_t file[6];
+    uint8_t ext[3];
+    uint8_t attrib;
+    uint8_t eofCnt;
+    uint16_t blkCnt;
+    uint16_t hdrBlk;
 } direct_t;
 
 typedef struct {
-    byte name[9];
-    byte version[2];
-    byte leftOver[38];
-    byte crlf[2];
-    byte fmtTable[77];
+    uint8_t name[9];
+    uint8_t version[2];
+    uint8_t leftOver[38];
+    uint8_t crlf[2];
+    uint8_t fmtTable[77];
 } label_t;
 
 #pragma pack(pop)
@@ -181,20 +187,20 @@ extern bool isisCliSeen;
 extern format_t formats[];
 
 extern int sPerCyl;
-extern byte *disk;
+extern uint8_t *disk;
 extern int sectorSize;
 extern bool interTrackSkew;
 extern int formatCh;
 
 #ifdef _MSC_VER
-#define stricmp _stricmp
+#define stricmp stricmp
 #endif
 void WriteImgFile(char *fname, int diskType, char *interleaves, bool useSkew, char *comment);
-void InitFmtTable(byte t0Interleave, byte t1Interleave, byte interleave);
+void InitFmtTable(uint8_t t0Interleave, uint8_t t1Interleave, uint8_t interleave);
 bool CopyFile(char *isisName, int attrib);
 void FormatDisk(int type, int formatCh);
 void WriteVolLabels();
 void WriteI2Directory();
 void WriteI3Directory();
 void WriteLabel();
-byte *GetSectorLoc(word trkSec);
+uint8_t *GetSectorLoc(uint16_t trkSec);

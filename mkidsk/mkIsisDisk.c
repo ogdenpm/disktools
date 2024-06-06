@@ -80,35 +80,29 @@ and can be separated with multiple comment lines starting with #. These comments
     label: name[.|-]ext     Used in ISIS.LAB name has max 6 chars, ext has max 3 chars
     version: nn             Up to 2 chars used in ISIS.LAB (extended to allow char as #xx hex value)
     format: diskFormat      ISIS II SD, ISIS II DD or ISIS III
-    interleave:  interleaveInfo     optional non standard interleave info taken from ISIS.LAB. Rarely needed
-    skew: skewInfo                  inter track skew - not currently used
-    os: operatingSystem     operating system on disk. NONE or ISIS ver, PDS ver, OSIRIS ver
-    crlf:                   Up to 2 chars used in ISIS.LAB allows char as #xx hex value
-marker for start of files
-    Files:
-List of files to add to the image in ISIS.DIR order. Comment lines starting with # are ignored
-each line is formated as
-    IsisName,attributes,len,checksum,srcLocation
-where
-    isisName is the name used in the ISIS.DIR
-    attibutes are the file's attributes any of FISW
-    checksum is the file's SHA1 checksum
+    interleave:  interleaveInfo     optional non standard interleave info taken from ISIS.LAB.
+Rarely needed skew: skewInfo                  inter track skew - not currently used os:
+operatingSystem     operating system on disk. NONE or ISIS ver, PDS ver, OSIRIS ver crlf: Up to 2
+chars used in ISIS.LAB allows char as #xx hex value marker for start of files Files: List of files
+to add to the image in ISIS.DIR order. Comment lines starting with # are ignored each line is
+formated as IsisName,attributes,len,checksum,srcLocation where isisName is the name used in the
+ISIS.DIR attibutes are the file's attributes any of FISW checksum is the file's SHA1 checksum
     location is where the file is stored or a special marker as follows
     AUTO - file is auto generated and the line is optional
     ZERO - file has zero length and is auto generated
     ZEROHDR - file has zero length but header is allocated eofcnt will be set to 128
     path - location of file to load a leading ^ is replaced by the repository path
- * 
+ *
 */
 
 #include "mkIsisDisk.h"
+#include "showVersion.h"
 #include <string.h>
-void showVersion(FILE *fp, bool full);
 
-#define MAXFORMAT   15      // e.g ISIS II SD
-#define MAXOS       15      // ISIS III(n) 2.0
-#define MAXYEAR     30      // ideally only one year but allow for longer
-#define MAXPN       64      // maximum part number/name
+#define MAXFORMAT 15 // e.g ISIS II SD
+#define MAXOS     15 // ISIS III(n) 2.0
+#define MAXYEAR   30 // ideally only one year but allow for longer
+#define MAXPN     64 // maximum part number/name
 
 char comment[MAXCOMMENT];
 char source[MAXCOMMENT];
@@ -117,111 +111,106 @@ char *relPath = path;
 char *filePath;
 
 uint8_t diskType = NOFORMAT;
-uint8_t osType = NONE;
+uint8_t osType   = NONE;
 label_t label;
-bool isisBinSeen = false;
-bool isisT0Seen = false;
-bool isisCliSeen = false;
-bool interleave = false;
+bool isisBinSeen    = false;
+bool isisT0Seen     = false;
+bool isisCliSeen    = false;
+bool interleave     = false;
 bool interTrackSkew = false;
-bool addSource = false;
-int formatCh = -1;                     // format character -e sets, otherwise defaults to 0xc7 for ISIS_II and 0xe5 for ISIS_PDS
+bool addSource      = false;
+int formatCh =
+    -1; // format character -e sets, otherwise defaults to 0xc7 for ISIS_II and 0xe5 for ISIS_PDS
 char *forcedSkew = NULL;
-
 
 char *Match(char *s, char *ref);
 
 char *special[] = { "AUTO", "DIR", "ZERO", "ZEROHDR", NULL };
 
-#define _DT(f, d)    ((f << 1) + d)
+#define _DT(f, d) ((f << 1) + d)
+// clang-format off
 struct {
     char *format;
     int disktype;
-} formatLookup[] = {
-    "SD", _DT(ISISU, SD),
-    "ISIS II SD", _DT(ISISU, SD),
-    "ISIS SD1", _DT(ISIS1, SD),
-    "ISIS SD2", _DT(ISIS2, SD),
-    "ISIS SD3", _DT(ISIS3, SD),
-    "ISIS SD4", _DT(ISIS4, SD),
-    "DD", _DT(ISISU, DD),
-    "ISIS II DD", _DT(ISISU, DD),
-    "ISIS DD3", _DT(ISIS3, DD),
-    "ISIS DD4", _DT(ISIS4, DD),
-    "PDS", _DT(ISISP, DD),
-    "ISIS PDS", _DT(ISISP, DD),
-    NULL, NOFORMAT
-};
+} formatLookup[] = { { "SD", _DT(ISISU, SD) },
+                     { "ISIS II SD", _DT(ISISU, SD) },
+                     { "ISIS SD1", _DT(ISIS1, SD) },
+                     { "ISIS SD2", _DT(ISIS2, SD) },
+                     { "ISIS SD3", _DT(ISIS3, SD) },
+                     { "ISIS SD4", _DT(ISIS4, SD) },
+                     { "DD", _DT(ISISU, DD) },
+                     { "ISIS II DD", _DT(ISISU, DD) },
+                     { "ISIS DD3", _DT(ISIS3, DD) },
+                     { "ISIS DD4", _DT(ISIS4, DD) },
+                     { "PDS", _DT(ISISP, DD) },
+                     { "ISIS PDS", _DT(ISISP, DD) },
+                     { NULL, NOFORMAT }
+                };
 #undef _DT
 
 struct {
     char *os;
     uint8_t osType;
-} osLookup[] = {
-    "NONE", NONE,                   // 0 always NONE
-    "UNKNOWN", UNKNOWN,             // 1 always UNKNOWN
-    "ISIS I 1.1",   I11,   
-    "ISIS II 2.2",  II22,
-    "ISIS II 3.4",  II34,
-    "ISIS II 4.0",  II40,
-    "ISIS II 4.1",  II41,
-    "ISIS II 4.2",  II42,
-    "ISIS II 4.2w", II42W,
-    "ISIS II 4.3",  II43,
-    "ISIS II 4.3w", II43W,
-    "PDS 1.0",      PDS10,          // update function chkCompatible if more pds variants added
-    "PDS 1.1",      PDS11,
-    "TEST 1.0",     TEST10,
-    "TEST 1.1",     TEST11,
-    "ISIS III(N) 2.0", III20,
-    "ISIS III(N) 2.2", III22,
-    "ISIS 1.1",     I11,
-    "ISIS 2.2",     II22,
-    "ISIS 3.4",     II34,
-    "ISIS 4.0",     II40,
-    "ISIS 4.1",     II41,
-    "ISIS 4.2",     II42,
-    "ISIS 4.2w",    II42W,
-    "ISIS 4.3",     II43,
-    "ISIS 4.3w",    II43W,
-    "CORRUPT", NONE,
-    NULL, NONE
-};
+} osLookup[]    = { {"NONE", NONE}, // 0 always NONE
+                    {"UNKNOWN", UNKNOWN}, // 1 always UNKNOWN
+                    {"ISIS I 1.1", I11},
+                    {"ISIS II 2.2", II22},
+                    {"ISIS II 3.4", II34},
+                    {"ISIS II 4.0", II40},
+                    {"ISIS II 4.1", II41},
+                    {"ISIS II 4.2", II42},
+                    {"ISIS II 4.2w", II42W},
+                    {"ISIS II 4.3", II43},
+                    {"ISIS II 4.3w", II43W},
+                    {"PDS 1.0", PDS10}, // update function chkCompatible if more pds variants added
+                    {"PDS 1.1", PDS11},
+                    {"TEST 1.0", TEST10},
+                    {"TEST 1.1", TEST11},
+                    {"ISIS III(N) 2.0", III20},
+                    {"ISIS III(N) 2.2", III22},
+                    {"ISIS 1.1", I11},
+                    {"ISIS 2.2", II22},
+                    {"ISIS 3.4", II34},
+                    {"ISIS 4.0", II40},
+                    {"ISIS 4.1", II41},
+                    {"ISIS 4.2", II42},
+                    {"ISIS 4.2w", II42W},
+                    {"ISIS 4.3", II43},
+                    {"ISIS 4.3w", II43W},
+                    {"CORRUPT", NONE},
+                    {NULL, NONE }
+                };
 
 osMap_t osMap[] = {
-    "non", NULL, 0,
-    "UNKNOWN", "", 0,                    // will pick up from user files
-    "ISIS I 1.1", "Intel80/isis_i/1.1/", USESWP,
-    "ISIS II 2.2", "Intel80/isis_ii/2.2/", USESWP,
-    "ISIS II 3.4", "Intel80/isis_ii/3.4/", 0,
-    "ISIS II 4.0", "Intel80/isis_ii/4.0/", 0,
-    "ISIS II 4.1", "Intel80/isis_ii/4.1/", 0,
-    "ISIS II 4.2", "Intel80/isis_ii/4.2/", HASOV0,
-    "ISIS II 4.2w", "Intel80/isis_ii/4.2w/", HASOV0,
-    "ISIS II 4.3", "Intel80/isis_ii/4.3/", HASOV0,
-    "ISIS II 4.3w", "Intel80/isis_ii/4.3w/", HASOV0,
-    "ISIS PDS 1.0", "Intel80/pds/1.0/", 0,
-    "ISIS PDS 1.1", "Intel80/pds/1.1/", 0,
-    "TEST 1.0", "Intel80/confid/1.0/", 0,
-    "TEST 1.1", "Intel80/confid/1.1/", 0,
-    "ISIS III(N) 2.0", "Intel80/isis_iii(n)/2.0/", HASOV0 + HASOV1,
-    "ISIS III(N) 2.2", "Intel80/isis_iii(n)/2.2/", HASOV0 + HASOV1,
+    {"non", NULL, 0},
+    {"UNKNOWN", "", 0}, // will pick up from user files
+    {"ISIS I 1.1", "Intel80/isis_i/1.1/", USESWP},
+    {"ISIS II 2.2", "Intel80/isis_ii/2.2/", USESWP},
+    {"ISIS II 3.4", "Intel80/isis_ii/3.4/", 0},
+    {"ISIS II 4.0", "Intel80/isis_ii/4.0/", 0},
+    {"ISIS II 4.1", "Intel80/isis_ii/4.1/", 0},
+    {"ISIS II 4.2", "Intel80/isis_ii/4.2/", HASOV0},
+    {"ISIS II 4.2w", "Intel80/isis_ii/4.2w/", HASOV0},
+    {"ISIS II 4.3", "Intel80/isis_ii/4.3/", HASOV0},
+    {"ISIS II 4.3w", "Intel80/isis_ii/4.3w/", HASOV0},
+    {"ISIS PDS 1.0", "Intel80/pds/1.0/", 0},
+    {"ISIS PDS 1.1", "Intel80/pds/1.1/", 0},
+    {"TEST 1.0", "Intel80/confid/1.0/", 0},
+    {"TEST 1.1", "Intel80/confid/1.1/", 0},
+    {"ISIS III(N) 2.0", "Intel80/isis_iii(n)/2.0/", HASOV0 + HASOV1},
+    {"ISIS III(N) 2.2", "Intel80/isis_iii(n)/2.2/", HASOV0 + HASOV1},
 
 };
-
+// clang-format on
 
 int getOsIndex(char *osname) {
     if (!*osname)
         return 0;
     for (int i = 0; osLookup[i].os; i++)
-        if (Match(osname, osLookup[i].os))     // look up location
-            return i;                       // return the index
-    return 1;                               // not standard treat as UNKNOWN
-
+        if (Match(osname, osLookup[i].os)) // look up location
+            return i;                      // return the index
+    return 1;                              // not standard treat as UNKNOWN
 }
-
-
-
 
 int getFormatIndex(char *format) {
     for (int i = 0; formatLookup[i].format; i++)
@@ -230,8 +219,7 @@ int getFormatIndex(char *format) {
     return -1;
 }
 
-
-void InitFmtTable(byte t0Interleave, byte t1Interleave, byte interleave) {
+void InitFmtTable(uint8_t t0Interleave, uint8_t t1Interleave, uint8_t interleave) {
     label.fmtTable[0] = t0Interleave + '0';
     label.fmtTable[1] = t1Interleave + '0';
     for (int i = 2; i < I2TRACKS; i++)
@@ -254,13 +242,12 @@ char *Match(char *s, char *ref) {
     return s;
 }
 
-bool checkSkew(char *s) {    // check skew is valid
+bool checkSkew(char *s) { // check skew is valid
     for (int i = 0; i < 3; i++)
         if (s[i] < '1' || '0' + 52 < s[i])
             return false;
     return true;
 }
-
 
 void decodePair(char *dest, char *src) {
     for (int i = 0; i < 2 && (isalnum(*src) || *src == '.' || *src == '#'); i++) {
@@ -278,48 +265,51 @@ void decodePair(char *dest, char *src) {
     }
 }
 
-
 void append(char *dst, char const *s) {
-    if (strlen(dst) + strlen(s) < MAXCOMMENT)	// ignore if comment too long
+    if (strlen(dst) + strlen(s) < MAXCOMMENT) // ignore if comment too long
         strcat(dst, s);
 }
 
-unsigned getDiskType(int formatIndex, int osIndex) {         // returns usable diskType
-    unsigned osType = osLookup[osIndex].osType;
+unsigned getDiskType(int formatIndex, int osIndex) { // returns usable diskType
+    unsigned osType  = osLookup[osIndex].osType;
     unsigned diskFmt = Format(formatLookup[formatIndex].disktype);
     unsigned density = Density(formatLookup[formatIndex].disktype);
 
     if (osType == NONE || osType == UNKNOWN) {
         if (diskFmt == ISISU) {
-            if (*label.fmtTable) {              // recipe specified interleave
-                if (density == 0) {             // SD, does it look like ISIS I or ISIS II 2.2 interleave
-                    if (strncmp(label.fmtTable, "1<3", 3) == 0)
-                        diskFmt = ISIS2;        // could be ISIS1 but the same format anyway
+            if (*label.fmtTable) {  // recipe specified interleave
+                if (density == 0) { // SD, does it look like ISIS I or ISIS II 2.2 interleave
+                    if (strncmp((char *)label.fmtTable, "1<3", 3) == 0)
+                        diskFmt = ISIS2; // could be ISIS1 but the same format anyway
                 } else
-                    diskFmt = strncmp(label.fmtTable, "1H5", 3) == 0 ? ISIS3 : ISIS4;
+                    diskFmt = strncmp((char *)label.fmtTable, "1H5", 3) == 0 ? ISIS3 : ISIS4;
             }
             if (diskFmt == ISISU)
                 diskFmt = label.version[0] == '3' ? ISIS3 : ISIS4;
-            return (diskFmt << 1) | density;   // update generic disk type
+            return (diskFmt << 1) | density; // update generic disk type
         }
     }
-    if (osType != NONE && ((diskFmt == ISISP) ^ (osType == PDS10 || osType == PDS11)))  // PDS must not have non PDS os
+    if (osType != NONE &&
+        ((diskFmt == ISISP) ^ (osType == PDS10 || osType == PDS11))) // PDS must not have non PDS os
         return NOFORMAT;
-    if ((diskFmt & 1) && (osType == I11 || osType == II22))         // os versions don't support DD
+    if ((diskFmt & 1) && (osType == I11 || osType == II22)) // os versions don't support DD
         return NOFORMAT;
 
-    if (diskFmt == ISIS1 &&osType != I11 ||
-        diskFmt == ISIS2 && osType != II22 ||
-        diskFmt == ISIS3 && osType != II34 ||
-        diskFmt == ISIS4 && osType < II40) {
-        fprintf(stderr, "Warning: non standard format %s with os %s\n", formatLookup[formatIndex].format, osLookup[osIndex].os);
+    if ((diskFmt == ISIS1 && osType != I11) || (diskFmt == ISIS2 && osType != II22) ||
+        (diskFmt == ISIS3 && osType != II34) || (diskFmt == ISIS4 && osType < II40)) {
+        fprintf(stderr, "Warning: non standard format %s with os %s\n",
+                formatLookup[formatIndex].format, osLookup[osIndex].os);
     }
     if (diskFmt == ISISU) {
         switch (osType) {
-        case I11:   return ISIS1 << 1;
-        case II22:  return ISIS2 << 1;
-        case II34:  return (ISIS3 << 1) | density;
-        default:    return (ISIS4 << 1) | density;
+        case I11:
+            return ISIS1 << 1;
+        case II22:
+            return ISIS2 << 1;
+        case II34:
+            return (ISIS3 << 1) | density;
+        default:
+            return (ISIS4 << 1) | density;
         }
     }
     return formatLookup[formatIndex].disktype;
@@ -329,9 +319,9 @@ void ParseRecipeHeader(FILE *fp) {
     char line[MAXLINE];
     char *s;
     int c;
-    char *appendTo = comment;
+    char *appendTo  = comment;
     int formatIndex = -1;
-    int osIndex = NONE;
+    int osIndex     = NONE;
 
     while (fgets(line, MAXLINE, fp)) {
         s = line;
@@ -344,8 +334,8 @@ void ParseRecipeHeader(FILE *fp) {
         }
         appendTo = NULL;
 
-        if (s = strchr(line, '\n')) {
-            while (--s != line && isblank(*s))  // trim
+        if ((s = strchr(line, '\n'))) {
+            while (--s != line && isblank(*s)) // trim
                 ;
             s[1] = 0;
         } else if (strlen(line) == MAXLINE - 1) {
@@ -361,7 +351,7 @@ void ParseRecipeHeader(FILE *fp) {
             break;
         if (Match(line, "#"))
             continue;
-        if (s = Match(line, "label:")) {
+        if ((s = Match(line, "label:"))) {
             for (int i = 0; i < 6; i++)
                 if (isalnum(*s))
                     label.name[i] = toupper(*s++);
@@ -370,23 +360,22 @@ void ParseRecipeHeader(FILE *fp) {
             for (int i = 6; i < 9; i++)
                 if (isalnum(*s))
                     label.name[i] = toupper(*s++);
-        } else if (s = Match(line, "version:"))
-            decodePair(label.version, s);
-        else if (s = Match(line, "format:")) {
+        } else if ((s = Match(line, "version:")))
+            decodePair((char *)label.version, s);
+        else if ((s = Match(line, "format:"))) {
             if ((formatIndex = getFormatIndex(s)) < 0) {
                 fprintf(stderr, "Unsupported disk format %s\n", s);
                 exit(1);
             }
-        } else if (s = Match(line, "interleave:")) {      // we have non standard interleave
-            if ('1' <= s[0] && s[0] <= 52 + '0' &&
-                '1' <= s[1] && s[1] <= 52 + '0' &&
-                '1' <= s[2] && s[2] <= 52 + '0')
+        } else if ((s = Match(line, "interleave:"))) { // we have non standard interleave
+            if ('1' <= s[0] && s[0] <= 52 + '0' && '1' <= s[1] && s[1] <= 52 + '0' && '1' <= s[2] &&
+                s[2] <= 52 + '0')
                 InitFmtTable(s[0] - '0', s[1] - '0', s[2] - '0');
-        } else if (s = Match(line, "os:"))
+        } else if ((s = Match(line, "os:")))
             osIndex = getOsIndex(s);
-        else if (s = Match(line, "crlf:"))
-            decodePair(label.crlf, s);
-        else if ((s = Match(line, "source:")) && addSource) {
+        else if ((s = Match(line, "crlf:")))
+            decodePair((char *)label.crlf, s);
+        else if (((s = Match(line, "source:"))) && addSource) {
             append(source, "\n");
             append(source, line);
             append(source, "\n");
@@ -399,13 +388,15 @@ void ParseRecipeHeader(FILE *fp) {
     }
 
     if ((diskType = getDiskType(formatIndex, osIndex)) == NOFORMAT) {
-        fprintf(stderr, "Invalid disk format %s for os %s\n", formatLookup[formatIndex].format, osLookup[osIndex].os);
+        fprintf(stderr, "Invalid disk format %s for os %s\n", formatLookup[formatIndex].format,
+                osLookup[osIndex].os);
         exit(1);
     }
     osType = osLookup[osIndex].osType;
-    char fmt[128];      // enough string space
+    char fmt[128]; // enough string space
     if (osIndex > 0)
-        sprintf(fmt, "\n%s System Disk - format %s\n", osLookup[osIndex].os, formatLookup[formatIndex].format);
+        sprintf(fmt, "\n%s System Disk - format %s\n", osLookup[osIndex].os,
+                formatLookup[formatIndex].format);
     else
         sprintf(fmt, "\nNon-System Disk - format %s\n", formatLookup[formatIndex].format);
     append(comment, fmt);
@@ -413,7 +404,7 @@ void ParseRecipeHeader(FILE *fp) {
 }
 
 char *ParseIsisName(char *isisName, char *src) {
-    while (isblank(*src))       // ignore leading blanks
+    while (isblank(*src)) // ignore leading blanks
         src++;
     for (int i = 0; i < 6 && isalnum(*src); i++)
         *isisName++ = *src++;
@@ -432,11 +423,20 @@ char *ParseAttributes(char *src, int *attributep) {
         if (attributes < 0)
             attributes = 0;
         switch (toupper(*src)) {
-        case 'I': attributes |= INV; break;
-        case 'W': attributes |= WP; break;
-        case 'S': attributes |= SYS; break;
-        case 'F': attributes |= FMT; break;
-        case ' ': break;
+        case 'I':
+            attributes |= INV;
+            break;
+        case 'W':
+            attributes |= WP;
+            break;
+        case 'S':
+            attributes |= SYS;
+            break;
+        case 'F':
+            attributes |= FMT;
+            break;
+        case ' ':
+            break;
         default:
             fprintf(stderr, "Warning bad attribute %c\n", *src);
         }
@@ -447,26 +447,20 @@ char *ParseAttributes(char *src, int *attributep) {
 }
 
 // the ParsePath return codes
-enum {
-    PATHOK = 1,
-    DIRLIST = 2,
-    IGNORE = 3,
-    TOOLONG = 4
-};
+enum { PATHOK = 1, DIRLIST = 2, IGNORE = 3, TOOLONG = 4 };
 
 void ParsePath(char *src) {
     char *s;
     static bool warnRepo = true;
 
-    while (isblank(*src))          // remove any leading space;
+    while (isblank(*src)) // remove any leading space;
         src++;
-    if ((s = strchr(src, ',')))    // remove any additional field
+    if ((s = strchr(src, ','))) // remove any additional field
         *s = 0;
 
-    s = strchr(src, '\0');          // remove trailing spaces
+    s = strchr(src, '\0'); // remove trailing spaces
     while (s > src && isblank(s[-1]))
         *--s = 0;
-
 
     if (!*src) {
         filePath = "*missing path";
@@ -500,15 +494,17 @@ void ParsePath(char *src) {
     filePath = path;
 }
 
-void chkSystem()  {
-    if (!isisT0Seen)
+void chkSystem() {
+    if (!isisT0Seen) {
         if ((diskType >> 1) == ISISP)
             fprintf(stderr, "Error: PDS System disk requires ISIS.T0\n");
         else if (osType > 0)
             fprintf(stderr, "Warning: System disk requires ISIS.T0 - using Non-System boot file\n");
+    }
     if (osType > 0) {
         if (!isisBinSeen)
-            fprintf(stderr, "Error: System disk requires %s\n", (diskType >> 1) == ISISP ? "ISIS.PDS" : "ISIS.BIN");
+            fprintf(stderr, "Error: System disk requires %s\n",
+                    (diskType >> 1) == ISISP ? "ISIS.PDS" : "ISIS.BIN");
         if (!isisCliSeen)
             fprintf(stderr, "Error: System disk requires ISIS.CLI\n");
     }
@@ -521,14 +517,14 @@ void GenIsisName(char *isisName, char *line) {
         *isisName = 0;
         return;
     }
-    if (s = strrchr(fname, '/'))
+    if ((s = strrchr(fname, '/')))
         fname = s + 1;
-    if (s = strrchr(fname, '\\'))
+    if ((s = strrchr(fname, '\\')))
         fname = s + 1;
     if (*fname == '^')
         fname++;
-    ParseIsisName(isisName, fname);     // generate the ISIS name
-    if ((s = strchr(isisName, '.')) && s[1] == 0)   // don't auto generate name ending in  .
+    ParseIsisName(isisName, fname);               // generate the ISIS name
+    if ((s = strchr(isisName, '.')) && s[1] == 0) // don't auto generate name ending in  .
         *s = 0;
 }
 
@@ -537,7 +533,6 @@ char *skipws(char *s) {
         s++;
     return s;
 }
-
 
 bool isIsisName(const char *name) {
     int i;
@@ -560,10 +555,10 @@ void ParseFiles(FILE *fp) {
     while (fgets(line, MAXLINE, fp)) {
         if (line[0] == '#')
             continue;
-        if (!strchr(line, '\n')) {          // truncated line
+        if (!strchr(line, '\n')) { // truncated line
             while ((c = getc(fp)) != '\n' && c != EOF)
                 ;
-            if (!strchr(line, '#')) {       // don't worry about extended comments
+            if (!strchr(line, '#')) { // don't worry about extended comments
                 fprintf(stderr, "%s - line truncated\n", line);
                 continue;
             }
@@ -578,18 +573,19 @@ void ParseFiles(FILE *fp) {
         if (*s == 0)
             continue;
 
-        if (*s == ',' || !strchr(s, ','))                   // null ISIS name or no ISIS name, so generate from location
+        if (*s == ',' ||
+            !strchr(s, ',')) // null ISIS name or no ISIS name, so generate from location
             GenIsisName(isisName, s);
         else {
-            s = ParseIsisName(isisName, s);                 // get the isisFile
+            s = ParseIsisName(isisName, s); // get the isisFile
             if (*s != ',')
-                *isisName = 0;                              // force error message
+                *isisName = 0; // force error message
         }
         if (!isIsisName(isisName)) {
             fprintf(stderr, "%s - Invalid ISIS name\n", line);
             continue;
         }
-        if (strchr(s + 1, ',')) {                           // attribute present or only location
+        if (strchr(s + 1, ',')) { // attribute present or only location
             s = ParseAttributes(s + 1, &attributes);
             if (*s != ',') {
                 fprintf(stderr, "%s - Invalid Attributes\n", line);
@@ -598,8 +594,8 @@ void ParseFiles(FILE *fp) {
         } else
             attributes = 0;
 
-        if (*s == ',' && strchr(s + 1, ','))                // checksum present or only location
-            s = strchr(s + 1, ',') +1;
+        if (*s == ',' && strchr(s + 1, ',')) // checksum present or only location
+            s = strchr(s + 1, ',') + 1;
 
         ParsePath(s);
         if (*filePath == '*') {
@@ -607,13 +603,15 @@ void ParseFiles(FILE *fp) {
             continue;
         } else if (strcmp(isisName, "ISIS.BIN") == 0) {
             if (!osType || (diskType >> 1) == ISISP) {
-                fprintf(stderr, "ISIS.BIN not allowed for %s system disk - skipping\n", osMap[osType].osname);
+                fprintf(stderr, "ISIS.BIN not allowed for %s system disk - skipping\n",
+                        osMap[osType].osname);
                 continue;
             }
             isisBinSeen = true;
         } else if (strcmp(isisName, "ISIS.PDS") == 0) {
             if (!osType || (diskType >> 1) != ISISP) {
-                fprintf(stderr, "ISIS.PDS not allowed for %s system disk - skipping\n", osMap[osType].osname);
+                fprintf(stderr, "ISIS.PDS not allowed for %s system disk - skipping\n",
+                        osMap[osType].osname);
                 continue;
             } else if (strcmp(filePath, "AUTO") != 0)
                 isisBinSeen = true;
@@ -623,7 +621,6 @@ void ParseFiles(FILE *fp) {
             isisCliSeen = true;
         if (!CopyFile(isisName, attributes))
             fprintf(stderr, "%s can't find source file %s\n", isisName, filePath);
-
     }
     chkSystem();
 }
@@ -633,52 +630,52 @@ void usage() {
     if (shown)
         return;
     shown++;
-    printf(
-        "mkidsk - Generate imd or img files from ISIS II / PDS recipe files (c) Mark Ogden 29-Mar-2020\n\n"
-        "usage: mkidsk -v | -V | [options]* [-]recipe [diskname][.fmt]\n"
-        "where\n"
-        "-v / -V    show version infomation and exit. Must be only option\n"
-        "recipe     file with instructions to build image. Optional - prefix\n"
-        "           if name starts with @\n"
-        "diskname   generated disk image name - defaults to recipe without leading @\n"
-        "fmt        disk image format either .img or .imd - defaults to " EXT "\n"
-        "\noptions are\n"
-        "-h         displays this help info\n"
-        "-s         add source: info to imd images\n"
-        "-f[nn]     override C7 format byte with E5 or hex value specified by nn\n"
+    printf("mkidsk - Generate imd or img files from ISIS II / PDS recipe files (c) Mark Ogden "
+           "29-Mar-2020\n\n"
+           "usage: mkidsk -v | -V | [options]* [-]recipe [diskname][.fmt]\n"
+           "where\n"
+           "-v / -V    show version infomation and exit. Must be only option\n"
+           "recipe     file with instructions to build image. Optional - prefix\n"
+           "           if name starts with @\n"
+           "diskname   generated disk image name - defaults to recipe without leading @\n"
+           "fmt        disk image format either .img or .imd - defaults to " EXT "\n"
+           "\noptions are\n"
+           "-h         displays this help info\n"
+           "-s         add source: info to imd images\n"
+           "-f[nn]     override C7 format byte with E5 or hex value specified by nn\n"
 
-        "-i[xyz]    apply interleave. xyz forces the interleave for track 0, 1, 2-76 for ISIS I & ISIS II disks\n"
-        "           x,y & z are as per ISIS.LAB i.e. interleave + '0'\n"
-        "-t         apply inter track skew\n"
-        );
+           "-i[xyz]    apply interleave. xyz forces the interleave for track 0, 1, 2-76 for ISIS I "
+           "& ISIS II disks\n"
+           "           x,y & z are as per ISIS.LAB i.e. interleave + '0'\n"
+           "-t         apply inter track skew\n");
 }
 
-void main(int argc, char **argv) {
+int main(int argc, char **argv) {
     FILE *fp;
     char *recipe;
     char outfile[_MAX_PATH + 4] = "";
     char *s;
     char *diskname;
-    char ext[5] = EXT;      // .imd or .img
 
-    if (argc == 2 && _stricmp(argv[1], "-v") == 0) {
-        showVersion(stdout, argv[1][1] == 'V');
-        exit(0);
-    }
+    CHK_SHOW_VERSION(argc, argv);
+
     for (; --argc > 0; argv++) {
         if (argv[1][0] != '-' || argv[1][1] == '@')
             break;
         switch (tolower(argv[1][1])) {
         default:
             fprintf(stderr, "unknown option %s\n", argv[1]);
-        case 'h': usage(); break;
+        case 'h':
+            usage();
+            break;
         case 'i':
             interleave = true;
-            if (argv[1][2])
+            if (argv[1][2]) {
                 if (checkSkew(argv[1] + 2))
                     forcedSkew = argv[1] + 2;
                 else
                     fprintf(stderr, "ignoring invaild skew specification in -i option\n");
+            }
             break;
         case 't':
             interTrackSkew = true;
@@ -692,30 +689,30 @@ void main(int argc, char **argv) {
             addSource = true;
         }
     }
-    if (argc < 1 || argc > 2) {                 // allow for recipe and optional diskname
+    if (argc < 1 || argc > 2) { // allow for recipe and optional diskname
         usage();
         exit(1);
     }
-    recipe = argv[1] + (argv[1][0] == '-');              // allow - prefix to @filename for powershell
+    recipe = argv[1] + (argv[1][0] == '-'); // allow - prefix to @filename for powershell
     if (strlen(recipe) >= _MAX_PATH) {
         fprintf(stderr, "recipe path name too long\n");
         exit(1);
     }
 
-    diskname = argc == 2 ? argv[2] : EXT;            // use disk and ext if given else just assume default fmt
+    diskname = argc == 2 ? argv[2] : EXT; // use disk and ext if given else just assume default fmt
     if (strlen(diskname) >= _MAX_PATH) {
         fprintf(stderr, "disk path name too long\n");
         exit(1);
     }
 
-    if (_stricmp(diskname, ".imd") != 0 && _stricmp(diskname, ".img") != 0) { // we have name
+    if (stricmp(diskname, ".imd") != 0 && stricmp(diskname, ".img") != 0) { // we have name
         strcpy(outfile, diskname);
         s = strchr(outfile, '\0') - 4;
-        if (s <= outfile || (_stricmp(s, ".imd") != 0 && _stricmp(s, ".img") != 0))
+        if (s <= outfile || (stricmp(s, ".imd") != 0 && stricmp(s, ".img") != 0))
             strcat(outfile, EXT);
     } else {
-        char *recipeFile = (s = strrchr(recipe, '\\')) ? s + 1 : recipe;
-        if (s = strchr(recipe, '/'))
+        char *recipeFile = ((s = strrchr(recipe, '\\'))) ? s + 1 : recipe;
+        if ((s = strchr(recipe, '/')))
             recipeFile = s + 1;
         *outfile = 0;
         strncpy(outfile, recipe, recipeFile - recipe);
@@ -726,18 +723,17 @@ void main(int argc, char **argv) {
         fprintf(stderr, "Output file path too long\n");
         exit(1);
     }
- 
 
     // use envionment variable to define root
-    if (s = getenv("IFILEREPO")) {         // environment variable defined
-        strncat(path, s, _MAX_PATH - 1);    // path too long will be detected later
+    if ((s = getenv("IFILEREPO"))) {       // environment variable defined
+        strncat(path, s, _MAX_PATH - 1); // path too long will be detected later
         for (s = path; *s; s++)
             if (*s == '\\')
                 *s = '/';
         if (s > path && s[-1] != '/')
             *s++ = '/';
-        *s = 0;
-        relPath = s;                        // where we add relative path
+        *s      = 0;
+        relPath = s; // where we add relative path
     }
 
     if ((fp = fopen(recipe, "rt")) == NULL) {
@@ -753,5 +749,6 @@ void main(int argc, char **argv) {
     WriteLabel();
     ParseFiles(fp);
     fclose(fp);
-    WriteImgFile(outfile, diskType, interleave ? forcedSkew ? forcedSkew : "" : NULL, interTrackSkew, comment);
+    WriteImgFile(outfile, diskType, interleave ? forcedSkew ? forcedSkew : "" : NULL,
+                 interTrackSkew, comment);
 }

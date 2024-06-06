@@ -36,9 +36,9 @@ MODIFICATION HISTORY
 
 direct_t *directory;
 
-byte *bitMap;
+uint8_t *bitMap;
 int sPerCyl = DDSECTORS;
-byte *disk;
+uint8_t *disk;
 unsigned diskSize;
 int sectorSize = 128;
 int binHdrBlk;
@@ -63,15 +63,15 @@ format_t formats[] = {
 #pragma pack(push, 1)
 struct {
     char volName[10];
-    byte fill;
-    byte fileDriver;
-    word volGran;
+    uint8_t fill;
+    uint8_t fileDriver;
+    uint16_t volGran;
     uint32_t volSize;
-    word maxFnode;
+    uint16_t maxFnode;
     uint32_t fnodeStart;
-    word fnodeSize;
-    word rootFnode;
-    byte unknown[8];
+    uint16_t fnodeSize;
+    uint16_t rootFnode;
+    uint8_t unknown[8];
     char osFile[12];
 } rmxLabel = {"          ", 7, 0, 1024, I3TRACKS * I3SECTORS * I3SECTORSIZE, 0, 0, 0, 0,
               {0, 1, 4, 0, 0, 0, '0', 0}, "ISIS.PDS    "};
@@ -104,7 +104,7 @@ struct {
         end
 */
 
-byte nsBoot[] = {
+uint8_t nsBoot[] = {
     0xDB, 0x79, 0xDB, 0x7B, 0xDB, 0xFF, 0xE6, 0x2,
     0xC2, 0x4, 0x30, 0x21, 0x1A, 0x30, 0x6, 0x20, 0x4E,
     0xCD, 0x9, 0xF8, 0x23, 0x5, 0xC2, 0x10, 0x30, 0xC7,
@@ -114,7 +114,7 @@ byte nsBoot[] = {
     'N', 'O', 'T', 'H', 'E', 'R', 0xD, 0xA
 };
 
-word AllocSector() {
+uint16_t AllocSector() {
     static int bytePos = 0;     // optimisation - can use static as we don't delete sectors
     int track, bitPos;
 
@@ -142,7 +142,7 @@ word AllocSector() {
     return BLOCK(track, (bytePos * 8 + bitPos) % sPerCyl + 1);      // sectors start at 1
 }
 
-void ReserveSector(word trkSec) {
+void ReserveSector(uint16_t trkSec) {
     if (Format(diskType) == ISISP)
         bitMap[BLKTRK(trkSec)] |= 1 << ((BLKSEC(trkSec) - 1) / 4);
     else {
@@ -152,11 +152,11 @@ void ReserveSector(word trkSec) {
 
 }
 
-byte *GetSectorLoc(word trkSec) {
+uint8_t *GetSectorLoc(uint16_t trkSec) {
     return disk + (BLKTRK(trkSec) * sPerCyl + BLKSEC(trkSec) - 1) * sectorSize;
 }
 
-void NewDataSector(word *hdr) {
+void NewDataSector(uint16_t *hdr) {
     *hdr = AllocSector();
     memset(GetSectorLoc(*hdr), 0, sectorSize);        // clear out sector
     if (Format(diskType) == ISISP) {                             // record additional sectors of cluster
@@ -167,12 +167,12 @@ void NewDataSector(word *hdr) {
 }
 
 
-word NewHdrSector(word trkSec) {
+uint16_t NewHdrSector(uint16_t trkSec) {
     if (trkSec == 0)
         trkSec = AllocSector();
     else
         ReserveSector(trkSec);
-    word *hdr = (word *)GetSectorLoc(trkSec);
+    uint16_t *hdr = (uint16_t *)GetSectorLoc(trkSec);
     memset(hdr, 0, sectorSize);
     if (Format(diskType) == ISISP) {
         hdr[2] = trkSec + 1;
@@ -182,8 +182,8 @@ word NewHdrSector(word trkSec) {
     return trkSec;
 }
 
-word *NewHdrPtr(word trkSec) {
-    return (word *)GetSectorLoc(NewHdrSector(trkSec));
+uint16_t *NewHdrPtr(uint16_t trkSec) {
+    return (uint16_t *)GetSectorLoc(NewHdrSector(trkSec));
 }
 
 void FormatDisk(int type, int formatCh) {
@@ -193,7 +193,7 @@ void FormatDisk(int type, int formatCh) {
     sectorSize = Format(diskType) == ISISP ? 256 : 128;
     unsigned diskSize = formats[type].nCyl * formats[type].nHead * formats[type].nSector * sectorSize ;
 
-    if ((disk = (byte *)malloc(diskSize)) == NULL) {
+    if ((disk = (uint8_t *)malloc(diskSize)) == NULL) {
         fprintf(stderr, "fatal error out of memory\n");
         exit(1);
     }
@@ -213,7 +213,7 @@ void FormatDisk(int type, int formatCh) {
 void WriteVolLabels()
 {
     bitMap[0] = 0xf;        // track 0 blocked out      
-    byte *label = GetSectorLoc(ISOLAB_LOC);
+    uint8_t *label = GetSectorLoc(ISOLAB_LOC);
     memset(label, ' ', 128);
     memcpy(label, "VOL1ISISPDS", 11);
     label[71] = 'M';      // probably represents MFM
@@ -228,7 +228,7 @@ void WriteVolLabels()
 
 
 
-void SetLinks(word *hdr, int  startSlot, int cnt, int trkSec) {
+void SetLinks(uint16_t *hdr, int  startSlot, int cnt, int trkSec) {
     int i;
     for (i = 0; i < cnt; i++) {
         hdr[startSlot + i] = trkSec + i;
@@ -238,11 +238,11 @@ void SetLinks(word *hdr, int  startSlot, int cnt, int trkSec) {
         hdr[startSlot + i++] = 0;
 }
 
-bool NameToIsis(byte *isisName, char *name) {
+bool NameToIsis(uint8_t *isisName, char *name) {
     // convert name to isis internal format
     for (int i = 0; i < 6; i++) {
         if (isalnum(*name))
-            isisName[i] = (byte)toupper(*name++);
+            isisName[i] = (uint8_t)toupper(*name++);
         else
             isisName[i] = 0;
     }
@@ -250,7 +250,7 @@ bool NameToIsis(byte *isisName, char *name) {
         name++;
     for (int i = 6; i < 9; i++) {
         if (isalnum(*name))
-            isisName[i] = (byte)toupper(*name++);
+            isisName[i] = (uint8_t)toupper(*name++);
         else
             isisName[i] = 0;
     }
@@ -258,7 +258,7 @@ bool NameToIsis(byte *isisName, char *name) {
 }
 
 direct_t *Lookup(char *name, bool autoName) {
-    byte isisName[9];
+    uint8_t isisName[9];
     if (!NameToIsis(isisName, name)) {
         fprintf(stderr, "illegal ISIS name %s\n", name);
         exit(1);
@@ -271,13 +271,13 @@ direct_t *Lookup(char *name, bool autoName) {
             if (directory[i].use == NEVUSE)
                 break;
         }
-#pragma warning(disable : 6385 6386)        // suppress warning about writing the 9 chars to full file name
+
         else if (memcmp(directory[i].file, isisName, 9) == 0)
             return &directory[i];
     if (firstFree)
         memcpy(firstFree->file, isisName, 9);
     return firstFree;
-#pragma warning(default : 6385 6386)
+
 }
 
 direct_t *MakeDirEntry(char *name, int attrib, int eofCnt, int blkCnt, int hdrBlk) {
@@ -302,14 +302,14 @@ bool CopyFile(char *isisName, int attrib) {
     direct_t *dir;
     int blkCnt = 0;
     int hdrIdx;
-    word *hdr;
-    byte buf[I3SECTORSIZE];      // used as staging area for data read
-    int actual;
+    uint16_t *hdr;
+    uint8_t buf[I3SECTORSIZE];      // used as staging area for data read
+    int actual = 0;
     FILE *fp;
     int curHdrBlk;
 
     if (strcmp(filePath, "AUTO") == 0) {
-        if (dir = Lookup(isisName, false)) {
+        if ((dir = Lookup(isisName, false))) {
             if (attrib >= 0)
                 dir->attrib = attrib;
         } else
@@ -326,19 +326,17 @@ bool CopyFile(char *isisName, int attrib) {
     /* make sure that ISIS system files not generated in WriteDirectory are given default
     * attributes unless overridden
     */
-    if (attrib < 0)
-        if (strcmp(isisName, "ISIS.BIN") == 0 || 
-            strcmp(isisName, "ISIS.PDS") == 0 ||
-            strcmp(isisName, "ISIS.CLI") == 0 ||
-            strcmp(isisName, "ISIS.OV0") == 0 ||
-            strcmp(isisName, "ISIS.OV1") == 0 ||
-            strcmp(isisName, "ISIS.OV2") == 0 ||
+    if (attrib < 0) {
+        if (strcmp(isisName, "ISIS.BIN") == 0 || strcmp(isisName, "ISIS.PDS") == 0 ||
+            strcmp(isisName, "ISIS.CLI") == 0 || strcmp(isisName, "ISIS.OV0") == 0 ||
+            strcmp(isisName, "ISIS.OV1") == 0 || strcmp(isisName, "ISIS.OV2") == 0 ||
             strcmp(isisName, "ISISC.BIN") == 0)
 
-            attrib = (Format(diskType) == ISIS1 || Format(diskType) == ISIS2 ? WP : FMT) | SYS | INV;       // ISIS I & ISIS II 2.2 use WP rather than F
+            attrib = (Format(diskType) == ISIS1 || Format(diskType) == ISIS2 ? WP : FMT) | SYS |
+                     INV; // ISIS I & ISIS II 2.2 use WP rather than F
         else
             attrib = 0;
-
+    }
     if ((fp = fopen(filePath, "rb")) == NULL) {
         return false;
     }
@@ -349,7 +347,7 @@ bool CopyFile(char *isisName, int attrib) {
 
     if (dir->hdrBlk == 0)
         dir->hdrBlk = NewHdrSector(0);
-    hdr = (word *)GetSectorLoc(dir->hdrBlk);
+    hdr = (uint16_t *)GetSectorLoc(dir->hdrBlk);
     curHdrBlk = dir->hdrBlk;
     while (1) {
         for (hdrIdx = 2; hdrIdx < (Format(diskType) == ISISP ? 125 : 64); hdrIdx++) {
@@ -367,11 +365,11 @@ bool CopyFile(char *isisName, int attrib) {
 
         if (hdr[1] == 0) {     // see if forward link exists
             hdr[1] = NewHdrSector(0);
-            word *nxtHdr = (word *)GetSectorLoc(hdr[1]);
+            uint16_t *nxtHdr = (uint16_t *)GetSectorLoc(hdr[1]);
             nxtHdr[0] = curHdrBlk;
         }
         curHdrBlk = hdr[1];
-        hdr = (word *)GetSectorLoc(curHdrBlk);
+        hdr = (uint16_t *)GetSectorLoc(curHdrBlk);
     }
     if (blkCnt > dir->blkCnt) {
         dir->blkCnt = blkCnt;
@@ -415,7 +413,7 @@ void CopyOsFiles() {        // copies system files, (note if t0Only is true only
 void WriteI2Directory() {
     int cntBitMapSectors = formats[diskType].bitMapSize;
     // setup linkage for ISIS.T0
-    word *hdr = NewHdrPtr(ISIST0_HDR);
+    uint16_t *hdr = NewHdrPtr(ISIST0_HDR);
     SetLinks(hdr, 2, ISIST0_SIZE, ISIST0_DAT);
     // setup linkage for ISIS.LAB
 
@@ -457,7 +455,7 @@ void WriteI3Directory() {
 
     int cntBitMapSectors = formats[diskType].bitMapSize;
     // setup linkage for ISIS.T0
-    word *hdr = NewHdrPtr(ISIS3T0_HDR);
+    uint16_t *hdr = NewHdrPtr(ISIS3T0_HDR);
     SetLinks(hdr, 2, ISIS3T0_SIZE, ISIS3T0_HDR + 1);
     // setup linkage for ISIS.LAB
 
@@ -484,9 +482,9 @@ void WriteI3Directory() {
 }
 
 void WriteLabel() {
-    // iniitlise the supplementary label info and write to image
+    // initialise the supplementary label info and write to image
     if (Format(diskType) == ISISP) {
-        char *labelSector = GetSectorLoc(ISIS3LAB_HDR + 1);
+        uint8_t *labelSector = GetSectorLoc(ISIS3LAB_HDR + 1);
         memset(label.leftOver, ' ', sizeof(label.leftOver));
         memcpy(labelSector, &label, sizeof(label) - sizeof(label.fmtTable));
         labelSector = GetSectorLoc(ISIS3LAB_HDR + 3);

@@ -38,15 +38,16 @@ enum {
     IMG, IMD
 };
 
-int BuildSMap(byte *smap, int nSector, int interleave, int bias)
+int BuildSMap(uint8_t *smap, int nSector, int interleave, int bias)
 {
-    int slot = bias;
-    memset(smap, 0, nSector * sizeof(byte));
+    int slot = bias - interleave;
+    memset(smap, 0, nSector * sizeof(uint8_t));
     for (int i = 1; i <= nSector; i++) {
         slot = (slot + interleave) % nSector;
         while (smap[slot])
-            slot = ++slot % nSector;
+            slot = (slot + 1) % nSector;
         smap[slot] = i;
+
 
     }
     return slot;        // return last slot assigned.
@@ -71,7 +72,7 @@ void WriteIMDHdr(FILE *fp, char *comment) {
     putc(0x1A, fp);
 }
 
-bool SameCh(byte *sec, int len) {
+bool SameCh(uint8_t *sec, int len) {
     for (int i = 1; i < len; i++)
         if (sec[0] != sec[i])
             return false;
@@ -106,7 +107,7 @@ void WriteImgFile(char *fname, int diskType, char *interleaves, bool useSkew, ch
 
  //   BuildSMap(interleaves);
     fmtExt = strrchr(fname, '.');
-    fmt = _stricmp(fmtExt, ".img") == 0 ? IMG : IMD;
+    fmt = stricmp(fmtExt, ".img") == 0 ? IMG : IMD;
 
     if (fmt == IMD)
         WriteIMDHdr(fp, comment);
@@ -129,7 +130,7 @@ void WriteImgFile(char *fname, int diskType, char *interleaves, bool useSkew, ch
             else
                 bias = lastSlot + skew;
 
-            byte smap[MAXSECTOR];
+            uint8_t smap[MAXSECTOR];
             lastSlot = BuildSMap(smap, spt, interleave, bias);
 
             if (fmt == IMD) {
@@ -141,7 +142,7 @@ void WriteImgFile(char *fname, int diskType, char *interleaves, bool useSkew, ch
                 fwrite(smap, 1, spt, fp);    // sector numbering map
             }
             for (int secNum = 0; secNum < spt; secNum++) {
-                byte *sector = GetSectorLoc(BLOCK(cyl, smap[secNum] + head * spt));
+                uint8_t *sector = GetSectorLoc(BLOCK(cyl, smap[secNum] + head * spt));
                 if (fmt == IMD) {
                     if (SameCh(sector, 128 << sSize)) {
                         putc(2, fp);
