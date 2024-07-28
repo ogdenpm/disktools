@@ -1,0 +1,154 @@
+<!doctype html>
+<html>
+<head>
+<meta charset='UTF-8'><meta name='viewport' content='width=device-width initial-scale=1'>
+<title>recipe</title></head>
+<body><h1>mkidsk recipe file format</h1>
+<p><strong>mkidsk</strong> creates ISIS I, ISIS II and ISIS PDS disk images in .IMD or .IMG format using a text &quot;recipe&quot; file that provides instructions as to the content and format of the disk image.</p>
+<p>unidsk automatically creates a recipe file when it decodes an existing .IMD or .IMG file to document the content. It is also possible to hand create files, see <a href='#creating-your-own-recipe'>Creating your own recipe</a>, in this file.</p>
+<p>Although <strong>mkidsk</strong> is flexible on recipe filenames, the convention used by <strong>unidsk</strong> and <strong>irepo</strong> is that recipe files begin with an @ character. It is strongly recommended that this convention is followed.</p>
+<h2>Recipe</h2>
+<p>A recipe file is a simple text file that contains a small amount of meta data and a list of files to include in the disk image. It can also contain comment lines, to record supplementary information.</p>
+<p> There are three types of information lines recorded in a recipe file, with blank lines being ignored.</p>
+<ol start='' >
+<li>Lines beginning with a #. These are comment lines and can be freely interspersed with other lines. See note below.</li>
+<li>Metadata lines. These start with a keyword, then a  colon, followed by a text value. These can occur in any order. The last metadata line is mandatory and has the keyword <strong>Files</strong> with no text value. This is used to signal that remaining content is the file list.</li>
+<li>Disk content lines, these define the files to be included in ISIS.DIR order.
+Note key operating system files have fixed entries in ISIS.DIR and this is honoured by mkidsk.</li>
+
+</ol>
+<p><strong>Note</strong>:  If <strong>mkidsk</strong> is creating a .IMD file, it copies some of the recipe comments as part of the IMD header. Specifically, the first block of comments at the start of the recipe file and, if the -s option is specified, any <strong>source</strong> metadata line and the immediately following comment lines.</p>
+<h3>First line</h3>
+<p><strong>mkidsk</strong> puts no special meaning on the first line, except as noted in comments above. However to be consistent with <strong>unidsk</strong> and the <strong>irepo</strong> tools it is recommended that it has the format</p>
+<pre><code># name
+where name is the recipe name without the leading @.
+As this apepars in any .IMD file it helps keep an audit trail
+Note. irepo will make sure the first line follows this appoach
+</code></pre>
+<p>See naming.md for my personal naming convention.<div style="page-break-after: always; break-after: page;"></div></p>
+<h3>Metadata</h3>
+<p>The following metadata lines are explicitly processed, others are ignored. The order here reflects the order unidsk uses. </p>
+<p>Note it is recommended to always provide the metadata marked with a *.</p>
+<figure><table>
+<thead>
+<tr><th>Metadata</th><th>Notes</th></tr></thead>
+<tbody><tr><td>*<strong>label</strong>: <em>label_name</em></td><td>The label name stored in ISIS.LAB.<br>To be consistent with ISIS, <em>label_name</em> should be up to  6 alphanumeric characters, followed optionally by a dot or dash  and up to 3 alphanumeric characters.<br>The name is converted to upper case.</td></tr><tr><td><strong>version</strong>: nn</td><td>Record the version reference in ISIS.LAB. It can be up to 2 characters. Default is 2 nulls</td></tr><tr><td>*<strong>format</strong>: <em>disk_format</em></td><td>Mandatory meta data item that specifies disk format to use. The main options are SD, DD and PDS, with the aliases ISIS II SD, ISIS II DD and ISIS PDS accepted for historical reasons.<br>Note SD1, SD2, SD3, SD4, DD3 and DD4 can also be used to force defaults for interleave and skew, see mkidsk documentation for more information.</td></tr><tr><td><strong>*os</strong>: <em>os_system</em></td><td>The operating system to be written on the disk, valid options are noted below<br>If this meta data is missing, os: NONE is assumed.</td></tr><tr><td><strong>interleave</strong>: <em>interleave_info</em></td><td>Rarely specified, but provides an override for the default disk interleave. <br>The info is 3 characters one each for track 0, track 1 and remaining tracks, the character value is &#39;0&#39; + the interleave so an interleave of 12 is the character &#39;&lt;&#39;<br>Note, mkidsk uses the format and os specifications to work out the interleave if not specified.</td></tr><tr><td><strong>skew</strong>:  <em>skew_Info</em></td><td>Not used by <strong>mkidsk</strong>,  but documents a non standard intertrack skew. Same format as interleave_info<br>Note mkidsk uses the os/format specifications to work out the skew to use, if required.</td></tr><tr><td><strong>crlf</strong>: <em>nn</em></td><td>Only really of use for ISIS PDS disks where the crlf field in the ISIS.LAB file is not set during format<br>This provides a way to force the value to match an original disk. Here each n is either an alphanumeric character, a dot or  #hh, where h is a hex nibble 0-9,A-F</td></tr><tr><td><strong>source</strong>: <em>filename</em></td><td>Records the source image file that the information in the recipe was capture from.<br>Although generated by <strong>unidsk</strong>, additional entries can be added to help record alternative image sources<br>See notes above re use of comment lines after the source: line.</td></tr><tr><td>*<strong>Files</strong>:</td><td>Mandatory last meta data item</td></tr></tbody>
+</table></figure>
+<p>Note: Interleave is the spacing between sectors on a track and skew is the sector spacing added between tracks.</p>
+<h4>Current supported values for os meta data</h4>
+<p>Note user specified OS files will overwrite these, so it is advisable to either not specify the OS files in the content lines, or to use the AUTO location, see below.</p>
+<figure><table>
+<thead>
+<tr><th>Name (case insensitive)</th><th>Default OS written to disk</th></tr></thead>
+<tbody><tr><td>NONE or CORRUPT</td><td>Only ISIS.DIR, ISIS.LAB, ISIS.MAP and non system ISIS.T0 provided.<br>Note ISIS.BIN should not be specified. Non standard ISIS.T0 can be specified</td></tr><tr><td>UNKNOWN</td><td>Only ISIS.DIR, ISIS.LAB, ISIS.MAP and non system ISIS.T0 provided.<br>User specifies other files and bootable ISIS.T0.</td></tr><tr><td>ISIS 1.1 or ISIS I 1.1</td><td>ISIS I 1.1, a check is made that the format is SD</td></tr><tr><td>ISIS 2.2 or ISIS II 2.2</td><td>ISIS II 2.2, a check is made that the format is SD</td></tr><tr><td>ISIS m.n or ISIS II m.n</td><td>ISIS II m.m where m.n is one of 3.4, 4.2, 4.1, 4.2, 4.2w, 4.3, 4.3w. SD &amp; DD formats supported</td></tr><tr><td>ISIS III(N) m.n</td><td>ISIS III(N) m.n where m.n is 2.0 or 2.2. SD &amp; DD formats supported</td></tr><tr><td>PDS m.n</td><td>ISIS PDS m.n where m.n is 1.0 or 1.1 - requires PDS format</td></tr><tr><td>TEST m.n</td><td>Writes the special ISIS.BIN used by CONFIG m.n, where m.n is 1.0 or 1.1. SD &amp; DD formats supported</td></tr></tbody>
+</table></figure>
+<h3>Disk content lines</h3>
+<p>The individual description lines specify the files used in ISIS.DIR order. Each line is of the form</p>
+<pre><code>[ISISName,[attributes,[checksum,]]]location [# comment]
+</code></pre>
+<p>The location field is mandatory, others can be omitted, however if one of them is used, all previous prior to it must be provided, although they can be blank.</p>
+<figure><table>
+<thead>
+<tr><th>Field</th><th>Notes</th></tr></thead>
+<tbody><tr><td>ISISName</td><td>The name used in the ISIS.DIR file that is created.<br>It should be up to 6 alphanumeric characters optionally followed by a dot and up to 3 alphanumeric characters<br>If omitted the name is derived from the final filename part of the location field, see note below for details</td></tr><tr><td>attributes</td><td>The attributes to be set for the file. They can be any of<br><strong>F</strong>  Format<br><strong>I</strong>   Invisible<br><strong>S</strong>  System<br><strong>W</strong> Write Protected<br>If no attributes are supplied, the system files have their default format attributes as per the OS specified, the others have none<br>To force no attributes for system files use a space character.</td></tr><tr><td>checksum</td><td>This is the SHA1 checksum of the file. Its main purpose is to allow lookup of files in a central file repository.<br>if the file starts with a * character is is assumed the file has an error and <strong>mkidsk</strong> skips the file, otherwise the value is ignored.<br><strong>unidsk</strong> and <strong>irepo</strong> however use it to identify files in the repository and it is used to track  changed items in the repository.</td></tr><tr><td>location</td><td>This is either a special marker or the location of the file to use as follows:<br><strong>AUTO</strong>          the file is auto generated. The line is optional but can be used to specify non-standard attributes<br><strong>ZERO</strong>           the file has zero length and is auto generated<br>path             the location of the file to load. A leading <strong>^</strong> is used to prefix the name with the file repository path</td></tr><tr><td>comment</td><td>Optional comment prefixed by a #.<br>Note this does mean that location paths cannot have # in them.</td></tr></tbody>
+</table></figure>
+<p>Note a suitable set of system files, from the list below, are automatically included by mkidsk and need not be listed explicitly.</p>
+<p>ISIS.DIR, ISIS.LAB, ISIS.MAP, ISIS.FRE, ISIS.T0, ISIS.BIN, ISIS.PDS, ISIS.OV0, ISIS.OV1, ISIS.OV2, ISISC.BIN</p>
+<p>A potential reason for listing the above files is to override the default system attributes and it is generally recommended that if this is done, the location is set to AUTO.</p>
+<p>For files in the list above from ISIS.T0 onwards, it is possible to specify alternative files to use to create non standard disks, e.g. when OS is specified as UNKNOWN.</p>
+<h2>Example</h2>
+<p>The example below was generated using <strong>unidsk</strong> disk on the  file <a href='http://bitsavers.trailing-edge.com/bits/Intel/MDS/MDS_II/isis_II/95000333.imd'> 95000333.imd</a>, from the bitsavers web site.</p>
+<pre><code># IN-950033-03-S
+label: 950033-03
+version: 34
+format: SD
+os: NONE
+source: 95000333.imd
+# IMD 1.17: 12/09/2009 18:51:04
+# ISIS-II PL/M-86 COMPILER
+# P/N 9500033-03 SD
+# (C) INTEL 1978
+Files:
+ISIS.DIR,FI,,AUTO
+ISIS.MAP,FI,,AUTO
+ISIS.T0,FI,Fc/5LJAGrWS8Kz1X0GgSF8Dln5o,^Intel80/isis_ii/nonsys/isis.t0
+ISIS.LAB,FI,,AUTO
+PLM86,W,/60LQe2UCXMh8Dc942v3AvNF9Qg,^Intel80/plm86/1.2/plm86
+PLM86.OV0,WI,VI29iYKVpy9GeqiX5R9Ca1bh63Y,^Intel80/plm86/1.2/plm86.ov0
+PLM86.OV1,WI,KmLgmu1ogNu2ZD/lmEwh8R8tHDo,^Intel80/plm86/1.2/plm86.ov1
+PLM86.OV2,WI,zsn/0+inB0y8MKp0t+pgW2eNCUo,^Intel80/plm86/1.2/plm86.ov2
+PLM86.OV3,WI,6BHF8ZPZwNid/XmB+qM4HPOpSqA,^Intel80/plm86/1.2/plm86.ov3
+PLM86.OV4,WI,S9YCuJ/7oe2g8RPK0G96pGUcVV0,^Intel80/plm86/1.2/plm86.ov4
+PLM86.OV5,WI,vJv6r6B4WFNnIgcyiQbNnypA93M,^Intel80/plm86/1.2/plm86.ov5
+PLM86.OV6,WI,0tklWqAv6ITm5iWiEgaArpXUaSw,^Intel80/plm86/1.2/plm86.ov6
+PLM86.LIB,W,QW0KTjXZ8+UJxblvn65nGQL6Qsc,^Intel80/plm86/1.2/plm86.lib
+IXREF,W,TdfNx2lHaV891ycMS5MauUtSAYk,^Intel80/ixref/1.2/ixref
+</code></pre>
+<p>Note, the version: 34, indicates that the original disk was formatted on an ISIS II 3.4 system, however examining the imd file reveals that none of the interleave and skew has been preserved.</p>
+<h3>Auto generation of ISISName</h3>
+<p>In the latest recipe format, it is possible to omit ISISName from the recipe line. The tools mkidsk and irepo generate a suitable value from the location information as follows.</p>
+<ol start='' >
+<li><p>The final file name part of the location path is located.</p>
+</li>
+<li><p>The leading characters of the file name are checked to find the longest match against following</p>
+<ol start='' >
+<li>1-6 alphanumeric characters, a dot, 1-3 alphanumeric characters</li>
+<li>1-6 alphanumeric characters</li>
+
+</ol>
+</li>
+<li><p>It there is no match, then an error is reported, otherwise the matching text, converted to uppercase, is used as the ISISName.</p>
+</li>
+
+</ol>
+<p>Note the file name can have extra characters beyond the matching text. For example</p>
+<pre><code>^Intel80/isis_ii/nonsys/isis.t0				=&gt; ISIS.T0
+^Intel80/isis_ii/nonsys/isis.t0_0xe5		=&gt; ISIS.T0		extra text ignored
+file.1										=&gt; FILE.1
+fileabc.123									=&gt; FILEAB		no dot after 6 alphanumeric characters
+file.1$$									=&gt; FILE.1
+file.$$$									=&gt; FILE			$ not alphanumeric, so 0 alphanumeric after dot
+</code></pre>
+<p>&nbsp;</p>
+<h2>Creating your own recipe</h2>
+<p>Although original intent of recipes was to capture information to be able to recreate an ISIS disk image, it is reasonably simple to write recipe files to create bespoke disks. Either by starting from scratch as shown in the examples below, or by copying and amending an existing recipe.</p>
+<p><strong>Note</strong> the end of line comments beginning ! are for explanation and not part of the recipe file</p>
+<h3>Example 1</h3>
+<p>The mkidsk recipe to create an ISIS-II DD disk, with label MYTEST,  no system and two local files mytest and mytest.dat. It assumes that the recipe file is &quot;&quot;@MYTEST simple&quot;</p>
+<pre><code># MYTEST simple			! mirrors file name without the @ as per recommendation
+label: MYTEST
+format: DD
+Files:
+mytest					! remaining data is auto generated from these filenames
+mytest.dat
+</code></pre>
+<h3>Example 2</h3>
+<p>The mkidsk recipe to create an ISIS-II SD disk, with label MYTEST,  ISIS-II V4.0, the DIR command and two local files mytest and mytest.dat. It assumes that the recipe file is &quot;&quot;@MYTEST bootable&quot;</p>
+<pre><code># MYTEST bootable			! mirrors file name without the @ as per recommendation
+label: MYTEST
+format: SD
+os: ISIS 4.0
+Files:
+^Intel80/isis_ii/4.0/dir	! include the dir command
+mytest						! local files
+mytest.dat					
+</code></pre>
+<p>Note although the above are sufficient for <strong>mkidsk</strong>, running <strong>irepo -u</strong> <em>recipe_name</em> , will fill in missing information and also check the files exist.</p>
+<pre><code>Running irepo -u &quot;@MYTEST bootable&quot;, with two randomly named files mytest and mytest.dat, changes the file into
+
+# MYTEST bootable	  
+label: MYTEST	 	  
+format: SD	 	  
+os: ISIS 4.0		 	  
+Files:
+DIR,,IjfRkCY/72p5Se7le6CNq8Zh84U,^Intel80/isis_ii/4.0/dir
+MYTEST,,4TZC4FGa38yJtp2fNGdPOa7bHmg,mytest	  
+MYTEST.DAT,,L2SveCSD5U0t4bEKMndtgtHSj3E,mytest.dat
+</code></pre>
+<h2>See Also</h2>
+<p><a href='naming.md'>Naming convention</a> and <a href='disktools.md'>disktools</a></p>
+<pre><code>Update by Mark Ogden 16-Nov-2020
+</code></pre>
+<p>&nbsp;</p>
+</body>
+</html>
