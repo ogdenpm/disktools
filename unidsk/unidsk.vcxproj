@@ -250,6 +250,8 @@
     <ClInclude Include="db.h" />
     <ClInclude Include="sha1.h" />
     <ClInclude Include="unidsk.h" />
+    <ClInclude Include="_appinfo.h" />
+    <ClInclude Include="_version.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
