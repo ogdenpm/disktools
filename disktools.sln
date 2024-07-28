@@ -21,8 +21,6 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "flux2imd", "flux2imd\flux2i
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "irepo", "irepo\irepo.vcxproj", "{E2D53067-3185-4839-B346-75359BCE768C}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "unirmx", "unirmx\unirmx.vcxproj", "{5CCEE252-0FD9-45D1-994C-B91B4D2DD6EC}"
-EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "shared", "shared\shared.vcxitems", "{695D41A5-347E-4670-9DFC-51D63C3D02C2}"
 EndProject
 Global
@@ -105,14 +103,6 @@ Global
 		{E2D53067-3185-4839-B346-75359BCE768C}.Release|x64.Build.0 = Release|x64
 		{E2D53067-3185-4839-B346-75359BCE768C}.Release|x86.ActiveCfg = Release|Win32
 		{E2D53067-3185-4839-B346-75359BCE768C}.Release|x86.Build.0 = Release|Win32
-		{5CCEE252-0FD9-45D1-994C-B91B4D2DD6EC}.Debug|x64.ActiveCfg = Debug|x64
-		{5CCEE252-0FD9-45D1-994C-B91B4D2DD6EC}.Debug|x64.Build.0 = Debug|x64
-		{5CCEE252-0FD9-45D1-994C-B91B4D2DD6EC}.Debug|x86.ActiveCfg = Debug|Win32
-		{5CCEE252-0FD9-45D1-994C-B91B4D2DD6EC}.Debug|x86.Build.0 = Debug|Win32
-		{5CCEE252-0FD9-45D1-994C-B91B4D2DD6EC}.Release|x64.ActiveCfg = Release|x64
-		{5CCEE252-0FD9-45D1-994C-B91B4D2DD6EC}.Release|x64.Build.0 = Release|x64
-		{5CCEE252-0FD9-45D1-994C-B91B4D2DD6EC}.Release|x86.ActiveCfg = Release|Win32
-		{5CCEE252-0FD9-45D1-994C-B91B4D2DD6EC}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -121,7 +111,6 @@ Global
 		SolutionGuid = {3504CFA6-F674-401C-81A8-E05DAABFF949}
 	EndGlobalSection
 	GlobalSection(SharedMSBuildProjectFiles) = preSolution
-		shared\shared.vcxitems*{5ccee252-0fd9-45d1-994c-b91b4d2dd6ec}*SharedItemsImports = 4
 		shared\shared.vcxitems*{624791fe-2d71-4fd9-9153-af0e5557fab2}*SharedItemsImports = 4
 		shared\shared.vcxitems*{695d41a5-347e-4670-9dfc-51d63c3d02c2}*SharedItemsImports = 9
 		shared\shared.vcxitems*{f69d6f30-585a-44f7-8e5b-42b3656e181c}*SharedItemsImports = 4
