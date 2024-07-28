@@ -274,3 +274,5 @@ flux2imd/am.pl
 
 flux2imd/fm.pl
 /any2imd
+
+.clang-format
