@@ -72,7 +72,7 @@ char *basename(char *path) {
 // auto expanding allocation for i block
 
 bool cread(void *buf, int len) {
-    return docomp ? fHead.ver > 19 ? Decode(buf, len) : oldAdv(buf, len)
+    return docomp ? fHead.ver > 19 ? decodeNew(buf, len) : decodeOld(buf, len)
                   : readIn(buf, len);
 }
 
@@ -590,7 +590,7 @@ int main(int argc, char *argv[]) {
     // check for advanced compression
     if (fHead.sig[0] == 't') {
         docomp = 1;                                      // set global stepping to redirect read()
-        fHead.ver > 19 ? init_Decode(fpin) : oldReset(); // initialize decompression routine
+        fHead.ver > 19 ? initNew() : initOld(); // initialize decompression routine
     }
 
     showHeader(&fHead);

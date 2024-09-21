@@ -55,8 +55,8 @@ In summary changes by WTK:
 #include <unistd.h>
 #endif
 
-
-extern FILE *fpin;      // global as chaining may alter
+#include "td02imx.h"
+extern FILE *fpin; // global as chaining may alter
 
 /* WTK adds top level control structure to give Decode()
    a memory between calls
@@ -72,14 +72,15 @@ static struct tdlzhuf {
 
 /* LZSS Parameters */
 
-#define SBSIZE         4096 // Size of string buffer
-#define LASIZE         60   // Size of look-ahead buffer
-#define THRESHOLD       2   // Min match for compress
+#define SBSIZE    4096 // Size of string buffer
+#define LASIZE    60   // Size of look-ahead buffer
+#define THRESHOLD 2    // Min match for compress
 
 #define NIL       SBSIZE /* End of tree's node  */
 
 static unsigned char text_buf[SBSIZE + LASIZE - 1];
-static short match_position, match_length, leftSon[SBSIZE + 1], rightSon[SBSIZE + 257], parent[SBSIZE + 1];
+static short match_position, match_length, leftSon[SBSIZE + 1], rightSon[SBSIZE + 257],
+    parent[SBSIZE + 1];
 
 void InitTree(void) /* Initializing tree */
 {
@@ -95,18 +96,18 @@ void InsertNode(int r) /* Inserting node to the tree */
     unsigned char *key;
     unsigned c;
 
-    cmp     = 1;
-    key     = &text_buf[r];
-    p       = SBSIZE + 1 + key[0];
+    cmp         = 1;
+    key         = &text_buf[r];
+    p           = SBSIZE + 1 + key[0];
     rightSon[r] = leftSon[r] = NIL;
-    match_length      = 0;
+    match_length             = 0;
     for (;;) {
         if (cmp >= 0) {
             if (rightSon[p] != NIL)
                 p = rightSon[p];
             else {
                 rightSon[p] = r;
-                parent[r]  = p;
+                parent[r]   = p;
                 return;
             }
         } else {
@@ -134,10 +135,10 @@ void InsertNode(int r) /* Inserting node to the tree */
             }
         }
     }
-    parent[r]       = parent[p];
-    leftSon[r]      = leftSon[p];
-    rightSon[r]      = rightSon[p];
-    parent[leftSon[p]] = r;
+    parent[r]           = parent[p];
+    leftSon[r]          = leftSon[p];
+    rightSon[r]         = rightSon[p];
+    parent[leftSon[p]]  = r;
     parent[rightSon[p]] = r;
     if (rightSon[parent[p]] == p)
         rightSon[parent[p]] = r;
@@ -146,17 +147,15 @@ void InsertNode(int r) /* Inserting node to the tree */
     parent[p] = NIL; /* remove p */
 }
 
-
 /* Huffman coding parameters */
 
-#define N_CHAR   (256 - THRESHOLD + LASIZE)
+#define N_CHAR    (256 - THRESHOLD + LASIZE)
 /* character code (= 0..N_CHAR-1) */
-#define TABLESIZE        (N_CHAR * 2 - 1) /* Size of Table */
-#define ROOT        (TABLESIZE - 1)          /* root position */
-#define MAX_FREQ 0x8000
+#define TABLESIZE (N_CHAR * 2 - 1) /* Size of Table */
+#define ROOT      (TABLESIZE - 1)  /* root position */
+#define MAX_FREQ  0x8000
 /* update when cumulative frequency */
 /* reaches to this value */
-
 
 /*
  * Tables for encoding/decoding upper 6 bits of
@@ -183,9 +182,7 @@ static uint8_t d_code[256] = {
     0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E, 0x3F,
 };
 
-
-static uint8_t d_len[]     = { 2, 2, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 6, 6, 6, 7 };
-
+static uint8_t d_len[] = { 2, 2, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 6, 6, 6, 7 };
 
 static uint16_t freq[TABLESIZE + 1]; /* cumulative freq crcTable */
 
@@ -198,11 +195,12 @@ short prnt[TABLESIZE + N_CHAR];
 /* pointing children nodes (son[], son[] + 1)*/
 short son[TABLESIZE];
 
-static int getbuf   = 0;
+static int getbuf     = 0;
 static uint8_t getlen = 0;
 
-int GetBit() /* get one bit */
-{
+
+
+int getStreamBit() { /* get one bit */
     if (getlen == 0) {
         while (fpin && (getbuf = getc(fpin)) == EOF)
             chainTd0();
@@ -213,15 +211,15 @@ int GetBit() /* get one bit */
     return (getbuf & (1 << --getlen)) != 0;
 }
 
-int GetByte(FILE *fp) /* get a byte */
-{
+int GetStreamByte() { /* get a byte */
     uint8_t topbits = getbuf << (8 - getlen);
-    while (fpin && (getbuf = getc(fp)) == EOF)
+    while (fpin && (getbuf = getc(fpin)) == EOF)
         chainTd0();
     if (!fpin)
         return -1;
     return topbits | (getbuf >> getlen);
 }
+
 
 /* initialize freq tree */
 
@@ -229,8 +227,8 @@ void StartHuff() {
     int i, j;
 
     for (i = 0; i < N_CHAR; i++) {
-        freq[i]     = 1;
-        son[i]      = i + TABLESIZE;
+        freq[i]             = 1;
+        son[i]              = i + TABLESIZE;
         prnt[i + TABLESIZE] = i;
     }
     i = 0;
@@ -243,7 +241,7 @@ void StartHuff() {
         j++;
     }
     freq[TABLESIZE] = 0xffff;
-    prnt[ROOT] = 0;
+    prnt[ROOT]      = 0;
 }
 
 /* reconstruct freq tree */
@@ -324,7 +322,7 @@ void update(int c) {
     } while ((c = prnt[c]) != 0); /* do it until reaching the root */
 }
 
-short DecodeChar(FILE *fp) {
+short DecodeChar() {
     int ret;
     unsigned short c;
 
@@ -336,7 +334,7 @@ short DecodeChar(FILE *fp) {
      * else choose #(son[]+1) (input bit == 1)
      */
     while (c < TABLESIZE) {
-        if ((ret = GetBit(fp)) < 0)
+        if ((ret = getStreamBit()) < 0)
             return (-1);
         c += (unsigned)ret;
         c = son[c];
@@ -346,13 +344,13 @@ short DecodeChar(FILE *fp) {
     return c;
 }
 
-int16_t DecodePosition(FILE *fp) {
+int16_t DecodePosition() {
     int val;
     uint16_t i, j, c;
 
     /* decode upper 6 bits from d_code */
-    if ((val = GetByte(fp)) < 0)
-        return (-1);                // bad read
+    if ((val = GetStreamByte()) < 0)
+        return (-1); // bad read
     i = (uint16_t)val;
     c = d_code[i] << 6;
 
@@ -360,7 +358,7 @@ int16_t DecodePosition(FILE *fp) {
     j = d_len[i >> 4];
 
     while (--j) {
-        if ((val = GetBit(fp)) < 0) // bad read
+        if ((val = getStreamBit()) < 0) // bad read
             return (-1);
         i = (i << 1) | (uint16_t)val;
     }
@@ -373,21 +371,20 @@ split out initialization code to init_Decode()
 
 */
 
-void init_Decode(FILE *fpin) {
+void initNew() {
     tdctl.bufcnt = 0;
     StartHuff();
     memset(text_buf, ' ', SBSIZE - LASIZE);
-    tdctl.r  = SBSIZE - LASIZE;
-    tdctl.fp = fpin;
+    tdctl.r = SBSIZE - LASIZE;
 }
 
-bool Decode(unsigned char *buf, uint16_t len) /* Decoding/Uncompressing */
+bool decodeNew(uint8_t *buf, uint16_t len) /* Decoding/Uncompressing */
 {
     short c, pos;
     int count; // was an unsigned long, seems unnecessary
     for (count = 0; count < len;) {
         if (tdctl.bufcnt == 0) {
-            if ((c = DecodeChar(tdctl.fp)) < 0)
+            if ((c = DecodeChar()) < 0)
                 return (count); // fatal error
             if (c < 256) {
                 *(buf++)            = (uint8_t)c;
@@ -395,7 +392,7 @@ bool Decode(unsigned char *buf, uint16_t len) /* Decoding/Uncompressing */
                 tdctl.r &= (SBSIZE - 1);
                 count++;
             } else {
-                if ((pos = DecodePosition(tdctl.fp)) < 0)
+                if ((pos = DecodePosition()) < 0)
                     return (count); // premature EOF
                 tdctl.bufpos = (tdctl.r - pos - 1) & (SBSIZE - 1);
                 tdctl.bufcnt = c - 255 + THRESHOLD;
@@ -417,4 +414,3 @@ bool Decode(unsigned char *buf, uint16_t len) /* Decoding/Uncompressing */
     }
     return count == len;
 }
-

@@ -47,15 +47,16 @@ static uint16_t inIdx;
 static uint16_t codesLeft; // number of codes to left to read
 
 static uint8_t suffix;      // byte to append
-static uint16_t code;       // current code value
+static int16_t code;        // current code value
 static uint8_t stack[8192]; // used to store prefix strings, in reverse order
 static uint16_t sp;         // current index in oldStack
-static bool highCode;       // used to control whether lower / upper packed 12 bit code is read
+static bool lowCode;       // used to control whether lower / upper packed 12 bit code is read
+static uint16_t codePart;
 
 extern FILE *fpin; // file to read
 // extern char *filename;   // only needed for multi-volume sets
 
-static uint16_t enter(uint16_t pred, uint8_t suff);
+static void enter(uint16_t pred, uint8_t suff);
 
 void chainTd0() {
     fclose(fpin);
@@ -83,6 +84,15 @@ bool readIn(uint8_t *buf, uint16_t len) {
     return fpin != NULL;
 }
 
+
+int readTd0Byte() {
+    int c;
+    while (fpin && (c = getc(fpin)) == EOF)
+        chainTd0();
+    return fpin ? c : EOF;
+}
+
+
 /// <summary>
 /// read a little endian word from a buffer
 /// </summary>
@@ -98,7 +108,7 @@ inline uint16_t leword(uint8_t *p) {
 /// Initialize the lzw and physical translation tables and key decoder parameters.
 /// </summary>
 ///
-void oldReset() {
+void initOld() {
     entryCnt = codesLeft = 0;
     memset(table, 0, sizeof(table));
     for (int i = 0; i < 256; i++) // mark the first 256 entries as terminators
@@ -116,11 +126,10 @@ void oldReset() {
 static bool readBlk() {
     uint8_t rawCodeSize[2];
 
-    highCode = false; // tracks toggling of first / second code in the 3 byte number
-    inIdx    = 0;
+    lowCode = true; // true if reading low code in 3 byte number
 
-    if (!readIn(rawCodeSize, 2) || !readIn(inBuf, (leword(rawCodeSize) + 1) >> 1))
-        return false;
+    if (!readIn(rawCodeSize, 2))
+        return EOF;
     codesLeft = leword(rawCodeSize) / 3;
     return true;
 }
@@ -130,15 +139,19 @@ static bool readBlk() {
 /// </summary>
 /// <returns>21 bit code</returns>
 ///
-static uint16_t getCode() {
-    uint16_t code = leword(inBuf + inIdx++);
-    if (highCode) {
-        code >>= 4;
-        inIdx++; // skip to 3 byte boundary
-    }
-    highCode = !highCode;
+static int16_t getCode() {
+    int c1, c2;
+    if (lowCode) {
+        if ((c1 = readTd0Byte()) == EOF || (c2 = readTd0Byte()) == EOF)
+            return EOF;
+        codePart = c1 + c2 * 256;
+    } else if ((c1 = readTd0Byte()) == EOF)
+        return EOF;
+    else
+        codePart = ((codePart >> 12) & 0xf) + (c1 << 4);
+    lowCode = !lowCode;
     codesLeft--;
-    return code & 0xfff;
+    return codePart & 0xfff;
 }
 
 /// <summary>
@@ -147,13 +160,11 @@ static uint16_t getCode() {
 /// <param name="pred">The predecessor.</param>
 /// <param name="suff">The new code byte to add.</param>
 ///
-static uint16_t enter(uint16_t pred, uint8_t suff) {
+static void enter(uint16_t pred, uint8_t suff) {
     if (entryCnt < TABLE_SIZE) {
         table[entryCnt].predecessor = pred;
-        table[entryCnt].suffix      = suff;
-        return entryCnt++;
+        table[entryCnt++].suffix      = suff;
     }
-    return entryCnt;
 }
 
 /// <summary>
@@ -165,48 +176,42 @@ static uint16_t enter(uint16_t pred, uint8_t suff) {
 /// <returns>actual length copied.</returns>
 ///
 int getOldByte() {
-    static uint8_t state = INITIAL;
-    static uint16_t newCode;
-    static uint8_t newSuffix;
 
     for (;;) {
-        if (state == INITIAL) {
-            if (codesLeft == 0) {
-                oldReset(); // will set refill for next  iteration of loop
-                if (!readBlk()) // premature EOF
-                    return EOF;
-                code   = getCode();
-                return (suffix = table[code].suffix);
-            } else {
-                newCode = getCode();
-                if (newCode >= entryCnt) { // KwKwK scenario
-                    newSuffix = suffix;
-                    pEntry    = &table[code];
-                } else
-                    pEntry = &table[newCode];
+        if (sp)
+            return stack[--sp];
 
-                while (pEntry->predecessor !=
-                       0xffff) { // stack the predecessor, generated in reverse order
-                    stack[sp++] = pEntry->suffix;
-                    pEntry      = &table[pEntry->predecessor];
-                }
-                state = DESTACK;
-                return (suffix = pEntry->suffix);
+        if (codesLeft == 0) {
+            initOld();
+            if (!readBlk()) // premature EOF
+                return EOF;
+            if (codesLeft) { // avoid the case of a zero length block
+                code = getCode();
+                return (suffix = table[code].suffix);
             }
-        } else if (sp)
-                return stack[--sp];
-        else {
-            state = INITIAL;
-            if (newCode >= enter(code, suffix)) { // handle the KwKwK scenario
-                code = newCode;
-                return (suffix = newSuffix);
+        } else {
+            int16_t newCode = getCode();
+            if (newCode < 0)
+                return EOF;
+            if (newCode >= entryCnt) { // KwKwK scenario
+                stack[sp++] = suffix;
+                pEntry      = &table[code];
+            } else
+                pEntry = &table[newCode];
+            while (pEntry->predecessor !=
+                   0xffff) { // stack the predecessor, generated in reverse order
+                stack[sp++] = pEntry->suffix;
+                pEntry      = &table[pEntry->predecessor];
             }
+            suffix = pEntry->suffix;
+            enter(code, suffix);
             code = newCode;
+            return suffix;
         }
     }
 }
 
-bool oldAdv(uint8_t *buf, uint16_t len) {
+bool decodeOld(uint8_t *buf, uint16_t len) {
     int c;
     while (len--) {
         if ((c = getOldByte()) == EOF)
