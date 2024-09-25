@@ -15,10 +15,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="tdcrc.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="tdlzhuf.c">
+    <ClCompile Include="td0Read.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="td02imx.c">
@@ -30,15 +27,15 @@
     <ClCompile Include="save.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="lzw.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="getopt.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="td02imx.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="td0.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

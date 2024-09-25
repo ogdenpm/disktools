@@ -123,14 +123,13 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="getopt.c" />
-    <ClCompile Include="lzw.c" />
     <ClCompile Include="save.c" />
-    <ClCompile Include="tdcrc.c" />
-    <ClCompile Include="tdlzhuf.c" />
+    <ClCompile Include="td0Read.c" />
     <ClCompile Include="td02imx.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="getopt.h" />
+    <ClInclude Include="td0.h" />
     <ClInclude Include="td02imx.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

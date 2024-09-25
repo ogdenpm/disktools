@@ -1,8 +1,4 @@
 /* ::[[ @(#) getopt.c 1.5 89/03/11 05:40:23 ]]:: */
-#ifndef LINT
-static char sccsid[] = "::[[ @(#) getopt.c 1.5 89/03/11 05:40:23 ]]::";
-#endif
-
 /*
  * Here's something you've all been waiting for:  the AT&T public domain
  * source for getopt(3).  It is the code which was given out at the 1985
@@ -39,13 +35,14 @@ int getopt(int argc, char **argv, char *opts) {
     int c;
     char *cp;
 
-    if (sp == 1)
+    if (sp == 1) {
         if (optind >= argc || argv[optind][0] != '-' || argv[optind][1] == '\0')
             return (EOF);
         else if (strcmp(argv[optind], "--") == 0) {
             optind++;
             return (EOF);
         }
+    }
     optopt = c = argv[optind][sp];
     if (c == ':' || (cp = strchr(opts, c)) == NULL)
         usage("illegal option -%c", c);

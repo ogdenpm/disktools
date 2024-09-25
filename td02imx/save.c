@@ -1,10 +1,6 @@
+
 #include "td02imx.h"
 #include <time.h>
-
-static int16_t imdSectorMap[256];  // order indexed into sectors array, > 0xff then missing IDAM
-static int8_t imdCylinderMap[256]; // IMD cylinder Map
-static int8_t imdHeadMap[256];     // IMD head map
-static int8_t imdHead;             // head with bits set if cylinder or head map required
 
 
 void writeBadSector(FILE *fp, char *msg, uint16_t size) {
@@ -19,24 +15,24 @@ void writeBadSector(FILE *fp, char *msg, uint16_t size) {
     }
 }
 
-void saveIMDHdr(FILE *fp) {
+void saveIMDHdr(FILE *fp, td0Header_t *pHead) {
     fprintf(fp, "IMD 1.20: ");
-    if (fHead.stepping & HAS_COMMENT) // had a comment so use time from original td0 file
-        fprintf(fp, "%02d/%02d/%04d %02d:%02d:%02d\r\n", cHead.day, cHead.mon + 1, cHead.yr + 1900,
-                cHead.hr, cHead.min, cHead.sec);
+    if (pHead->stepping & HAS_COMMENT) // had a comment so use time from original td0 file
+        fprintf(fp, "%02d/%02d/%04d %02d:%02d:%02d\r\n", pHead->day, pHead->mon + 1,
+                pHead->yr + 1900, pHead->hr, pHead->min, pHead->sec);
     else {
         time_t nowTime;
         struct tm *now;
         time(&nowTime);
         now = localtime(&nowTime);
 
-        fprintf(fp, "%02d/%02d/%04d %02d:%02d:%02d\r\n", now->tm_mday,
-                                    now->tm_mon + 1, now->tm_year + 1900, now->tm_hour, now->tm_min, now->tm_sec);
+        fprintf(fp, "%02d/%02d/%04d %02d:%02d:%02d\r\n", now->tm_mday, now->tm_mon + 1,
+                now->tm_year + 1900, now->tm_hour, now->tm_min, now->tm_sec);
     }
 
-    fprintf(fp, "Converted from %s\r\n", td0File);
+    fprintf(fp, "Converted from %s\r\n", srcFile);
 
-    for (char *s = cHead.comment; *s; s++) {
+    for (char *s = pHead->comment; *s; s++) {
         if (*s == '\n')
             putc('\r', fp);
         putc(*s, fp);
@@ -52,10 +48,7 @@ bool sameValues(uint8_t *buf, uint16_t len) {
 }
 
 // pSector == NULL for SEC_NOID
-void saveIMDSector(FILE *fp, uint8_t cylinder, uint8_t head, uint16_t slot, uint8_t keep) {
-    track_t *pTrack   = &tracks[cylinder][head];
-    uint16_t sSize    = 128 << pTrack->sSize;
-    sector_t *pSector = slot < UNALLOCATED ? &pTrack->sectors[imdSectorMap[slot]] : NULL;
+void saveIMDSector(FILE *fp, sector_t *pSector) {
 
     if (!pSector || (pSector->flags & SEC_NODAT))
         putc(0, fp);
@@ -64,7 +57,7 @@ void saveIMDSector(FILE *fp, uint8_t cylinder, uint8_t head, uint16_t slot, uint
         putc(0xe5, fp);
     } else {
         uint8_t type   = pSector->flags & SEC_DAM ? 3 : 1;
-        uint16_t sSize = 128 << pSector->hdr.sSize;
+        uint16_t sSize = 128 << pSector->sSize;
         if (pSector->flags & SEC_CRC)
             type += 4;
         if (sameValues(pSector->data, sSize)) {
@@ -78,12 +71,9 @@ void saveIMDSector(FILE *fp, uint8_t cylinder, uint8_t head, uint16_t slot, uint
     }
 }
 
+void saveIMDTrack(FILE *fp, td0Header_t *pHead, uint8_t cylinder, uint8_t head) {
 
-
-
-
-void saveIMDTrack(FILE *fp, uint8_t cylinder, uint8_t head, uint8_t keep) {
-    track_t *pTrack = &tracks[cylinder][head];
+    track_t *pTrack = &disk[cylinder][head];
     if (!pTrack->sectors) {
         warn("%d/%d: track missing", cylinder, head);
         return;
@@ -94,62 +84,64 @@ void saveIMDTrack(FILE *fp, uint8_t cylinder, uint8_t head, uint8_t keep) {
     }
 
     // check if track has expected geometry
-    sizing_t *si = &sizing[pTrack->encoding - 1][pTrack->sSize][head]; // expected layout
+    sizing_t *si = &sizing[pTrack->encoding][pTrack->sSize][head]; // expected layout
 
-    if (si->nSec != pTrack->mapLen || si->first != pTrack->first ||
+    if (si->nSec != pTrack->nUsable || si->first != pTrack->first ||
         (si->first + si->nSec - 1) != pTrack->last)
         warn("%d/%d: Possible missing IDAMS, using sector range %d-%d", cylinder, head,
              pTrack->first, pTrack->last);
 
     // build cylinder & head maps and mark if needed
+    uint8_t sectorOrder[256];
     uint8_t cylinderMap[256];
     uint8_t headMap[256];
     uint8_t imdHead = head;
 
-    for (int slot = 0; slot < pTrack->mapLen; slot++) {
-        cylinderMap[slot] = pTrack->sectors[pTrack->sectorMap[slot]].hdr.trk;
-        headMap[slot]     = pTrack->sectors[pTrack->sectorMap[slot]].hdr.head;
+    for (int slot = 0; slot < pTrack->nUsable; slot++) {
+        sectorOrder[slot] = pTrack->sectors[pTrack->sectorMap[slot]].sec;
+        cylinderMap[slot] = pTrack->sectors[pTrack->sectorMap[slot]].cyl;
+        headMap[slot]     = pTrack->sectors[pTrack->sectorMap[slot]].head;
         if (cylinderMap[slot] != cylinder)
             imdHead |= 0x80;
         if (headMap[slot] != head)
             imdHead |= 0x40;
     }
 
-    uint8_t mode = ((fHead.dataRate & 7) > 2 ? 0 : (fHead.dataRate & 1) ? 1 : 2);
-    if (pTrack->encoding == MFM)
+    uint8_t mode = ((pHead->density & 7) > 2 ? 0 : (pHead->density & 1) ? 1 : 2);
+    if (pTrack->encoding == 0)
         mode += 3;
 
-    putc(mode, fp);           // IMD mode
-    putc(cylinder, fp);       // IMD cylinder
-    putc(imdHead, fp);        // IMD head
-    putc(pTrack->mapLen, fp); // IMD number of sectors
-    putc(pTrack->sSize, fp);  // IMD Sector Size
-    for (int slot = 0; slot < pTrack->mapLen; slot++)
-        putc(pTrack->sectors[pTrack->sectorMap[slot]].hdr.sec, fp);
+    putc(mode, fp);            // IMD mode
+    putc(cylinder, fp);        // IMD cylinder
+    putc(imdHead, fp);         // IMD head
+    putc(pTrack->nUsable, fp); // IMD number of sectors
+    putc(pTrack->sSize, fp);   // IMD Sector Size
+    if (fwrite(sectorOrder, 1, pTrack->nUsable, fp) != pTrack->nUsable)
+        warn("Write error: sector map");
 
-    if ((imdHead & 0x80) && fwrite(imdCylinderMap, 1, pTrack->mapLen, fp) != pTrack->mapLen)
+    if ((imdHead & 0x80) && fwrite(cylinderMap, 1, pTrack->nUsable, fp) != pTrack->nUsable)
         warn("Write error: cylinder map");
-    if ((imdHead & 0x40) && fwrite(imdHeadMap, 1, pTrack->mapLen, fp) != pTrack->mapLen)
+    if ((imdHead & 0x40) && fwrite(headMap, 1, pTrack->nUsable, fp) != pTrack->nUsable)
         warn("Write error: head map");
 
-    for (int slot = 0; slot < pTrack->mapLen; slot++)
-        saveIMDSector(fp, cylinder, head, slot, keep);
+    for (int slot = 0; slot < pTrack->nUsable; slot++)
+        saveIMDSector(fp, &pTrack->sectors[pTrack->sectorMap[slot]]);
 }
 
 void saveIMGSector(FILE *fp, uint8_t cylinder, uint8_t head, uint16_t slot, uint8_t keep) {
-    track_t *pTrack = &tracks[cylinder][head];
+    track_t *pTrack = &disk[cylinder][head];
     uint16_t sSize  = 128 << pTrack->sSize;
     if (slot >= UNALLOCATED) {
         if ((keep & SEC_NOID) || pTrack->sSize == MIXEDSIZES) {
-            warn("%d/%d: omitting sector at slot %d", cylinder, head, slot & 0xff);
+            warn("%d/%d: omitting sector %d", cylinder, head, slot & 0xff);
         } else {
-            warn("%d/%d: filling missing sector at slot %d", cylinder, head, slot & 0xff);
+            warn("%d/%d: filling missing sector %d", cylinder, head, slot & 0xff);
             writeBadSector(fp, "** missing **", sSize);
         }
     } else {
-        sector_t *pSector = &pTrack->sectors[imdSectorMap[slot]];
-        uint8_t sectorId  = pSector->hdr.sec;
-        uint8_t sFlags    = pSector->hdr.sFlags & ~SEC_DUP;
+        sector_t *pSector = &pTrack->sectors[slot];
+        uint8_t sectorId  = pSector->sec;
+        uint8_t sFlags    = pSector->flags & ~SEC_DUP;
         char *fill        = NULL;
         if (sFlags & SEC_CRC) {
             warn("%d/%d: sector %d CRC error", cylinder, head, sectorId);
@@ -173,19 +165,18 @@ void saveIMGSector(FILE *fp, uint8_t cylinder, uint8_t head, uint16_t slot, uint
     }
 }
 
-
-
 void saveIMGTrack(FILE *fp, uint8_t cylinder, uint8_t head, uint8_t keep) {
     uint16_t sectorMap[256];
-    track_t *pTrack = &tracks[cylinder][head];
-    sizing_t *si    = &sizing[pTrack->encoding - 1][pTrack->sSize][head]; // expected layout
+    track_t *pTrack = &disk[cylinder][head];
+    sizing_t *si    = &sizing[pTrack->encoding][pTrack->sSize][head]; // expected layout
     uint8_t first   = si->first;
     uint8_t last    = first + si->nSec - 1;
 
     if (pTrack->sectors) {
         // check if missing IDAMs need to be flagged
 
-        if ((keep && SEC_NOID) && (si->nSec != pTrack->mapLen || first != pTrack->first || last != pTrack->last)) {
+        if ((keep && SEC_NOID) &&
+            (si->nSec != pTrack->nUsable || first != pTrack->first || last != pTrack->last)) {
             warn("%d/%d: Possible missing IDAMS, using sector range %d-%d", cylinder, head,
                  pTrack->first, pTrack->last);
             first = pTrack->first;
@@ -197,9 +188,9 @@ void saveIMGTrack(FILE *fp, uint8_t cylinder, uint8_t head, uint8_t keep) {
             sectorMap[slot] = UNALLOCATED + slot;
 
         // populate the known entries
-        for (int mapIdx = 0; mapIdx < pTrack->mapLen; mapIdx++) {
-            uint8_t sectorIdx                                = pTrack->sectorMap[mapIdx];
-            sectorMap[pTrack->sectors[sectorIdx].hdr.sec] = sectorIdx;
+        for (int mapIdx = 0; mapIdx < pTrack->nUsable; mapIdx++) {
+            uint8_t sectorIdx                         = pTrack->sectorMap[mapIdx];
+            sectorMap[pTrack->sectors[sectorIdx].sec] = sectorIdx;
         }
 
         // create the final sectorMap
@@ -209,25 +200,25 @@ void saveIMGTrack(FILE *fp, uint8_t cylinder, uint8_t head, uint8_t keep) {
                 sectorMap[nSec++] = sectorMap[inSlot];
 
         for (int slot = 0; slot < nSec; slot++)
-            saveIMGSector(fp, cylinder, head, slot, keep);
+            saveIMGSector(fp, cylinder, head, sectorMap[slot], keep);
     }
 
     else
         warn("%d/%d - track missing - use IMD format", cylinder, head);
 }
 
-void saveImage(char const *outFile, uint8_t keep, uint8_t layout) {
+void saveImage(char const *outFile, td0Header_t *pHead, uint8_t keep, uint8_t layout) {
     FILE *fpout;
     if (!(fpout = fopen(outFile, "wb")))
         fatal("Cannot create output file %s", outFile);
 
     char *s = strrchr(basename((char *)outFile), '.');
 
-    if (s && stricmp(s, ".imd") == 0) {
-        saveIMDHdr(fpout);
+    if (s && strcasecmp(s, ".imd") == 0) {
+        saveIMDHdr(fpout, pHead);
         for (int cylinder = 0; cylinder < nCylinder; cylinder++)
             for (int head = 0; head < nHead; head++)
-                saveIMDTrack(fpout, cylinder, head, keep);
+                saveIMDTrack(fpout, pHead, cylinder, head);
 
     } else if (layout == ALT || nHead == 1)
         for (int cylinder = 0; cylinder < nCylinder; cylinder++)
