@@ -58,6 +58,11 @@ inline int leword(uint8_t *p) {
     return p[0] + p[1] * 256;
 }
 
+/// <summary>
+/// helper to malloc memory and check for out of memory
+/// </summary>
+/// <param name="size">Amount of memory to allocate in bytes.</param>
+/// <returns>pointer to the allocated block</returns>
 void *safeMalloc(size_t size) {
     void *p = malloc(size);
     if (!p)
@@ -173,7 +178,7 @@ td0Header_t *openTd0(char *name) {
 /// Read a full track of data including all of the sectors
 /// Memory is allocated for the underlying sector information
 /// It is assumed that this memory is used by the consumer and if so it
-/// should transfer the pointer to a local variable and clear the sectors
+/// should transfer the sectors pointer to a local variable and clear the sectors
 /// pointer e.g.
 ///     track_t *p;
 ///     if ((p = readTrack()) {
@@ -198,6 +203,7 @@ td0Track_t *readTrack() {
         return NULL;
     if (!readTd0(&curTrack.cyl, sizeof(td0TrackHeader_t) - 1))
         fatal("Corrupt file, failed to read track header");
+
 
     if (curTrack.tCrc != (calcCrc(&curTrack.nSec, sizeof(td0TrackHeader_t) - 1, 0) & 0xff))
         fatal("CRC error in track record %d", curTrack.cyl);
@@ -240,7 +246,7 @@ static void readSector(sector_t *pSector) {
         if (!readTd0(&patBuf.pattern, len))
             fatal("Premature EOF reading pattern");
 
-        pSector->data = malloc(sSize);
+        pSector->data = safeMalloc(sSize);
         uint8_t *ptr  = pSector->data;
         uint8_t *pEnd = ptr + sSize;
 
@@ -269,7 +275,7 @@ static void readSector(sector_t *pSector) {
             for (uint16_t i = 1; i < len; i += step) {
                 switch (patBuf.pattern[i]) {
                 case COPY:
-                    if (i + 1 > len || patBuf.pattern[i + 1] + 2 > len)
+                    if (i + 1 >= len || patBuf.pattern[i + 1] + 2 > len)
                         fatal("Corrupt file: short RLE-Copy pattern");
                     if (ptr + patBuf.pattern[i + 1] <= pEnd)
                         memcpy(ptr, &patBuf.pattern[i + 2], patBuf.pattern[i + 1]);
@@ -303,7 +309,7 @@ static void readSector(sector_t *pSector) {
 
         if ((calcCrc(pSector->data, sSize, 0) & 0xff) != pSector->sCrc)
             fatal("%d/%d/%d: Sector header CRC error", pSector->cyl, pSector->head, pSector->sec);
-        pSector->extraFlag = 0; // safe to reuse as crc checked
+        pSector->extraFlag = 0;
     }
 }
 
