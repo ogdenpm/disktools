@@ -46,7 +46,7 @@ typedef unsigned char byte;
 #define	DEBUG_ONE	0x01		// Do only one track
 
 // LZSS parameters
-#define SBSIZE		4096				// Size of Ring buffer
+#define MBSIZE		4096				// Size of Ring buffer
 #define LASIZE		60					// Size of Look-ahead buffer
 #define THRESHOLD	2					// Minimum match for compress
 
@@ -63,7 +63,7 @@ typedef unsigned char uint8;
 
 unsigned short
     parent[TSIZE+N_CHAR],	// parent nodes (0..T-1) and leaf positions (rest)
-    son[TSIZE],				// pointers to child nodes (son[], son[]+1)
+    child[TSIZE],				// pointers to child nodes (son[], son[]+1)
     freq[TSIZE+1];			// frequency table
     Bits, Bitbuff,			// buffered bit count and left-aligned bit buffer
     GBcheck,				// Getbyte check down-counter
@@ -79,7 +79,7 @@ unsigned char
     GBstate,				// Decoder state
     Eof,					// End-of-file indicator
     Advcomp,				// Advanced compression enabled
-    ring_buff[SBSIZE+LASIZE-1];	// text buffer for match strings
+    ring_buff[MBSIZE+LASIZE-1];	// text buffer for match strings
 
 FILE
     *fpi,					// Input file pointer
@@ -130,19 +130,19 @@ void init_decompress()
 
     for(i = j = 0; i < N_CHAR; ++i) {		// Walk up
         freq[i] = 1;
-        son[i] = i + TSIZE;
+        child[i] = i + TSIZE;
         parent[i+TSIZE] = i; }
 
     while(i <= ROOT) {						// Back down
         freq[i] = freq[j] + freq[j+1];
-        son[i] = j;
+        child[i] = j;
         parent[j] = parent[j+1] = i++;
         j += 2; }
 
     memset(ring_buff, ' ', sizeof ring_buff);
     Advcomp = 0xff;  freq[TSIZE] = 0xFFFF;
     parent[ROOT] = Bitbuff = Bits = 0;
-    GBr = SBSIZE - LASIZE;
+    GBr = MBSIZE - LASIZE;
 }
 
 /*
@@ -155,9 +155,9 @@ void update(int c)
     if(freq[ROOT] == MAX_FREQ) {		// Tree is full - rebuild
         // Halve cumulative freq for leaf nodes
         for(i = j = 0; i < TSIZE; ++i) {
-            if(son[i] >= TSIZE) {
+            if(child[i] >= TSIZE) {
                 freq[j] = (freq[i] + 1) / 2;
-                son[j] = son[i];
+                child[j] = child[i];
                 ++j; } }
 
         // make a tree - first connect children nodes
@@ -170,12 +170,12 @@ void update(int c)
 
             memmove(&freq[k+1], &freq[k], l);
             freq[k] = f;
-            memmove(&son[k+1], &son[k], l);
-            son[k] = i; }
+            memmove(&child[k+1], &child[k], l);
+            child[k] = i; }
 
         // Connect parent nodes
         for(i = 0 ; i < TSIZE ; ++i)
-            if((k = son[i]) >= TSIZE)
+            if((k = child[i]) >= TSIZE)
                 parent[k] = i;
             else
                 parent[k] = parent[k+1] = i; }
@@ -188,14 +188,14 @@ void update(int c)
             while(k > freq[++l]);
             freq[c] = freq[--l];
             freq[l] = k;
-            parent[i = son[c]] = l;
+            parent[i = child[c]] = l;
             if(i < TSIZE)
                 parent[i+1] = l;
-            parent[j = son[l]] = c;
-            son[l] = i;
+            parent[j = child[l]] = c;
+            child[l] = i;
             if(j < TSIZE)
                 parent[j+1] = c;
-            son[c] = j;
+            child[c] = j;
             c = l; } }
     while(c = parent[c]);	// Repeat up to root
 }
@@ -215,7 +215,7 @@ unsigned short GetChar()
 /*
  * Get a single bit from the input stream
  */
-unsigned short GetBit()
+unsigned short getNewBit()
 {
     unsigned short t;
     if(!Bits--) {
@@ -230,7 +230,7 @@ unsigned short GetBit()
 /*
  * Get a byte from the input stream - NOT bit-aligned
  */
-unsigned short GetByte()
+unsigned short getNew8Bits()
 {
     unsigned short t;
     if(Bits < 8)
@@ -254,8 +254,8 @@ unsigned short DecodeChar()
     // choose node #(son[]) if input bit == 0
     // choose node #(son[]+1) if input bit == 1
     c = ROOT;
-    while((c = son[c]) < TSIZE)
-        c += GetBit();
+    while((c = child[c]) < TSIZE)
+        c += getNewBit();
 
     update(c -= TSIZE);
     return c;
@@ -269,13 +269,13 @@ unsigned short DecodePosition()
     unsigned short i, j, c;
 
     // Decode upper 6 bits from given table
-    i = GetByte();
+    i = getNew8Bits();
     c = d_code[i] << 6;
 
     // input lower 6 bits directly
     j = d_len[i >> 4];
     while(--j)
-        i = (i << 1) | GetBit();
+        i = (i << 1) | getNewBit();
 
     return (i & 0x3F) | c;
 }
@@ -318,15 +318,15 @@ int getbyte()
             c = DecodeChar();
             if(c < 256) {		// Direct data extraction
                 ring_buff[GBr++] = (byte)c;
-                GBr &= (SBSIZE-1);
+                GBr &= (MBSIZE-1);
                 return c; }
             GBstate = 255;		// Begin extracting a compressed string
-            GBi = (GBr - DecodePosition() - 1) & (SBSIZE-1);
+            GBi = (GBr - DecodePosition() - 1) & (MBSIZE-1);
             GBj = c - 255 + THRESHOLD;
             GBk = 0; }
         if(GBk < GBj) {			// Extract a compressed string
-            ring_buff[GBr++] = (byte)c = ring_buff[(GBk++ + GBi) & (SBSIZE-1)];
-            GBr &= (SBSIZE-1);
+            ring_buff[GBr++] = (byte)c = ring_buff[(GBk++ + GBi) & (MBSIZE-1)];
+            GBr &= (MBSIZE-1);
             return c; }
         GBstate = 0; }			// Reset to non-string state
 }
@@ -367,7 +367,7 @@ int getblock(void *vp, unsigned short size, unsigned char *e)
 #define	SEC_DAM		0x04		// Sector has Deleted Address Mark
 #define	SEC_DOS		0x10		// Sector not allocated
 #define	SEC_NODAT	0x20		// Sector has no data field
-#define	SEC_NOID	0x40		// Sector has no ID field
+#define	SEC_AUTO	0x40		// Sector has no ID field
 
 #pragma pack(push, 1)
 // Main image file header
