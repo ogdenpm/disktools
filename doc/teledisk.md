@@ -1,15 +1,7 @@
-​                                   **Teledisk**
+# **Teledisk Image File Format Notes**
 
-​                             **Image File Format**
-
-​                                        **Notes**
-​                                 **Dave Dunfield**
-​                                  **April 2, 2007**
-​     **Last revised: September 23, 2024 by Mark Ogden**
-
-
-
-
+**Based on work by  Dave Dunfield  April 2, 2007**
+​**Last revised: October 4th, 2024 by Mark Ogden**
 
 # 1. Introduction
 
@@ -35,7 +27,7 @@ The following people whom I have never met have saved me  tons  of  time by  mak
 
 **Simon Owen**: Published source code to read some .TD0 files for his SimCoupe emulator.
 
-**Haruhika Okumura**: Published LZSS-Huffman source code which has become "the reference" for many implementations.
+**Haruhika Okumura**: Published LZH source code which has become "the reference" for many implementations.
 
 **Mark Ogden**: Updated notes to reflect v2.23 of Teledisk, added information on the "old" advanced compression and multi volume disk sets and made some corrections.
 
@@ -46,21 +38,21 @@ The overall disk image file has this format:
 ```
 Image header                (12 bytes)
 ;If the image was created using "Advanced Compression", everything
-;below this line is compressed with LZW or LZSS-Huffman encoding.
+;below this line is compressed with LZW or LZH encoding.
 Optional comment header     (10 bytes)
 Optional comment data       (Variable size)
  ;For each track on the disk ...
- Track header              (4 bytes)
+ Track header               (4 bytes)
    ;For each sector within the track
-   Sector header           (6 bytes)
-   Optional data header    (3 bytes)
-   Optional data block     (variable size)
+   Sector header            (6 bytes)
+   Optional data header     (3 bytes)
+   Optional data block      (variable size)
 ;Image ends with Track header beginning with 255 (FF hex)
 ```
 
 Although rarely used, the format also supports overflow of data into another file. This is described in the section Multi-volume support.
 
-If the Teledisk image was generated with "Advanced Data Compression", all parts of the file following  the "Image Header"  are compressed as  a single block as described in the section Advanced Compression.
+If the Teledisk image was generated with "Advanced Data Compression", all parts of the file following  the "Image Header"  are compressed as described in the section Advanced Compression.
 
 # 3. Image Header
 
@@ -87,18 +79,18 @@ Cyclic Redundancy Check     (2 byte little endian word)
 
 ## 3.2 Sequence (1 byte)
 
- - TDCHECK reports  "bad header"  if this value is  set  to  anything other than 00. Other disks in a multi-volume set check the sequence matches, i.e. it is also 00.
+ - TDCHECK reports  "bad header"  if this value is  set  to  anything other than 00. Other disks in a multi-volume set check the sequence matches, i.e. also 00.
 
    A consequence of this is that the signature can be treated as a simple C string.
 
-## 3.3 CheckSequence (1 byte)
+## 3.3 Checksequence (1 byte)
 
-   - This must be the same for the all disks in a multi-volume set. It is typically 0.
+   - This must be the same for the all disks in a multi-volume set. It is calculated using the current local time and is the  sum of minute, hour and month day.
 
 ## 3.4 Teledisk file format version (1 byte)
 
    - Encodes the version number of the file format used to create the image. It is in the form High-nibble.low-nibble. eg: 15 = 1.5
-      Note v1.05 and possibly earlier of Teledisk do not support file formats earlier than 1.0. 
+      Note Teledisk v1.05 and possibly earlier do not support file formats earlier than 1.0. 
 
 ## 3.5 Density (1 byte)
 
@@ -133,8 +125,7 @@ Cyclic Redundancy Check     (2 byte little endian word)
 
 - The density and FM/MFM encoding are appended to these descriptions. TDCHECK reports both 250kbps and 300kbps as low density.
 
-- Note the 96 tpi disk in 48 tpi drive seems unusual as in the best case it would read alternate tracks
-     but it is possible that it will read corrupt data due to flux transitions from adjacent tracks.
+- Note the 96 tpi disk in 48 tpi drive seems unusual, as in the best case it would read alternate tracks but it is possible that it will read corrupt data due to flux transitions from adjacent tracks.
 
 ## 3.7 Stepping (1 byte)
 
@@ -150,7 +141,7 @@ Cyclic Redundancy Check     (2 byte little endian word)
 
 ## 3.8 DOS allocation flag (1 byte)
 
-non-zero means the disk was read using the DOS FAT table  to  skip unallocated sectors.
+non-zero (1) means the disk was read using the DOS FAT table  to  skip unallocated sectors.
 
 ## 3.9 Sides (1 byte)
 
@@ -231,12 +222,15 @@ Cyclic Redundancy Check     (1 byte)
 
 This field indicates how many sectors are recorded for this track. This also indicates how many sector headers  to  expect  following the track header.
 
-A number of sectors of 255 (FF hex) indicates the end of the track list.  No other fields occur in this record,  and the CRC  is  not checked.
+A number of sectors of 255 (FF hex) indicates the end of the track list.  No CRC check is done and it is possible early versions of Teledisk did not write the full track header.
 
 Note, the number of sectors may not match the real number of sectors per track for the following reasons:
 
-- An unreadable IDAM and sector data will not be included.
-- Occasionally two copies of the sectors on a track are included. I believe this occurs when a 48tpi disk is read in a 96tpi  drive when it reads the track from two head steppings. If the data read is different, both sets of sectors are used. This also possibly explains why occasionally apparent duplicate sectors are not marked.
+- The controller failed to read the IDAM and sector data due to media errors.
+- Spurious detection of IDAMs or data due to media errors.
+- When Teledisk reads the IDAMs on a track it captures more than one revolution of the disk and in theory could read up to 100 IDAMs. In processing these it looks for the the repeat of the  first IDAM to determine the correct number of sectors. However if the remaining IDAMs don't mirror the same sequence, possibly due to read errors, it will include all the IDAMs read. In most cases this will result in duplicate sectors.
+- When processing a track, Teledisk uses the floppy disk "read track" command to read the first sector on the disk. It uses this in an attempt to synchronise the IDAMs it read separately to the start of the track. If it cannot find this sector it inserts an auto-generates a dummy sector with the sector value of 100 + number of sectors as the  first sector and increments the number of sectors. It uses the cylinder/head/sector size information taken from the original first IDAM read.
+  Note: If the sector read with the "read track"  command has a data error or a sector length different from the first IDAM read, Teledisk is unlikely to find a match.
 
 ## 5.2 Cylinder number (1 byte)
 
@@ -285,7 +279,7 @@ This field indicates the  logical  Side/Head  indicator  which  is  written in t
 
 This field indicates the logical sector number which is wrtten  in the ID field of the disk sector.  Sector numbers do not have to be in any particular order  (the ordering of the  sectors  determines the interleave factor of the track), do not necessarily begin at 0 or 1, and are not necessarily an unbroken series of numbers.  Some formats encode seemingly arbitrary sector numbers.
 
-Teledisk sometimes creates bogus sectors headers to describe  data  that is not in a properly formatted sector or where the IDAM cannot be read.  These  extra  sectors appear to be created with sector numbers beginning at 100.
+See section 5.1 for information on Teledisk auto generated sectors.
 
 ##  6.4 Sector size (1 byte)
 
@@ -306,17 +300,15 @@ Note that disk formats exist which  have  different  sector  sizes  within the s
 This is a bit field indicating characteristics that Teledisk noted  about the sector when it  was  recorded.   The  field  contain  the logical OR of the following hex byte values
 
 ```
-01 = Sector was duplicated within a track
+01 = Sector was duplicated within a track	- does not appear to be used anymore
 02 = Sector was read with a CRC error
 04 = Sector has a "deleted-data" address mark
-10 = Sector data was skipped based on DOS allocation [note]
+10 = Sector data was skipped based on DOS allocation
 20 = Sector had an ID field but not data [note]
-40 = Sector had data but no ID field (bogus header)
+40 = Sector had data but no ID field (Teledisk generated a dummy IDAM)
 ```
 
-Note:  Bit values 20H or 10H or Sector size > 8 indicate  that  NO  SECTOR  DATA  BLOCK FOLLOWS.
-
-The meaning of some of these bits was taken  from  early  Teledisk documentation,  and may not be accurate. It is possible that 01H for duplicated sector is reserved for genuine duplicate sectors ids on a track. See section 5.1 as to why duplicates may appear that are not marked.
+Note:  Bit values 20H or 10H or Sector size > 8 indicate  that there is NO data block for this sector.
 
 ## 6.6 Cyclic Redundancy Check (1 byte)
 
@@ -339,7 +331,7 @@ Encoded sector data     (Data block size bytes)
 
 This indicates the size of the encoded sector data  block. Its content should expand to the expected sector size.
 
-Note the max size supported is 4000h.
+See section 7.3 for notes on maximum data block size.
 
 ## 7.2 Encoded sector data (variable size)
 
@@ -395,9 +387,27 @@ Repeat count		(1 byte)
 Repeat bytes		(2 bytes)
 ```
 
+## 7.3 Maximum data block size
+
+In the Teledisk applications the maximum encoded data block size supported is 32,768 (4000H) in most versions and 18,944 (4A00H) in v2.23.
+
+In practice this is more likely to reflect the space needed during the sector packing. As an example Telediskv2.15 and probably others versions, pack sectors using the following algorithm
+
+1. if the whole sector is repeated words, use repeated 2 byte pattern
+
+2. else RLE encoding is done as follows
+   * Runs of 4 or more repeated words are encoded using RLE single 2-byte chunk encoding.
+   * Other data is encoded using the RLE raw data encoding.
+
+   Note multiple fragments are used if the length/count is >255
+
+3. If the final RLE length is > the sector size the whole sector is encoded as raw data instead
+
+Allowing for the one byte encoding method, this would make the maximum required block size (max sector size + 1) bytes.
+
 # 8. Cyclic redundancy check
 
-The error-checking 16 bit cyclic redundancy check is calculated with the polynomial value 0A097H using an input preset value of 0. Individual headers determine the data used in the calculation and whether the full 16 bits or low 8 bits are used.
+The error-checking 16 bit cyclic redundancy check is calculated with the polynomial value 0A097H using an input pre-set value of 0. Individual headers determine the data used in the calculation and whether the full 16 bits or low 8 bits are used.
 
 # 9. Multi-volume support
 
@@ -431,6 +441,6 @@ This compresses all data as a single block with LZH encoding with the string loo
 pre-set to all spaces (ASCII  20). The ring buffer size is 4096, the lookahead size is 60 and the threshold is 2. The frequency tables are rebuilt when the highest count is 8000H.
 
 ```
-Updated 23-Sep-2024 - Mark Ogden
+Updated 4-Oct-2024 - Mark Ogden
 ```
 
