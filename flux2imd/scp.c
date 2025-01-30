@@ -73,7 +73,7 @@ bool scpOpen(const char *fname) {
 
 
 
-scpClose() {
+bool scpClose() {
     if (scpFp)
         fclose(scpFp);
     scpFp = NULL;

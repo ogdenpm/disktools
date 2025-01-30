@@ -44,6 +44,10 @@ MODIFICATION HISTORY
 #include "flux2imd.h"
 #include "trackManager.h"
 #include "util.h"
+#ifdef __GNUC__
+#include <limits.h>
+#define _MAX_PATH PATH_MAX
+#endif
 
 static bool SameCh(uint8_t *pData, int size) {      // valid sectors have the SUSPECT tag cleared so simple compare
 
@@ -70,7 +74,7 @@ static void WriteIMDHdr(FILE* fp, const char* fname) {
     dateTime = localtime(&curTime);
     fprintf(fp, "IMD 1.18 %02d/%02d/%04d %02d:%02d:%02d\r\n", dateTime->tm_mday, dateTime->tm_mon + 1, dateTime->tm_year + 1900,
     dateTime->tm_hour, dateTime->tm_min, dateTime->tm_sec);
-    fprintf(fp, "Created from %s by flux2imd\r\n\x1a", fileName(fname));
+    fprintf(fp, "Created from %s by flux2imd\r\n\x1a", basename(fname));
 }
 
 // E_FM5, E_FM5H, E_FM8, E_FM8H, E_MFM5, E_MFM5H, E_MFM8, E_MFM8H, E_M2FM8
@@ -92,7 +96,7 @@ void writeImdFile(const char *fname) {
         logFull(D_ERROR, "cannot create %s\n", fname);
         return;
     }
-    logFull(ALWAYS, "IMD file %s created\n", fileName(imdFile));
+    logFull(ALWAYS, "IMD file %s created\n", basename(imdFile));
 
     WriteIMDHdr(fp, fname);
     for (int cyl = 0; cyl <= maxCylinder; cyl++)

@@ -34,15 +34,15 @@
 #include "trackManager.h"
 #include "stdflux.h"
 
-static uint32_t ctime, etime;       // clock time and end of cell time
-static nominalCellSize = 1; 
-uint32_t cellSize;           // width of a cell
+static int32_t ctime, etime;       // clock time and end of cell time
+static int32_t nominalCellSize = 1; 
+int32_t cellSize;           // width of a cell
 static int fCnt, aifCnt, adfCnt, pcCnt; // dpll paramaters
 static bool up; 
-static uint32_t maxCell;            //  bounds on cell width
-static uint32_t minCell;
+static int32_t maxCell;            //  bounds on cell width
+static int32_t minCell;
 
-static uint32_t cellDelta;
+static int32_t cellDelta;
 
 uint64_t pattern;
 uint16_t bits65_66 = 0;
@@ -69,7 +69,7 @@ adapt_t profiles[] = {
 /* 4 */    {200, 32, 6.0, 400, 32, 2.0, 600, 0.25},    // hard sector default as no gap pre sync bytes also short blocks
 };
 
-#define CNTPROFILE  (sizeof(profiles)/ sizeof(profiles[0]))
+#define CNTPROFILE  (int)(sizeof(profiles)/ sizeof(profiles[0]))
 
 
 // profiles used by encodings E_FM5 = 0, E_FM5H, E_FM8, E_FM8H, E_MFM5, E_MFM5H, E_MFM8, E_MFM8H, E_M2FM8
@@ -146,7 +146,7 @@ int getBit() {
     }
 
     if (slot < 7 || slot > 8) {
-        if (slot <= 6 && !up || slot >= 9 && up) {			// check for up/down switch
+        if ((slot <= 6 && !up) || (slot >= 9 && up)) {			// check for up/down switch
             up = !up;
             pcCnt = fCnt = 0;
         }
@@ -189,7 +189,7 @@ bool retrain(int profile) {
         logFull(D_FATAL, "For %s unknown encoding %d\n", curFormat->name, curFormat->encoding);
     nominalCellSize = curFormat->nominalCellSize;
 
-    if (profile >= CNTPROFILE || profile >= strlen(curFormat->profileOrder)) {
+    if (profile >= CNTPROFILE || profile >= (int)strlen(curFormat->profileOrder)) {
         adaptProfile = 0;
         return false;
     }

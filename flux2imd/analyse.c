@@ -33,7 +33,6 @@
 #include "util.h"
 #include "stdflux.h"
 
-static int encoding = 0;
 
 unsigned flip32(unsigned n) {
     unsigned result = 0;

@@ -23,7 +23,7 @@
 #include <stdio.h>
 #include <memory.h>
 #include <string.h>
-#include "flux2Imd.h"
+#include "flux2imd.h"
 #include "trackManager.h"
 #include "util.h"
 
@@ -176,11 +176,11 @@ static char *sectorToString(track_t *pTrack, uint8_t slot) {
     sector_t *p = &pTrack->sectors[slot];
 
     if (p->status & SS_IDAMGOOD)
-        sprintf(s, "%02d/%d/%02d", p->idam.cylinder, p->idam.side, p->idam.sectorId);
+        sprintf(s, "%02d/%d/%02d", p->idam.cylinder % 99, p->idam.side & 3, p->idam.sectorId % 99);
     else if (p->status & SS_FIXED)
-        sprintf(s, "%02d/%d/%02d*", p->idam.cylinder, p->idam.side, p->idam.sectorId);
+        sprintf(s, "%02d/%d/%02d*", p->idam.cylinder % 99, p->idam.side & 3, p->idam.sectorId % 99);
     else
-        sprintf(s, "%02d/%d/??", p->idam.cylinder, p->idam.side);
+        sprintf(s, "%02d/%d/??", p->idam.cylinder % 99, p->idam.side & 3);
     return s;
 }
 
@@ -258,7 +258,7 @@ void displayBadSlots(track_t *pTrack) {
             if (slotToSector[i] != 0xff)
                 logBasic("(%d)", slotToSector[i]);
             else
-                logBasic("(??)");
+                logBasic("(\?\?)");
         }
     logBasic("\n");
 }

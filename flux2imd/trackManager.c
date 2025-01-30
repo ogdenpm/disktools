@@ -116,6 +116,7 @@ static void removeTrack(track_t* p) {
 
 
 bool checkTrack(int profile) {
+    (void)profile;
     assert(trackPtr);
     if (debug & D_NOOPTIMISE)
         return false;

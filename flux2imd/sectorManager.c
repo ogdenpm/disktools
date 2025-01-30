@@ -38,13 +38,13 @@
 #include "stdflux.h"
 
 static int prevSlot = -1;
-static unsigned curSpacing;
-static unsigned minSpacing;
-static unsigned maxSpacing;
+static int curSpacing;
+static int minSpacing;
+static int maxSpacing;
 
 
 // determine new spt if spacing has changed
-static void chkSpacingChange(unsigned newSpacing) {
+static void chkSpacingChange(int newSpacing) {
 
     for (formatInfo_t *p = curFormat + 1; p->encoding == curFormat->encoding && p->sSize == curFormat->sSize; p++) {
         if (abs(p->spacing - newSpacing) < 3) {
@@ -111,15 +111,15 @@ static unsigned slotAt(int pos, bool isIdam) {
     } else {
         prevSlot += slotDelta;
         // now work out effective spacing
-        unsigned newSpacing = posDelta / slotDelta;
+        int newSpacing = posDelta / slotDelta;
         if ((newSpacing < minSpacing || newSpacing > maxSpacing) && curFormat->options & O_SPC)
             chkSpacingChange(newSpacing);
         // keep in tolerance
         newSpacing = newSpacing > maxSpacing ? maxSpacing : newSpacing < minSpacing ? minSpacing : newSpacing;
 
-        if (newSpacing != curSpacing)
+        if (newSpacing != curSpacing) {
             DBGLOG(D_TRACKER, "Spacing changed from %d to %d\n", curSpacing, newSpacing);
-
+        }
         curSpacing = newSpacing;
 
 

@@ -60,8 +60,6 @@ static struct {
     int16_t itype;
 } fluxIndex[MAXROTATE * (MAXHARDSECTOR + 1)];
 
-static int16_t cyl;
-static int16_t head;
 
 /* parsed data from the kinfo blocks*/
 static int hc = 0;			// hard sector count or 0 for soft sector
@@ -201,17 +199,17 @@ static uint32_t oob(const uint8_t *fluxBuf, uint32_t fluxPos, uint32_t size, uin
             memcpy(tmp, oobBlk, len);
             tmp[len] = '\0';
             char *s;
-            if (s = strstr(tmp, "hc="))
+            if ((s = strstr(tmp, "hc=")))
                 hc = atoi(s + 3);
-            if (s = strstr(tmp, "sck="))
+            if ((s = strstr(tmp, "sck=")))
                 sck = atof(s + 4);
-            if (s = strstr(tmp, "ick=="))        // handle spurious double = in some older kryoflux versions
+            if ((s = strstr(tmp, "ick==")))        // handle spurious double = in some older kryoflux versions
                 ick = atof(s + 5);
-            else if (s = strstr(tmp, "ick="))
+            else if ((s = strstr(tmp, "ick=")))
                 ick = atof(s + 4);
-            if (s = strstr(tmp, "host_date="))
+            if ((s = strstr(tmp, "host_date=")))
                 strncpy(scanDate, s + 10, 10);		// scanDate[10] will be 0 due to bss initialisation
-            if (s = strstr(tmp, "host_time="))
+            if ((s = strstr(tmp, "host_time=")))
                 strncpy(scanTime, s + 10, 8);		// scanTime[8] will be 0 due to bss initialisation
             free(tmp);
         }
@@ -258,6 +256,7 @@ bool pass1KryoFlux(const uint8_t *image, uint32_t size) {
             break;
         case FLUX3:
             sampleCnt++;
+            // fall through
         case NOP3:
             streamPos += 3;
             fluxPos += 3;
@@ -321,6 +320,7 @@ bool pass2KryoFlux(const uint8_t *image, uint32_t size) {
             continue;
         case OVL16:
             ovl16 += 0x10000;
+            // fall through
         case NOP1:
             streamPos++;
             fluxPos++;

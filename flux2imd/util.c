@@ -24,8 +24,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include "util.h"
+#ifdef __GNUC__
+#include <limits.h>
+#define _MAX_PATH PATH_MAX
+#endif
 
-char logPrefix[_MAX_FNAME * 2 + 3];      // fname[item];
+char logPrefix[_MAX_PATH + 3];      // fname[item];
 unsigned debug;
 FILE *logFp = NULL;  
 
@@ -52,10 +56,10 @@ uint8_t flip[] = {
 
 bool extMatch(const char* fname, const char* ext) {
     char* s = strrchr(fname, '.');
-    return (s && _stricmp(s, ext) == 0);
+    return (s && stricmp(s, ext) == 0);
 }
 
-const char* fileName(const char* fname) {
+const char* basename(const char* fname) {
     char* s = strrchr(fname, '/');
     char* t = strrchr(fname, '\\');
     if (!s || (t && s < t))
@@ -117,7 +121,7 @@ void createLogFile(const char* name) {
         strcpy(strrchr(logFile, '.'), ".log");
         if ((logFp = fopen(logFile, "wt")) == NULL) {
             logFp = stdout;
-            logFull(D_ERROR, "could not create %s; using stdout\n", fileName(logFile));
+            logFull(D_ERROR, "could not create %s; using stdout\n", basename(logFile));
         }
     } else
         logFp = stdout;
@@ -135,7 +139,7 @@ void* xmalloc(size_t size) {
 
 
 void setLogPrefix(const char *container, const char *element) {
-    strcpy(logPrefix, fileName(container));
+    strcpy(logPrefix, basename(container));
     if (element && *element)
-        sprintf(strchr(logPrefix, 0), "[%s]", fileName(element));
+        sprintf(strchr(logPrefix, 0), "[%s]", basename(element));
 }

@@ -30,6 +30,11 @@
 #include <stdarg.h>
 #include <string.h>
 
+#ifdef __GNUC__
+#define stricmp strcasecmp
+#define strnicmp strncasecmp
+#endif
+
 // option flags
 #define pOpt    1
 #define gOpt    2
@@ -54,11 +59,11 @@ enum {
 extern unsigned debug;
 
 void* xmalloc(size_t size);
-uint8_t flip[];
+extern uint8_t flip[];
 void logFull(int level, char* fmt, ...);
 int logBasic(char* fmt, ...);
 
 bool extMatch(const char* fname, const char* ext);
-const char* fileName(const char* fname);
+const char* basename(const char* fname);
 void createLogFile(const char *fname);
 void setLogPrefix(const char *container, const char *element);

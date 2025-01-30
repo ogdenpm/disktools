@@ -13,8 +13,6 @@
 #define stricmp _stricmp
 #endif
 
-static TrackId trackId;
-
 typedef struct {
     bool (*open)(const char *fname);
     bool (*load)();
@@ -52,7 +50,7 @@ bool openFluxFile(const char *fname) {
     setLogPrefix(fname, NULL);
     createLogFile(NULL);            // revert to stdout for general errors
 
-    if (s = strrchr(fname, '.')) {
+    if ((s = strrchr(fname, '.'))) {
         if (stricmp(s, ".raw") == 0)
             io = rawFuncs;
         else if (stricmp(s, ".zip") == 0)
@@ -89,6 +87,7 @@ bool closeFluxFile() {
 
 // handler for invalid files
 static bool errOpen(const char *fname) {
+    (void)fname;
     return false;
 }
 
@@ -136,7 +135,6 @@ static bool rawClose() {
 
 // data variables for zip files
 static struct zip_t *zip;
-static bool zipEof = true;
 static int zipReadCnt = 0;
 static int zipEntriesCnt = 0;
 static const char *zipName;

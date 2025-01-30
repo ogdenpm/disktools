@@ -259,7 +259,7 @@ void showFormats() {
     printf("Current user specified single formats are\n");
     printf("    %-12s  Description\n", "Format");
     for (int i = 0; formatInfo[i].name; i++)
-        if (*formatInfo[i].name != 0x80 && formatInfo[i].description)
+        if (*formatInfo[i].name != -128 && formatInfo[i].description)
             printf("    %-12s  %s\n", formatInfo[i].name, formatInfo[i].description);
     printf("Note ** formats will auto adapt based on detected sectors / encoding\n\n");
     printf("Current predefined multi formats are\n");
@@ -348,7 +348,7 @@ static bool crcStd(uint16_t* buf, int len) {
 static formatInfo_t *lookupFormat(const char* fmtName) {
     formatInfo_t* p;
     for (p = formatInfo; p->name; p++) {
-        if (_stricmp(p->name, fmtName) == 0)
+        if (stricmp(p->name, fmtName) == 0)
             return p;
     }
     return NULL;
@@ -570,7 +570,7 @@ char *decodePattern64() {
         if (tmp >= 256)
             suspect = true;
     }
-    sprintf(decodeStr, "%08.8X%s", decoded, suspect ? "*" : "");
+    sprintf(decodeStr, "%8.8X%s", decoded, suspect ? "*" : "");
     return decodeStr;
 }
 
@@ -640,7 +640,7 @@ int matchPattern2(bool lock) {
 void setFormat(const char* fmtName) {
     curFormat = lookupFormat(fmtName);
     if (!curFormat)
-        logFull(D_FATAL, "Attempt to select unknown format %s\n", *fmtName == 0x80 ? fmtName + 1 : fmtName);
+        logFull(D_FATAL, "Attempt to select unknown format %s\n", *fmtName == -128 ? fmtName + 1 : fmtName);
 
 }
 
@@ -729,7 +729,7 @@ const char *getFormat(const char *userfmt) {
 
     if (userfmt)
         for (int i = 0; precannedFormats[i][0]; i++)
-            if (_stricmp(userfmt, precannedFormats[i][0]) == 0) {
+            if (stricmp(userfmt, precannedFormats[i][0]) == 0) {
                 userfmt = precannedFormats[i][1];
                 break;
             }

@@ -48,7 +48,6 @@ void displayHist(int levels)
 
     seekIndex(0);               // to start of data
     int scnt = 0;
-    int icnt = 0;
     while ((newTs = getTs()) != EODATA) {
         if (newTs >= 0) {        // ignore index markers
             scnt++;

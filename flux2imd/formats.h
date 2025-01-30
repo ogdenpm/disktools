@@ -70,7 +70,7 @@ typedef struct {
 
 typedef struct {
     char* name;
-    int sSize;      // sector len = 128 << ssize
+    unsigned sSize;      // sector len = 128 << ssize
     int firstSectorId;
     int spt;
     int encoding;
