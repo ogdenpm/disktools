@@ -195,7 +195,7 @@ extern int formatCh;
 #ifdef _MSC_VER
 #define stricmp stricmp
 #endif
-void WriteImgFile(char *fname, int diskType, char *interleaves, bool useSkew, char *comment);
+void WriteImgFile(char *fname, int diskType, char const *interleaves, bool useSkew, char *comment);
 void InitFmtTable(uint8_t t0Interleave, uint8_t t1Interleave, uint8_t interleave);
 bool CopyFile(char *isisName, int attrib);
 void FormatDisk(int type, int formatCh);

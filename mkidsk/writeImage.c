@@ -82,11 +82,11 @@ bool SameCh(uint8_t *sec, int len) {
 
 // interleaves points to disk interleave format as per standard ISIS.LAB format i.e. '0' biased
 // if interleaves == "" then use default
-// if inteleaves == NULL then no interleave
+// if interleaves == NULL then no interleave
 
-void WriteImgFile(char *fname, int diskType, char *interleaves, bool useSkew, char *comment) {
+void WriteImgFile(char *fname, int diskType, char const *interleaves, bool useSkew, char *comment) {
     FILE *fp;
-    int fmt = stricmp(strrchr(fname, '.'), ".img") == 0 ? IMG : IMD;
+    int fmt = stricmp(strrchr(fname, '.'), ".imd") == 0 ? IMD : IMG;
 
     if ((fp = fopen(fname, "wb")) == NULL) {
         fprintf(stderr, "Cannot create %s\n", fname);

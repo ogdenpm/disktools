@@ -96,13 +96,20 @@ ISIS.DIR attibutes are the file's attributes any of FISW checksum is the file's 
 */
 
 #include "mkIsisDisk.h"
-#include "showVersion.h"
+#include "utility.h"
+#include <stdarg.h>
 #include <string.h>
 
 #define MAXFORMAT 15 // e.g ISIS II SD
 #define MAXOS     15 // ISIS III(n) 2.0
 #define MAXYEAR   30 // ideally only one year but allow for longer
 #define MAXPN     64 // maximum part number/name
+
+#ifdef _WIN32
+#define DIRSEP "/\\"
+#else
+#define DIRSEP "/"
+#endif
 
 char comment[MAXCOMMENT];
 char source[MAXCOMMENT];
@@ -121,7 +128,7 @@ bool interTrackSkew = false;
 bool addSource      = false;
 int formatCh =
     -1; // format character -e sets, otherwise defaults to 0xc7 for ISIS_II and 0xe5 for ISIS_PDS
-char *forcedSkew = NULL;
+char const *forcedSkew = NULL;
 
 char *Match(char *s, char *ref);
 
@@ -203,6 +210,22 @@ osMap_t osMap[] = {
 };
 // clang-format on
 
+char const help[] = {
+    "Usage: %s [options]* recipe [diskname][.fmt]\n"
+    "Where\n"
+    "recipe     file with instructions to build image.\n"
+    "diskname   generated disk image name - defaults to recipe without leading @\n"
+    "fmt        disk image format - defaults to " EXT "\n"
+    "\nAnd options are\n"
+    "  -s         add source: info to imd images\n"
+    "  -f[=nn]    override C7 format byte with E5 or hex value specified by nn\n"
+
+    "  -i[=xyz]   apply interleave. xyz forces the interleave for track 0, 1, 2-76 for ISIS disks\n"
+    "             x,y & z are as per ISIS.LAB i.e. interleave + '0'\n"
+    "  -t         apply inter track skew\n"
+    "Note for .img files interleave and skew are ignored\n"
+};
+
 int getOsIndex(char *osname) {
     if (!*osname)
         return 0;
@@ -242,7 +265,7 @@ char *Match(char *s, char *ref) {
     return s;
 }
 
-bool checkSkew(char *s) { // check skew is valid
+bool checkSkew(char const *s) { // check skew is valid
     for (int i = 0; i < 3; i++)
         if (s[i] < '1' || '0' + 52 < s[i])
             return false;
@@ -257,7 +280,7 @@ void decodePair(char *dest, char *src) {
                 *dest = (isdigit(*src) ? *src++ - '0' : toupper(*src++) - 'A' + 10) << 4;
                 *dest++ += (isdigit(*src) ? *src++ - '0' : toupper(*src++) - 'A' + 10);
             } else {
-                fprintf(stderr, "warning invalid hex number #%.2s\n", src);
+                warn("invalid hex number #%.2s", src);
                 break;
             }
         } else
@@ -297,8 +320,8 @@ unsigned getDiskType(int formatIndex, int osIndex) { // returns usable diskType
 
     if ((diskFmt == ISIS1 && osType != I11) || (diskFmt == ISIS2 && osType != II22) ||
         (diskFmt == ISIS3 && osType != II34) || (diskFmt == ISIS4 && osType < II40)) {
-        fprintf(stderr, "Warning: non standard format %s with os %s\n",
-                formatLookup[formatIndex].format, osLookup[osIndex].os);
+        warn("non standard format %s with os %s", formatLookup[formatIndex].format,
+             osLookup[osIndex].os);
     }
     if (diskFmt == ISISU) {
         switch (osType) {
@@ -339,7 +362,7 @@ void ParseRecipeHeader(FILE *fp) {
                 ;
             s[1] = 0;
         } else if (strlen(line) == MAXLINE - 1) {
-            fprintf(stderr, "line too long %s\n", line);
+            warn("line too long %s", line);
             while ((c = getc(fp)) != EOF && c != '\n')
                 ;
             if (c == EOF)
@@ -363,10 +386,9 @@ void ParseRecipeHeader(FILE *fp) {
         } else if ((s = Match(line, "version:")))
             decodePair((char *)label.version, s);
         else if ((s = Match(line, "format:"))) {
-            if ((formatIndex = getFormatIndex(s)) < 0) {
-                fprintf(stderr, "Unsupported disk format %s\n", s);
-                exit(1);
-            }
+            if ((formatIndex = getFormatIndex(s)) < 0)
+                fatal("Unsupported disk format %s", s);
+
         } else if ((s = Match(line, "interleave:"))) { // we have non standard interleave
             if ('1' <= s[0] && s[0] <= 52 + '0' && '1' <= s[1] && s[1] <= 52 + '0' && '1' <= s[2] &&
                 s[2] <= 52 + '0')
@@ -382,16 +404,13 @@ void ParseRecipeHeader(FILE *fp) {
             appendTo = source;
         }
     }
-    if (formatIndex < 0) {
-        fprintf(stderr, "No format specified - format: is mandatory\n");
-        exit(1);
-    }
+    if (formatIndex < 0)
+        fatal("No format specified - format: is mandatory");
 
-    if ((diskType = getDiskType(formatIndex, osIndex)) == NOFORMAT) {
-        fprintf(stderr, "Invalid disk format %s for os %s\n", formatLookup[formatIndex].format,
-                osLookup[osIndex].os);
-        exit(1);
-    }
+    if ((diskType = getDiskType(formatIndex, osIndex)) == NOFORMAT)
+        fatal("Invalid disk format %s for os %s", formatLookup[formatIndex].format,
+              osLookup[osIndex].os);
+
     osType = osLookup[osIndex].osType;
     char fmt[128]; // enough string space
     if (osIndex > 0)
@@ -438,7 +457,7 @@ char *ParseAttributes(char *src, int *attributep) {
         case ' ':
             break;
         default:
-            fprintf(stderr, "Warning bad attribute %c\n", *src);
+            warn("bad attribute %c", *src);
         }
         src++;
     }
@@ -481,7 +500,7 @@ void ParsePath(char *src) {
 
     // repository file
     if (relPath == path && warnRepo) {
-        fprintf(stderr, "Warning IFILEREPO not defined assuming local directory\n");
+        warn("IFILEREPO not defined assuming local directory\n");
         warnRepo = false;
     }
     src++;
@@ -497,16 +516,15 @@ void ParsePath(char *src) {
 void chkSystem() {
     if (!isisT0Seen) {
         if ((diskType >> 1) == ISISP)
-            fprintf(stderr, "Error: PDS System disk requires ISIS.T0\n");
+            fatal("PDS System disk requires ISIS.T0");
         else if (osType > 0)
-            fprintf(stderr, "Warning: System disk requires ISIS.T0 - using Non-System boot file\n");
+            warn("System disk requires ISIS.T0 - using Non-System boot file");
     }
     if (osType > 0) {
         if (!isisBinSeen)
-            fprintf(stderr, "Error: System disk requires %s\n",
-                    (diskType >> 1) == ISISP ? "ISIS.PDS" : "ISIS.BIN");
+            fatal("System disk requires %s", (diskType >> 1) == ISISP ? "ISIS.PDS" : "ISIS.BIN");
         if (!isisCliSeen)
-            fprintf(stderr, "Error: System disk requires ISIS.CLI\n");
+            fatal("System disk requires ISIS.CLI");
     }
 }
 
@@ -559,11 +577,11 @@ void ParseFiles(FILE *fp) {
             while ((c = getc(fp)) != '\n' && c != EOF)
                 ;
             if (!strchr(line, '#')) { // don't worry about extended comments
-                fprintf(stderr, "%s - line truncated\n", line);
+                warn("%s - line truncated", line);
                 continue;
             }
         }
-        if ((s = strchr(line, '#')) ||  (s = strchr(line, '\n'))) { // trim trailing blanks
+        if ((s = strchr(line, '#')) || (s = strchr(line, '\n'))) { // trim trailing blanks
             while (--s != line && (*s == '\r' || isblank(*s)))
                 ;
             s[1] = 0;
@@ -582,13 +600,13 @@ void ParseFiles(FILE *fp) {
                 *isisName = 0; // force error message
         }
         if (!isIsisName(isisName)) {
-            fprintf(stderr, "%s - Invalid ISIS name\n", line);
+            warn("%s - Invalid ISIS name", line);
             continue;
         }
         if (strchr(s + 1, ',')) { // attribute present or only location
             s = ParseAttributes(s + 1, &attributes);
             if (*s != ',') {
-                fprintf(stderr, "%s - Invalid Attributes\n", line);
+                warn("%s - Invalid Attributes", line);
                 continue;
             }
         } else
@@ -599,12 +617,11 @@ void ParseFiles(FILE *fp) {
 
         ParsePath(s);
         if (*filePath == '*') {
-            fprintf(stderr, "%s - skipped because %s\n", line, filePath + 1);
+            warn("%s - skipped because %s", line, filePath + 1);
             continue;
         } else if (strcmp(isisName, "ISIS.BIN") == 0) {
             if (!osType || (diskType >> 1) == ISISP) {
-                fprintf(stderr, "ISIS.BIN not allowed for %s system disk - skipping\n",
-                        osMap[osType].osname);
+                warn("ISIS.BIN not allowed for %s system disk - skipping", osMap[osType].osname);
                 continue;
             }
             isisBinSeen = true;
@@ -625,108 +642,63 @@ void ParseFiles(FILE *fp) {
     chkSystem();
 }
 
-void usage() {
-    static int shown = 0;
-    if (shown)
-        return;
-    shown++;
-    printf("mkidsk - Generate imd or img files from ISIS II / PDS recipe files (c) Mark Ogden "
-           "29-Mar-2020\n\n"
-           "usage: mkidsk -v | -V | [options]* [-]recipe [diskname][.fmt]\n"
-           "where\n"
-           "-v / -V    show version infomation and exit. Must be only option\n"
-           "recipe     file with instructions to build image. Optional - prefix\n"
-           "           if name starts with @\n"
-           "diskname   generated disk image name - defaults to recipe without leading @\n"
-           "fmt        disk image format either .img or .imd - defaults to " EXT "\n"
-           "\noptions are\n"
-           "-h         displays this help info\n"
-           "-s         add source: info to imd images\n"
-           "-f[nn]     override C7 format byte with E5 or hex value specified by nn\n"
-
-           "-i[xyz]    apply interleave. xyz forces the interleave for track 0, 1, 2-76 for ISIS I "
-           "& ISIS II disks\n"
-           "           x,y & z are as per ISIS.LAB i.e. interleave + '0'\n"
-           "-t         apply inter track skew\n"
-           "Note for .img files interleave and skew are ignored\n");
-}
-
 int main(int argc, char **argv) {
     FILE *fp;
     char *recipe;
-    char outfile[_MAX_PATH + 4] = "";
+    char *outfile;
     char *s;
     char *diskname;
 
-    CHK_SHOW_VERSION(argc, argv);
-
-    for (; --argc > 0; argv++) {
-        if (argv[1][0] != '-' || argv[1][1] == '@')
-            break;
-        switch (tolower(argv[1][1])) {
-        default:
-            fprintf(stderr, "unknown option %s\n", argv[1]);
+    while (getopt(argc, argv, "hsf=i=t") != EOF) {
+        switch (optopt) {
         case 'h':
-            usage();
-            break;
+            usage(NULL);
+
         case 'i':
             interleave = true;
-            if (argv[1][2]) {
-                if (checkSkew(argv[1] + 2))
-                    forcedSkew = argv[1] + 2;
+            if (optarg) {
+                if (checkSkew(optarg))
+                    forcedSkew = optarg;
                 else
-                    fprintf(stderr, "ignoring invaild skew specification in -i option\n");
+                    warn("Ignoring invalid skew specification in -i option");
             }
             break;
         case 't':
             interTrackSkew = true;
             break;
         case 'f':
-            if (sscanf(argv[1] + 2, "%x", &formatCh) != 1)
+            if (optarg) {
+                char *endPtr;
+                formatCh = (int)strtoul(optarg, &endPtr, 16);
+                if (endPtr == optarg || *endPtr || formatCh > 0xff) {
+                    warn("Invalid numeric value '%s' for -f  option", optarg);
+                    formatCh = ALT_FMTBYTE;
+                }
+            } else
                 formatCh = ALT_FMTBYTE;
-            formatCh &= 0xff;
             break;
         case 's':
             addSource = true;
+            break;
         }
     }
-    if (argc < 1 || argc > 2) { // allow for recipe and optional diskname
-        usage();
-        exit(1);
-    }
-    recipe = argv[1] + (argv[1][0] == '-'); // allow - prefix to @filename for powershell
-    if (strlen(recipe) >= _MAX_PATH) {
-        fprintf(stderr, "recipe path name too long\n");
-        exit(1);
-    }
+    if (optind < argc)
+        recipe = argv[optind++];
+    else
+        usage("Missing recipe file name");
 
-    diskname = argc == 2 ? argv[2] : EXT; // use disk and ext if given else just assume default fmt
-    if (strlen(diskname) >= _MAX_PATH) {
-        fprintf(stderr, "disk path name too long\n");
-        exit(1);
-    }
+    diskname = optind < argc ? argv[optind++] : EXT;
+    if (optind < argc)
+        usage("Unexpected argument after diskname");
 
-    if (stricmp(diskname, ".imd") != 0 && stricmp(diskname, ".img") != 0) { // we have name
-        strcpy(outfile, diskname);
-        s = strchr(outfile, '\0') - 4;
-        if (s <= outfile || (stricmp(s, ".imd") != 0 && stricmp(s, ".img") != 0))
-            strcat(outfile, EXT);
-    } else {
-        char *recipeFile = ((s = strrchr(recipe, '\\'))) ? s + 1 : recipe;
-        if ((s = strchr(recipe, '/')))
-            recipeFile = s + 1;
-        *outfile = 0;
-        strncpy(outfile, recipe, recipeFile - recipe);
-        strcpy(outfile + (recipeFile - recipe), *recipeFile == '@' ? recipeFile + 1 : recipeFile);
-        strcat(outfile, diskname);
-    }
-    if (strlen(outfile) >= _MAX_PATH) {
-        fprintf(stderr, "Output file path too long\n");
-        exit(1);
-    }
+    if (*diskname == '.' && !strchr(diskname + 1, '.') && diskname == basename(diskname)) // simple .ext
+        outfile = makeFilename(*recipe == '@' ? recipe + 1 : recipe, diskname, true);
+    else
+        outfile = makeFilename(diskname, EXT, false);
 
-    // use envionment variable to define root
-    if ((s = getenv("IFILEREPO"))) {       // environment variable defined
+
+    // use environment variable to define root
+    if ((s = getenv("IFILEREPO"))) {     // environment variable defined
         strncat(path, s, _MAX_PATH - 1); // path too long will be detected later
         for (s = path; *s; s++)
             if (*s == '\\')
@@ -737,10 +709,9 @@ int main(int argc, char **argv) {
         relPath = s; // where we add relative path
     }
 
-    if ((fp = fopen(recipe, "rt")) == NULL) {
-        fprintf(stderr, "cannot open %s\n", recipe);
-        exit(1);
-    }
+    if ((fp = fopen(recipe, "rt")) == NULL)
+        fatal("Cannot open %s", recipe);
+
     ParseRecipeHeader(fp);
     FormatDisk(diskType, formatCh);
     if (Format(diskType) != ISISP)

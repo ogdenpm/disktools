@@ -1,3 +1,3 @@
 #define APP_NAME        "mkidsk"
-#define APP_PRODUCT     "mkidsk"
-#define APP_DESCRIPTION "Create ISIS disk image from a recipe file"
+#define APP_DESCRIPTION "Generate imd or img files from ISIS II / PDS recipe files"
+
