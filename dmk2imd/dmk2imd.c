@@ -17,24 +17,19 @@
  * use of ideas, algorithms and code fragments contained herein to be used
  * in the creation of compatible programs on other platforms (eg: Linux).
  */
-#include "version.h"
+#include "imdVersion.h"
+#include "utility.h"
 #include <ctype.h>
 #include <memory.h>
 #include <stdarg.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdint.h>
-
-#ifdef AUTOVER
-#include "Generated/gitVersion.h"
-#else
-#include "version.in"
-#endif
 
 #define IS_LITTLE_ENDIAN (*(uint16_t *)"\x2\0" == 0x2)
 
-#define A1A1A1 0xCDB4 // CRC of: 0xA1, 0xA1, 0xA1
+#define A1A1A1           0xCDB4 // CRC of: 0xA1, 0xA1, 0xA1
 
 // DMK Image file header
 #pragma pack(push, 1)
@@ -54,27 +49,30 @@ unsigned P,                        // Segment read position
     crctab[256],                   // CRC generator table
     Omap[256];                     // Data offset map
 
-unsigned char *File, // Filename
-    *Wfile,          // Write file
-    *Comment,        // Comment filename
-    *ptr,            // General pointer
-    SD,              // Single density flag
-    SD2,             // SD emulation (2 accesses)
-    ForceSD,         // Force SD mode
-    AMflag,          // Address mark encountered flag
-    Udam,            // User defined data address mark handling
-    Wstop    = 255,  // Stop on warnings
-    Datarate = 255,  // Datarate value
-    Verbose  = 255,  // Allow messages
-    Nmap[256],       // Numbering map
-    Cmap[256],       // Cylinder map
-    Hmap[256],       // Head map
-    Smap[256],       // Size map
-    SDmap[256],      // Density select map
-    STmap[256];      // Sector type map
+char *File,         // Filename
+    *Wfile,         // Write file
+    *Comment,       // Comment filename
+    *ptr;           // General pointer
+uint8_t SD,         // Single density flag
+    SD2,            // SD emulation (2 accesses)
+    ForceSD,        // Force SD mode
+    AMflag,         // Address mark encountered flag
+    Udam,           // User defined data address mark handling
+    Wstop    = 255, // Stop on warnings
+    Datarate = 255, // Datarate value
+    Verbose  = 255, // Allow messages
+    Nmap[256],      // Numbering map
+    Cmap[256],      // Cylinder map
+    Hmap[256],      // Head map
+    Smap[256],      // Size map
+    SDmap[256],     // Density select map
+    STmap[256];     // Sector type map
 
 FILE *fpi, *fpo;
 
+#if '\r' != 0xd
+#error "Only ascii text is currently supported"
+#endif
 
 uint16_t rdStreamWord(unsigned offset) {
     return byteStream[offset] + (byteStream[offset + 1] << 8);
@@ -100,41 +98,6 @@ void dump(unsigned a, unsigned l)
 } */
 
 /*
- * Report error with formatted message and exit
- */
-error(char *fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
-
-    vprintf(fmt, args);
-    putc('\n', stdout);
-    if (fpo)
-        fclose(fpo);
-    if (fpi)
-        fclose(fpi);
-    exit(-1);
-}
-
-/*
- * Warning/Error with formatted message
- */
-warn(char *fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
-
-    vprintf(fmt, args);
-    putc('\n', stdout);
-
-    if (Wstop) {
-        if (fpo)
-            fclose(fpo);
-        if (fpi)
-            fclose(fpi);
-        exit(-1);
-    }
-}
-
-/*
  * Get a byte from the DMK track with SD duplication if needed
  */
 unsigned char A, B;
@@ -143,7 +106,7 @@ unsigned char getbyte(void) {
 
     A = byteStream[P++];
     if (SD2 && A != (B = byteStream[P++]))
-        error("SD data mismatch at %04x %02x!=%02x", P - 2, A, B);
+        fatal("SD data mismatch at %04x %02x!=%02x", P - 2, A, B);
     return A;
 }
 
@@ -210,76 +173,65 @@ void showheader(FILE *fp) {
     putc('\n', fp);
 }
 
-/*
- * Copy filename & append extension if required
- */
-void filename(unsigned char *file, unsigned char *ext, char dropext) {
-    unsigned char ef, *dest, *p;
-    dest = Smap;
-    ef   = 0;
-    p    = 0;
-    for (;;)
-        switch (*dest++ = *file++) {
-        case 0:               // End of string
-            if (dropext && p) // Remove extension from source
-                *(p - 1) = 0;
-            if (!ef) // No extension - add
-                strcpy(dest - 1, ext);
-            return;
-        case ':': // Disk specifier
-        case '\\':
-            p  = 0;
-            ef = 0; // Directory specifier
-            continue;
-        case '.': // Extension specifier
-            p  = file;
-            ef = 255;
-        }
-}
 
-char help[] = { "DMK-2-IMageDisk " VERSION " / " __DATE__ "\n"
-                "Copyright 2007-" CYEAR " Dave Dunfield - All rights reserved.\n"
-                "Windows port " GIT_VERSION " -- Mark Ogden " GIT_YEAR "\n\n"
-                "Use: DMK2IMD filename[.DMK] [options]\n\n"
-                "Opts:	/C[filename]	- insert Comment record\n"
-                "	/H		- force High density	(500kbps)\n"
-                "	/L		- force Low  density	(250kbps)\n"
-                "	/S		- force Single-density image\n"
-                "	/UD		- allow User defined DAM - treat as Deleted\n"
-                "	/UN		- allow User defined DAM - treat as Normal\n"
-                "	/W		- continue after Warning\n"
-                "	O=file[.IMD]	- specify output file		[filename.IMD]\n" };
+char const help[] = { "Usage: %s filename[.dmk] [options]\n\n"
+                "Options:\n"
+                "  /C[filename]    - insert Comment record\n"
+                "  /H              - force High density    (500kbps)\n"
+                "  /L              - force Low  density    (250kbps)\n"
+                "  /S              - force Single-density image\n"
+                "  /UD             - allow User defined DAM - treat as Deleted\n"
+                "  /UN             - allow User defined DAM - treat as Normal\n"
+                "  /W              - continue after Warning\n"
+                "  O=file[.imd]    - specify output file   [filename.imd]\n" };
 
 /*
  * Main program
  */
-main(int argc, char *argv[]) {
+// modified handling of options to support 2 char values portably
+#define OPT(a, b) (((a) << 8) | (b))
+enum {
+    OPTsC = OPT('/', 'C'),
+    OPTsL = OPT('/', 'L'),
+    OPTsH = OPT('/', 'H'),
+    OPTsS = OPT('/', 'S'),
+    OPTsW = OPT('/', 'W'),
+    OPTsU = OPT('/', 'U'),
+    OPTOe = OPT('O', '='),
+};
+
+int main(int argc, char *argv[]) {
     int c;
     unsigned short i, j, k, s, t, p, so;
 
-    // Process command line arguments
+    chkStdOptions(argc, argv);
+
+    // Process command line arguments modified for portability
     for (i = 1; i < argc; ++i) {
-        ptr = argv[i];
-        switch ((toupper(*ptr++) << 8) | toupper(*ptr++)) {
-        case '/C':
+        ptr      = argv[i];
+        char ch1 = toupper(*ptr++); // avoid sequence point risk
+        char ch2 = toupper(*ptr++);
+
+        switch (OPT(ch1, ch2)) {
+        case OPTsC:
             Comment = ptr;
             continue;
-        case '/L':
+        case OPTsL:
             Datarate = 2;
             continue;
-        case '/H':
+        case OPTsH:
             Datarate = 0;
             continue;
-        case '/S':
+        case OPTsS:
             ForceSD = 255;
             continue;
-        case '/W':
+        case OPTsW:
             Wstop = 0;
             continue;
-        case 'O=':
-            Wfile = ptr;
+        case OPTOe:
+            Wfile = makeFilename(ptr, ".imd", false);
             continue;
-        case '/U':
+        case OPTsU:
             switch (toupper(*ptr)) {
             case 'N':
                 Udam = 255;
@@ -290,39 +242,43 @@ main(int argc, char *argv[]) {
             }
         }
         if (File)
-            error(help); // help doesn't include %
+            usage("Multiple files specified");
         File = ptr - 2;
     }
 
     if (!File)
-        error(help); // help doesn't include %
+        usage("No file specified");
 
     // If comment file specified, preload it into buffer
     j = k = 0;
     if (Comment && *Comment) {
         if ((fpi = fopen(Comment, "rt")) == NULL)
-            error("can't open %s\n", Comment);
-        while ((c = getc(fpi)) != EOF)
-            byteStream[j++] = c;
+            fatal("can't open %s\n", Comment);
+        while ((c = getc(fpi)) != EOF) {
+            if (c == '\n')
+                byteStream[j++] = '\r';
+            if (c != '\r')
+                byteStream[j++] = c;
+        }
         fclose(fpi);
     }
 
-    //	IOB_size = 4096;
+    //  IOB_size = 4096;
 
     // Open files
-    filename(File, ".DMK", 255);
-    if ((fpi = fopen(Smap, "rb")) == NULL)
-        error("can't open %s\n", Smap);
-    filename(Wfile ? Wfile : File, ".IMD", 0);
-    if ((fpo = fopen(Smap, "wb")) == NULL)
-        error("can't create %s\n", Smap);
+    char *dmkFile = makeFilename(File, ".dmk", false);
+    if ((fpi = fopen(dmkFile, "rb")) == NULL)
+        fatal("can't open %s\n", dmkFile);
+    if (!Wfile)
+        Wfile = makeFilename(File, ".imd", true);
+    if ((fpo = fopen(Wfile, "wb")) == NULL)
+        fatal("can't create %s\n", Wfile);
 
     // Read header
     if (fread(&Dheader, sizeof(Dheader), 1, fpi) != 1) {
-        filename(File, ".DMK", 255);
-        error("can't read header from %s\n", Smap);
+        fatal("can't read header from %s\n", dmkFile);
     }
-    if (!IS_LITTLE_ENDIAN) {    // on big endian we need to fix the shorts
+    if (!IS_LITTLE_ENDIAN) { // on big endian we need to fix the shorts
         Dheader.Tsize = (Dheader.Tsize << 8) + (Dheader.Tsize >> 8);
         // current Natflag isn't used so no need to fix
     }
@@ -337,13 +293,22 @@ main(int argc, char *argv[]) {
         if (j) { // Already preloaded
             for (i = 0; i < j; ++i)
                 putc(k = byteStream[i], fpo);
+            if (k == '\r')
+                putc(k = '\n', fpo);
         } else { // Prompt for input
             printf("Enter image file comment - ^Z to end:\n");
-            while ((i = getc(stdin)) != EOF)
+            int c;
+
+            while ((c = getc(stdin)) != EOF) {
+                if (c == '\n')
+                    putc('\r', fpo);
                 putc(k = i, fpo);
+            }
         }
-        if (k != '\n')
+        if (k != '\n') {
+            putc('\r', fpo);
             putc('\n', fpo);
+        }
     }
     putc(0x1A, fpo); // Ascii EOF - terminate comment
 
@@ -373,10 +338,10 @@ main(int argc, char *argv[]) {
 
     for (t = 0; t < Dheader.Tracks; ++t) {
         if (fread(byteStream, 1, Dheader.Tsize, fpi) != Dheader.Tsize)
-                error("%u/ Unexpected EOF in DMK image", t);
+            fatal("%u/ Unexpected EOF in DMK image", t);
 
         Nsec = so = 0;
-        /* some dmk files have incorrect IDAM offsets, probably due to a bad conversion program 
+        /* some dmk files have incorrect IDAM offsets, probably due to a bad conversion program
            if the first IDAM offset doesn't point to an 0xFE, then look for the first 0XFE and
            calculate a bias to remove from the specified IDAM to fix the entries
         */
@@ -388,17 +353,17 @@ main(int argc, char *argv[]) {
                     break;
             }
             if (i < 512)
-                bias = s - i;       
+                bias = s - i;
         }
         while ((Nsec < 64) && (s = rdStreamWord(so))) { // fix there are only up to 64 IDAMs
             so += 2;
-            if (SDmap[Nsec] = SD2 = SD = (s & 0x8000) ? 0 : 255) { // SD
-                if (Dheader.Dflags & 0xC0)                         // Physical format is SD
+            if ((SDmap[Nsec] = SD2 = SD = (s & 0x8000) ? 0 : 255)) { // SD
+                if (Dheader.Dflags & 0xC0)                           // Physical format is SD
                     SD2 = 0;
-            }                         // No need to emulate
-            P = p = (s & 0x3FFF) - bias;       // DMK address mark offset
-            if (p == 128 || p == 0) { // should end in 0 but examples exist with offset 128 used
-                break;                // No more sectors
+            }                            // No need to emulate
+            P = p = (s & 0x3FFF) - bias; // DMK address mark offset
+            if (p == 128 || p == 0) {    // should end in 0 but examples exist with offset 128 used
+                break;                   // No more sectors
             }
             if ((p < 128) || (p >= Dheader.Tsize)) {
                 warn("%u/%u Sector offset %04x out of range", t, Nsec, p);
@@ -417,14 +382,14 @@ main(int argc, char *argv[]) {
             } // NoSector
 
             // Extract ID fields
-            P = p;                      // Reset input pointer
-            getbyte();                  // Skip address mark
-            Cmap[Nsec] = getbyte();     // Get Cylinder
-            Hmap[Nsec] = getbyte();     // Get Head
-            Nmap[Nsec] = getbyte();     // Get Number
-            Smap[Nsec] = getbyte(); // Get Size
-            STmap[Nsec]    = 1;         // Assume normal data
-            getword();                  // Clear CRC
+            P = p;                   // Reset input pointer
+            getbyte();               // Skip address mark
+            Cmap[Nsec]  = getbyte(); // Get Cylinder
+            Hmap[Nsec]  = getbyte(); // Get Head
+            Nmap[Nsec]  = getbyte(); // Get Number
+            Smap[Nsec]  = getbyte(); // Get Size
+            STmap[Nsec] = 1;         // Assume normal data
+            getword();               // Clear CRC
 
             // Validate data block
             k = 50;
@@ -439,11 +404,13 @@ main(int argc, char *argv[]) {
                 case 0xF9: // User defined ...
                 case 0xFA: // Data marks
                     if (!Udam)
-                        error("%u/%u User defined DAM %02x", t, Nsec, i);
+                        fatal("%u/%u User defined DAM %02x", t, Nsec, i);
                     if (Udam & 0xF0)
                         break;
+                    // FALLTHROUGH
                 case 0xF8:
                     STmap[Nsec] = 3; // Deleted data mark
+                    // FALLTHROUGH
                 case 0xFB:
                     break;
                 } // Normal data mark
@@ -465,9 +432,9 @@ main(int argc, char *argv[]) {
 
         // Check conditions IMD cannot currently handle (due to 765 limitation)
         if (!issame(SDmap, Nsec))
-            error("%u/%u PC cannot format mixed density within a track", t, Nsec);
+            fatal("%u/%u PC cannot format mixed density within a track", t, Nsec);
         if (!issame(Smap, Nsec))
-            error("%u/%u PC cannot format mixed sector size within a track", t, Nsec);
+            fatal("%u/%u PC cannot format mixed sector size within a track", t, Nsec);
 
         // Generate an IMD track record
         putc((SD ? 0x00 : 0x03) + Datarate, fpo); // Encoding type
