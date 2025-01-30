@@ -56,8 +56,8 @@ VPATH = $(SRCDIR):$(ROOT)/shared:$(ROOT)/utility
 
 LINKER ?= gcc
 
-all: $(TARGET) | $(INSTALLDIR)
-	cp -p $(TARGET) $(INSTALLDIR)
+all: $(TARGET)
+	install -D -p -t $(INSTALLDIR) $(TARGET)
 
 publish: distclean mkversion 
 	$(MAKE)
@@ -74,11 +74,12 @@ $(INSTALLDIR)/utility.a:
 	$(MAKE) -C $(ROOT)/Linux/utility utility.a
 
 $(SRCDIR)/_version.h: $(INSTALLDIR)/getVersion
-	(cd $(SRCDIR); $(INSTALLDIR)/getVersion -w)
+	$(INSTALLDIR)/getVersion -w $(SRCDIR)
 
+ifndef OWNTARGET
 $(TARGET): $(OBJS) _appinfo.o $(LIBS)
 	$(LINKER) -o $@ $^
-
+endif
 clean:
 	rm -f *.o
 

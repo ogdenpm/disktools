@@ -1,10 +1,11 @@
-TARGET: utility.a
+TARGET = utility.a
 OBJS = file.o getch.o memory.o message.o option.o
+OWNTARGET=Y
 include ../common.mk
 
-utility.a: $(OBJS)
+$(TARGET): $(OBJS)
 	ar rv $@ $(OBJS)
-	cp -p utility.a ../Install
+	install -D -p -t ../Install $(TARGET)
 
 $(OBJS): utility.h
 option.o: verInfo.h
