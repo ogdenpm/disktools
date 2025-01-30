@@ -47,33 +47,36 @@ TODO
     to allow recreation of the original .imd or .img file
 */
 
-
+#include <assert.h>
+#include <ctype.h>
+#include <malloc.h>
+#include <memory.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <memory.h>
-#include <malloc.h>
-#include <stdarg.h>
-#include <assert.h>
 #include <string.h>
-#include <ctype.h>
 #ifdef _MSC_VER
 #include <direct.h>
 #define mkdir(p, mode) _mkdir(p)
 #else
-#include <unistd.h>
 #include <errno.h>
 #include <sys/stat.h>
+#include <unistd.h>
 #endif
-#include <stdarg.h>
-#include <stdint.h>
-#include <stdbool.h>
 #include "unidsk.h"
-#include "showVersion.h"
+#include "utility.h"
+#include <stdarg.h>
+#include <stdbool.h>
+#include <stdint.h>
 
+char const help[] = { "Usage: %s [-l] [-d] file\n"
+                      "Where\n"
+                      "  -l  don't lookup in the repository\n"
+                      "  -d  debug - shows link info\n" };
 
 char targetPath[_MAX_PATH];
 
-bool isDOS = false;     // set to true if ISIS named DOS
+bool isDOS = false; // set to true if ISIS named DOS
 
 isisDir_t isisDir[MAXDIR];
 int dirIdx;
@@ -82,14 +85,14 @@ char comment[MAXCOMMENT];
 
 int diskType;
 FILE *logfp;
-bool showRdError = true;
-int rdErrorCnt = 0;
+bool showRdError   = true;
+int rdErrorCnt     = 0;
 int recoveredFiles = 0;
 
-bool debug = false;
-bool pad = false;
+bool debug         = false;
+bool pad           = false;
 
-#define NIFILES	10
+#define NIFILES 10
 
 typedef struct {
     unsigned char type;
@@ -100,68 +103,66 @@ typedef struct {
 } SECTOR;
 
 typedef struct {
-    unsigned char
-        Mode,				// Data rate/density
-        Cyl,				// Current cylinder
-        Head,				// Current head
-        Nsec;				// Number of sectors
-    unsigned	Size;				// Sector size
-    unsigned char	startSec,			// starting sector
-        Hflag;				// extra bits embedded in Head
-    unsigned char Smap[MAXSECTOR + 1];		// Sector numbering map
-    unsigned char Cmap[MAXSECTOR + 1];		// Cylinder numbering map
-    unsigned char Hmap[MAXSECTOR + 1];		// Head numbering map
-    uint64_t Smissing;      // bit set if sector is missing
-    uint8_t *buf;				// de interlaced track buffer
-} TRACK;	// Sector type flags
+    unsigned char Mode,                // Data rate/density
+        Cyl,                           // Current cylinder
+        Head,                          // Current head
+        Nsec;                          // Number of sectors
+    unsigned Size;                     // Sector size
+    unsigned char startSec,            // starting sector
+        Hflag;                         // extra bits embedded in Head
+    unsigned char Smap[MAXSECTOR + 1]; // Sector numbering map
+    unsigned char Cmap[MAXSECTOR + 1]; // Cylinder numbering map
+    unsigned char Hmap[MAXSECTOR + 1]; // Head numbering map
+    uint64_t Smissing;                 // bit set if sector is missing
+    uint8_t *buf;                      // de interlaced track buffer
+} TRACK;                               // Sector type flags
 
 int maxCylinder;
 
 TRACK *disk[MAXCYLINDER][MAXHEAD];
-uint64_t sectorMissing[MAXCYLINDER][MAXHEAD];        // bit set if sector is missing
+uint64_t sectorMissing[MAXCYLINDER][MAXHEAD]; // bit set if sector is missing
 
 // Mode (data rate) index to value conversion table
 unsigned Mtext[] = { 500, 300, 250 };
 
 // Encoded sector size to actual size conversion table
 unsigned xsize[] = { 128, 256, 512, 1024, 2048, 4096, 8192 };
-uint8_t transferBuf[8192];                      // for imd data is loaded here first incase sector id is bad
+uint8_t transferBuf[8192]; // for imd data is loaded here first incase sector id is bad
 
 // Table for mode translation
 unsigned char Tmode[] = { 0, 1, 2, 3, 4, 5 };
 
-unsigned char
-Fill,
-Dam = 255,			// Deleted address marks
-Bad = 255;			// Convert bad sectors
+unsigned char Fill,
+    Dam   = 255, // Deleted address marks
+    Bad   = 255; // Convert bad sectors
 
 int heads = 1;
 
 #pragma pack(push, 1)
 typedef struct {
-    uint16_t	flags;
-    uint8_t	type;
-    uint8_t	gran;
-    uint16_t	owner;
-    uint32_t	crTime;
-    uint32_t	accessTime;
-    uint32_t	modTime;
-    uint32_t	totalSize;
-    uint32_t	totalBlocks;
+    uint16_t flags;
+    uint8_t type;
+    uint8_t gran;
+    uint16_t owner;
+    uint32_t crTime;
+    uint32_t accessTime;
+    uint32_t modTime;
+    uint32_t totalSize;
+    uint32_t totalBlocks;
     struct {
-        uint16_t	numBlocks;
-        uint8_t	blkPtr[3];
+        uint16_t numBlocks;
+        uint8_t blkPtr[3];
     } ptr[8];
-    uint32_t	thisSize;
-    uint16_t	reserverdA;
-    uint16_t	reserverdB;
-    uint16_t	idCount;
+    uint32_t thisSize;
+    uint16_t reserverdA;
+    uint16_t reserverdB;
+    uint16_t idCount;
     struct {
-        uint8_t	access;
-        uint16_t	id;
+        uint8_t access;
+        uint16_t id;
     } accessor[3];
-    uint16_t	parent;
-    uint8_t	aux[3];
+    uint16_t parent;
+    uint8_t aux[3];
 } fnode_t;
 
 typedef struct {
@@ -192,28 +193,16 @@ struct {
 } ifiles[NIFILES];
 
 /*
-* Display error message and exit
-*/
-_Noreturn void fatal(char *fmt, ...)
-{
-    va_list args;
-    va_start(args, fmt);
-
-    vfprintf(stderr, fmt, args);
-    exit(-1);
-}
-
-/*
  * for Isis Read errors display error message if enabled
  * and keep running count of errors
  */
-void rdError(char *fmt, ...)
-{
-    va_list args;
-    va_start(args, fmt);
-
-    if (showRdError)
+void rdError(char *fmt, ...) {
+    if (showRdError) {
+        va_list args;
+        va_start(args, fmt);
         vfprintf(stderr, fmt, args);
+        va_end(args);
+    }
     rdErrorCnt++;
 }
 
@@ -221,44 +210,39 @@ int volGran, volSize, maxFnode, fnodeStart, fnodeSize, rootFnode;
 /*
  * High - speed test for compressable sector(all bytes same value)
  */
-int issame(unsigned char *buf, int size)
-{
+int issame(unsigned char *buf, int size) {
     for (int i = 1; i < size; i++)
         if (buf[i] != buf[0])
             return 0;
     return 1;
 }
 
-void free_track(TRACK *t)
-{
+void free_track(TRACK *t) {
     if (t->buf)
         free(t->buf);
     free(t);
 }
 
 // detect duplicate tracks which occasionally occurs on 80 track drives reading a 40 track disk
-int tracksSame(TRACK *t1, TRACK *t2)
-{
+int tracksSame(TRACK *t1, TRACK *t2) {
     if (t1->Cyl != t2->Cyl || t1->Head != t2->Head || t1->Nsec != t2->Nsec)
         return 0;
-    return	memcmp(t1->Smap, t2->Smap, t1->Nsec) == 0 &&
-        memcmp(t1->Cmap, t2->Cmap, t1->Nsec) == 0 &&
-        memcmp(t1->Hmap, t2->Hmap, t1->Nsec) == 0 &&
-        memcmp(t1->buf, t2->buf, t1->Nsec * t1->Size) == 0;
+    return memcmp(t1->Smap, t2->Smap, t1->Nsec) == 0 && memcmp(t1->Cmap, t2->Cmap, t1->Nsec) == 0 &&
+           memcmp(t1->Hmap, t2->Hmap, t1->Nsec) == 0 &&
+           memcmp(t1->buf, t2->buf, t1->Nsec * t1->Size) == 0;
 }
 
 /*
-* Load a track from an image into memory
-*/
-TRACK *load_track(FILE *fp)
-{
+ * Load a track from an image into memory
+ */
+TRACK *load_track(FILE *fp) {
     int c, i, m, h, n, s;
     TRACK *t;
 
     if ((m = getc(fp)) == EOF)
         return NULL;
 
-    t = (TRACK *)calloc(1, sizeof(TRACK));
+    t       = (TRACK *)calloc(1, sizeof(TRACK));
     t->Mode = m;
     if ((t->Cyl = getc(fp)) == EOF)
         fatal("EOF at Cylinder");
@@ -303,22 +287,23 @@ TRACK *load_track(FILE *fp)
                 for (int i = 0; i < n; i++)
                     if (t->Cmap[i]) {
                         t->Cmap[0] = t->Cmap[i];
-                        break;     
+                        break;
                     }
-                fprintf(stderr, "WARNING: mixed cylinder head mapping not supported. Mapping all of cylinder %d to %d\n", t->Cyl, t->Cmap[0]);
+                fprintf(stderr,
+                        "WARNING: mixed cylinder head mapping not supported. Mapping all of "
+                        "cylinder %d to %d\n",
+                        t->Cyl, t->Cmap[0]);
             }
             t->Cyl = t->Cmap[0];
             t->Hflag &= 0x7f;
             h &= 0x7f;
-        }
-        else
+        } else
             memset(t->Cmap, t->Cyl, n);
 
         if (h & 0x40) {
             if (fread(t->Hmap, 1, n, fp) != n)
                 fatal("EOF in Head Map");
-        }
-        else
+        } else
             memset(t->Hmap, h, n);
     }
     assert(t != NULL);
@@ -342,7 +327,8 @@ TRACK *load_track(FILE *fp)
             memset(transferBuf, h, s);
         }
         if (c && (t->startSec > t->Smap[i] || t->Smap[i] >= n + t->startSec))
-            fprintf(stderr, "Warning: Track %d/%d - Invalid sector %d\n", t->Cyl, t->Head, t->Smap[i]);
+            fprintf(stderr, "Warning: Track %d/%d - Invalid sector %d\n", t->Cyl, t->Head,
+                    t->Smap[i]);
         else if (c == 1 || c == 2) {
             memcpy(t->buf + s * (t->Smap[i] - t->startSec), transferBuf, s);
             t->Smissing &= ~(1ULL << (t->Smap[i] - t->startSec));
@@ -363,7 +349,7 @@ void load_imd(FILE *fp) {
         if (c == EOF) {
             fprintf(stderr, "EOF in comment\n");
             exit(1);
-        }         else if (c != '\r') {
+        } else if (c != '\r') {
             putchar(c);
             if (i < MAXCOMMENT)
                 comment[i++] = c;
@@ -383,7 +369,7 @@ void load_imd(FILE *fp) {
                 printf("track duplicate %d/%d - info different\n", t->Cyl, t->Head);
             free_track(t);
             continue;
-        }         else
+        } else
             disk[t->Cyl][t->Head] = t;
     }
 
@@ -391,11 +377,20 @@ void load_imd(FILE *fp) {
         diskType = UNKNOWN;
     else
         switch (disk[1][0] ? disk[1][0]->Nsec : disk[2][0]->Nsec) {
-        case 26: diskType = ISIS_SD; break;
-        case 52: diskType = ISIS_DD; break;
-        case 16: diskType = disk[0][0] && disk[0][0]->Size == 256 ? ISIS_DOS : ISIS_PDS; break;
-        case 8: diskType = ISIS_IV; break;
-        default: diskType = UNKNOWN;
+        case 26:
+            diskType = ISIS_SD;
+            break;
+        case 52:
+            diskType = ISIS_DD;
+            break;
+        case 16:
+            diskType = disk[0][0] && disk[0][0]->Size == 256 ? ISIS_DOS : ISIS_PDS;
+            break;
+        case 8:
+            diskType = ISIS_IV;
+            break;
+        default:
+            diskType = UNKNOWN;
         }
 }
 
@@ -409,13 +404,13 @@ struct {
     uint8_t spt;
     int sSize;
 } diskSizes[] = {
-// clang-format off
+    // clang-format off
     { 256256, ISIS_SD, 77, 1, 26, 128, 26, 128 },
     { 512512, ISIS_DD, 77, 1, 52, 128, 52, 128 },
     { 653312, ISIS_PDS, 80, 2, 16, 128, 16, 256 },
     { 327680, ISIS_DOS, 80, 1, 16, 256, 16, 256 }, // requires img in true linear order
     { 653184, ISIS_IV, 80, 2, 15, 128, 8, 512 }    // currently unreliable
-// clang-format on
+    // clang-format on
 };
 #define DISKOPT (sizeof(diskSizes) / sizeof(diskSizes[0]))
 
@@ -439,42 +434,41 @@ void load_img(FILE *fp) {
         exit(1);
     }
     diskType = diskSizes[diskopt].diskType;
-    heads = diskSizes[diskopt].heads;
+    heads    = diskSizes[diskopt].heads;
 
-    spt = diskSizes[diskopt].t0spt;
-    sSize = diskSizes[diskopt].t0SSize;
+    spt      = diskSizes[diskopt].t0spt;
+    sSize    = diskSizes[diskopt].t0SSize;
     for (track = 0; track < diskSizes[diskopt].tracks; track++) {
         for (int head = 0; head < diskSizes[diskopt].heads; head++) {
             if ((t = (TRACK *)calloc(1, sizeof(TRACK))) && (t->buf = malloc(spt * sSize))) {
-                t->Cyl = track;
-                t->Head = head;
-                t->Nsec = spt;
-                t->Size = sSize;
+                t->Cyl      = track;
+                t->Head     = head;
+                t->Nsec     = spt;
+                t->Size     = sSize;
                 t->startSec = 1;
                 if (fread(t->buf, sSize, spt, fp) != spt) {
                     fprintf(stderr, "read error\n");
                     exit(1);
                 }
                 disk[track][head] = t;
-            }
-            else {
+            } else {
                 fprintf(stderr, "out of memory\n");
                 exit(1);
             }
-            sSize = diskSizes[diskopt].sSize;       // rest of disk takes geometry
-            spt = diskSizes[diskopt].spt;
+            sSize = diskSizes[diskopt].sSize; // rest of disk takes geometry
+            spt   = diskSizes[diskopt].spt;
         }
     }
     maxCylinder = diskSizes[diskopt].tracks - 1;
 }
 
-uint8_t *getTS(int track, int sector)
-{
+uint8_t *getTS(int track, int sector) {
     TRACK *p;
     int head = 0;
     int spt;
-    int offset = 0;     // for ISIS-DOS, 256 byte sectors treated as 2x128 byte sectors, offset = 128 for 2nd sector
-    sector--;					// 0 base sector
+    int offset = 0; // for ISIS-DOS, 256 byte sectors treated as 2x128 byte sectors, offset = 128
+                    // for 2nd sector
+    sector--;       // 0 base sector
     if (diskType == ISIS_DOS) {
         offset = (sector % 2 * 128);
         sector /= 2;
@@ -485,19 +479,21 @@ uint8_t *getTS(int track, int sector)
     }
     if (disk[track][0])
         spt = disk[track][0]->Nsec;
-    else if (track != 0 || !disk[track][1] || diskType == UNKNOWN)  // special handling only for track 0 of ISIS_PDS and ISIS_IV disks
+    else if (track != 0 || !disk[track][1] ||
+             diskType == UNKNOWN) // special handling only for track 0 of ISIS_PDS and ISIS_IV disks
         return NULL;
     else
         spt = diskType == ISIS_PDS ? 16 : 15;
-    if (sector >= spt && heads > 0) {      // overflow onto other head ?
+    if (sector >= spt && heads > 0) { // overflow onto other head ?
         head++;
         sector -= spt;
     }
 
-    if (!(p = disk[track][head]))       // sector is still missing track
+    if (!(p = disk[track][head])) // sector is still missing track
         return NULL;
     if (sector >= p->Nsec) {
-        rdError("sector %d > max sector %d for cylinder %d head %d\n", sector + 1, p->Nsec, head, track);
+        rdError("sector %d > max sector %d for cylinder %d head %d\n", sector + 1, p->Nsec, head,
+                track);
         return NULL;
     }
 
@@ -506,49 +502,44 @@ uint8_t *getTS(int track, int sector)
     return p->buf + sector * p->Size + offset;
 }
 
-uint8_t *getBlock(int blk)
-{
+uint8_t *getBlock(int blk) {
     int logicalCylinder, offset;
     int t00cnt, t10cnt;
 
     if (disk[0][0])
         t00cnt = (disk[0][0]->Nsec * disk[0][0]->Size + volGran - 1) / volGran;
-    else	// special handling if t00 is missing
+    else // special handling if t00 is missing
         t00cnt = 4;
     t10cnt = (disk[1][0]->Nsec * disk[1][0]->Size + volGran - 1) / volGran;
 
-    if (blk < t00cnt) {// track 0, head 0
+    if (blk < t00cnt) { // track 0, head 0
         logicalCylinder = 0;
-        offset = (blk * volGran);
-    }
-    else {
-        blk += (t10cnt - t00cnt);	// trick to assume track 0, head 0 is same as others
+        offset          = (blk * volGran);
+    } else {
+        blk += (t10cnt - t00cnt); // trick to assume track 0, head 0 is same as others
         logicalCylinder = blk / t10cnt;
-        offset = blk % t10cnt * volGran;
+        offset          = blk % t10cnt * volGran;
     }
-    if (logicalCylinder / heads <= MAXCYLINDER && disk[logicalCylinder / heads][logicalCylinder % heads])
+    if (logicalCylinder / heads <= MAXCYLINDER &&
+        disk[logicalCylinder / heads][logicalCylinder % heads])
         return disk[logicalCylinder / heads][logicalCylinder % heads]->buf + offset;
     else
         return NULL;
 }
 
-int readWord(uint8_t *p)
-{
+int readWord(uint8_t *p) {
     return p[0] + p[1] * 256;
 }
 
-int readBlockNumber(uint8_t *p)
-{
+int readBlockNumber(uint8_t *p) {
     return p[0] + p[1] * 0x100 + p[2] * 0x10000;
 }
 
-int readDWord(uint8_t *p)
-{
+int readDWord(uint8_t *p) {
     return readWord(p) + readWord(p + 2) * 0x10000;
 }
 
-uint8_t *getFileLoc(fnode_t *fn, unsigned pos)
-{
+uint8_t *getFileLoc(fnode_t *fn, unsigned pos) {
     int i, n;
     uint8_t *p;
 
@@ -569,15 +560,14 @@ uint8_t *getFileLoc(fnode_t *fn, unsigned pos)
         n -= fn->ptr[i].numBlocks;
     if (i == 8)
         return NULL;
-    if (fn->flags & 2) {	// long file
+    if (fn->flags & 2) { // long file
         if ((p = getBlock(readBlockNumber(fn->ptr[i].blkPtr))) == NULL)
             return NULL;
         indirect = (indirect_t *)p;
         while (indirect->nblocks <= n)
             n -= (indirect++)->nblocks;
         p = getBlock(readBlockNumber(indirect->blockNum) + n);
-    }
-    else
+    } else
         p = getBlock(readBlockNumber(fn->ptr[i].blkPtr) + n);
 
     return p + pos % volGran;
@@ -585,11 +575,10 @@ uint8_t *getFileLoc(fnode_t *fn, unsigned pos)
 
 int iRead(int fd, uint8_t *buf, int pos, int count);
 
-int iOpen(int node)
-{
+int iOpen(int node) {
     if (!ifiles[0].inuse) {
         ifiles[0].inuse = 1;
-        ifiles[0].fn = (fnode_t *)getBlock(fnodeStart / volGran);
+        ifiles[0].fn    = (fnode_t *)getBlock(fnodeStart / volGran);
     }
 
     for (int i = 1; i < NIFILES; i++) {
@@ -604,8 +593,7 @@ int iOpen(int node)
     return -1;
 }
 
-int iRead(int fd, uint8_t *buf, int pos, int count)
-{
+int iRead(int fd, uint8_t *buf, int pos, int count) {
     fnode_t *fn;
     int n = 0;
     int delta;
@@ -635,15 +623,13 @@ int iRead(int fd, uint8_t *buf, int pos, int count)
     return n;
 }
 
-void iClose(int fd)
-{
+void iClose(int fd) {
     if (0 <= fd && fd < NIFILES)
         ifiles[fd].inuse = 0;
 }
 
-#define READCHUNK	2048
-void dumpfile(int fd, char *filename)
-{
+#define READCHUNK 2048
+void dumpfile(int fd, char *filename) {
     FILE *fout;
     int cnt;
     int pos = 0;
@@ -665,7 +651,7 @@ void dumpfile(int fd, char *filename)
     fclose(fout);
 }
 
-void dumpdirectory(int directory, char *dirPath)       // note recover not yet implemented
+void dumpdirectory(int directory, char *dirPath) // note recover not yet implemented
 {
     char path[_MAX_PATH];
     fnode_t *fn;
@@ -692,15 +678,34 @@ void dumpdirectory(int directory, char *dirPath)       // note recover not yet i
                 fn = ifiles[fd].fn;
                 fprintf(logfp, "fnode = %d, flags = %02X ", dentry.fnode, fn->flags);
                 switch (fn->type) {
-                case 0: fprintf(logfp, "%s -> fnode file - size %d\n", path, fn->totalSize); break;
-                case 1: fprintf(logfp, "%s -> volume free space map - size %d\n", path, fn->totalSize); break;
-                case 2: fprintf(logfp, "%s -> free nodes map - size %d\n", path, fn->totalSize); break;
-                case 3: fprintf(logfp, "%s -> space accounting file - size %d\n", path, fn->totalSize); break;
-                case 4: fprintf(logfp, "%s -> bad device blocks file - size %d\n", path, fn->totalSize); break;
-                case 6: fprintf(logfp, "%s -> directory file - size %d\n", path, fn->totalSize);  break;
-                case 8: fprintf(logfp, "%s -> data file - size %d\n", path, fn->totalSize); break;
-                case 9: fprintf(logfp, "%s -> volume label file - size %d\n", path, fn->totalSize); break;
-                default: fprintf(logfp, "%s -> unknown file format %d - size %d\n", path, fn->type, fn->totalSize); break;
+                case 0:
+                    fprintf(logfp, "%s -> fnode file - size %d\n", path, fn->totalSize);
+                    break;
+                case 1:
+                    fprintf(logfp, "%s -> volume free space map - size %d\n", path, fn->totalSize);
+                    break;
+                case 2:
+                    fprintf(logfp, "%s -> free nodes map - size %d\n", path, fn->totalSize);
+                    break;
+                case 3:
+                    fprintf(logfp, "%s -> space accounting file - size %d\n", path, fn->totalSize);
+                    break;
+                case 4:
+                    fprintf(logfp, "%s -> bad device blocks file - size %d\n", path, fn->totalSize);
+                    break;
+                case 6:
+                    fprintf(logfp, "%s -> directory file - size %d\n", path, fn->totalSize);
+                    break;
+                case 8:
+                    fprintf(logfp, "%s -> data file - size %d\n", path, fn->totalSize);
+                    break;
+                case 9:
+                    fprintf(logfp, "%s -> volume label file - size %d\n", path, fn->totalSize);
+                    break;
+                default:
+                    fprintf(logfp, "%s -> unknown file format %d - size %d\n", path, fn->type,
+                            fn->totalSize);
+                    break;
                 }
 
                 s = path;
@@ -709,13 +714,11 @@ void dumpdirectory(int directory, char *dirPath)       // note recover not yet i
                 if (fn->type == 6) {
                     if (mkdir(path, 0666) == -1 && errno != EEXIST) {
                         fprintf(stderr, "can't create directory %s\n", path);
-                    }
-                    else {
+                    } else {
                         strcat(path, "/");
                         dumpdirectory(fd, path);
                     }
-                }
-                else
+                } else
                     dumpfile(fd, path);
                 iClose(fd);
             }
@@ -725,10 +728,9 @@ void dumpdirectory(int directory, char *dirPath)       // note recover not yet i
 }
 
 uint8_t fnode0[16] = { 5, 0, 0, 1 };
-int fnode0Loc[] = { 0x30a00, 0x40000, 0 };
+int fnode0Loc[]    = { 0x30a00, 0x40000, 0 };
 
-void isis4()
-{
+void isis4() {
     uint8_t *p;
     int fd;
     //	fnode_t *fn;
@@ -742,14 +744,14 @@ void isis4()
 
     if (disk[0][0] == NULL) {
         fprintf(logfp, "Warning missing ISIS IV volume label sector\n");
-        volGran = disk[1][0]->Size;
-        fnodeSize = 128;	// It may be different on iRMX!!
+        volGran   = disk[1][0]->Size;
+        fnodeSize = 128; // It may be different on iRMX!!
         /* probe for the fnode entry */
         for (probe = fnode0Loc; *probe; probe++) {
             p = getBlock(*probe / volGran);
             if (memcmp(p + *probe % volGran, fnode0, 16) == 0) {
                 fnodeStart = *probe;
-                rootFnode = 0;
+                rootFnode  = 0;
                 for (int i = 2; i < 10; i++) {
                     p = getBlock((*probe + i * fnodeSize) / volGran);
                     if (p[(*probe + i * fnodeSize) % volGran + 2] == 6) {
@@ -768,38 +770,40 @@ void isis4()
             fprintf(stderr, "can't find directory\n");
             return;
         }
-    }
-    else {
+    } else {
         p = disk[0][0]->buf;
         p += 384;
         volGran = readWord(p + 12);
 
         unsigned i;
-        for (i = volGran; i && (i & 1) == 0; i >>= 1)    // vol should be 2^n
+        for (i = volGran; i && (i & 1) == 0; i >>= 1) // vol should be 2^n
             ;
         if (i != 1) {
             fprintf(stderr, "invalid volGran\n");
             return;
         }
         volSize = readDWord(p + 14);
-        if (volSize < 0 || volSize >(160 * 18 * 512)) { // max 1.44Mb diskette
+        if (volSize < 0 || volSize > (160 * 18 * 512)) { // max 1.44Mb diskette
             fprintf(stderr, "invalid volSize\n");
             return;
         }
-        maxFnode = readWord(p + 18);
+        maxFnode   = readWord(p + 18);
         fnodeStart = readDWord(p + 20);
-        fnodeSize = readWord(p + 24);
-        rootFnode = readWord(p + 26);
+        fnodeSize  = readWord(p + 24);
+        rootFnode  = readWord(p + 26);
     }
     printf("Assuming ISIS IV disk\n");
-    fprintf(logfp, "volGran = %d, volSize = %d, maxFnode = %d, fnodeStart = 0x%X, fnodeSize = %d, rootFnode = %d\n", volGran, volSize, maxFnode, fnodeStart, fnodeSize, rootFnode);
+    fprintf(logfp,
+            "volGran = %d, volSize = %d, maxFnode = %d, fnodeStart = 0x%X, fnodeSize = %d, "
+            "rootFnode = %d\n",
+            volGran, volSize, maxFnode, fnodeStart, fnodeSize, rootFnode);
     fd = iOpen(rootFnode);
     dumpdirectory(fd, "");
     iClose(fd);
     dumpfile(0, "__fnodes__");
     fclose(logfp);
 
-    //for (int i = 0; i < maxFnode; i++) {
+    // for (int i = 0; i < maxFnode; i++) {
     //	fn = (fnode_t *)getFnode(i);
     //	printf("fnode %d:\n", i);
     //	printf("\tflags = %04X, type = ", fn->flags);
@@ -814,27 +818,28 @@ void isis4()
     //	default: printf("unknown %d", fn->type); break;
     //	}
     //	printf(", gran = %d, owner = %d\n", fn->gran, fn->owner);
-    //	printf("\tcr$time = %d, access$time = %d, mod$time = %d", fn->crTime, fn->accessTime, fn->modTime);
-    //	printf(", total$size = %d, total$blocks = %d\n", fn->totalSize, fn->totalBlocks);
-    //	for (int j = 0; j < 8; j++) {
-    //		printf("\tptr[%d], num$blocks = %d, blk$ptr = %d\n", j, fn->ptr[j].numBlocks, fn->ptr[j].blkPtr[0] + fn->ptr[j].blkPtr[1] * 256 + fn->ptr[j].blkPtr[2] * 0x10000);
+    //	printf("\tcr$time = %d, access$time = %d, mod$time = %d", fn->crTime, fn->accessTime,
+    //fn->modTime); 	printf(", total$size = %d, total$blocks = %d\n", fn->totalSize,
+    //fn->totalBlocks); 	for (int j = 0; j < 8; j++) { 		printf("\tptr[%d], num$blocks = %d, blk$ptr =
+    //%d\n", j, fn->ptr[j].numBlocks, fn->ptr[j].blkPtr[0] + fn->ptr[j].blkPtr[1] * 256 +
+    //fn->ptr[j].blkPtr[2] * 0x10000);
     //	}
-    //	printf("\tthis$size = %d, reserved$a = %d, reserved$b = %d, id$count = %d\n", fn->thisSize, fn->reserverdA, fn->reserverdB, fn->idCount);
-    //	for (int j = 0; j < 3 && j < fn->idCount; j++)
-    //		printf("\taccessor[%d], access = %02X, id = %d\n", j, fn->accessor[j].access, fn->accessor[j].id);
-    //	printf("\tparent = %d\n", fn->parent);
+    //	printf("\tthis$size = %d, reserved$a = %d, reserved$b = %d, id$count = %d\n", fn->thisSize,
+    //fn->reserverdA, fn->reserverdB, fn->idCount); 	for (int j = 0; j < 3 && j < fn->idCount; j++)
+    //		printf("\taccessor[%d], access = %02X, id = %d\n", j, fn->accessor[j].access,
+    //fn->accessor[j].id); 	printf("\tparent = %d\n", fn->parent);
 
     //}
 }
 
-bool extractFile(dir_t *dptr, int dirSlot)
-{
+bool extractFile(dir_t *dptr, int dirSlot) {
     char filename[16];
     char isisName[11];
     FILE *fout;
     uint8_t *p;
     int blk, blkIdx;
-    isisLinkage_t *links = (isisLinkage_t *)&(dptr->blocks);	// trick to pick next block from directory info
+    isisLinkage_t *links =
+        (isisLinkage_t *)&(dptr->blocks); // trick to pick next block from directory info
     int prevTrk, prevSec;
     int sectorSize = diskType == ISIS_PDS ? 256 : 128;
 
@@ -844,7 +849,7 @@ bool extractFile(dir_t *dptr, int dirSlot)
         sprintf(isisName, "%.6s", dptr->name);
 
     if (!*isisName) {
-        if (dptr->status != 0)  // ignore missing name if deleted file
+        if (dptr->status != 0) // ignore missing name if deleted file
             return true;
         else {
             fprintf(stderr, "Missing file name for ISIS.DIR entry %d\n", dirSlot);
@@ -853,7 +858,7 @@ bool extractFile(dir_t *dptr, int dirSlot)
     }
 
     if (dptr->status != 0)
-        sprintf(filename, "#%d_%s", dirSlot, isisName);          // mark recovered file
+        sprintf(filename, "#%d_%s", dirSlot, isisName); // mark recovered file
     else
         strcpy(filename, isisName);
 
@@ -866,49 +871,60 @@ bool extractFile(dir_t *dptr, int dirSlot)
     }
     prevTrk = prevSec = 0;
 
-    showRdError = dptr->status == 0;
-    rdErrorCnt = 0;
+    showRdError       = dptr->status == 0;
+    rdErrorCnt        = 0;
 
-    if (debug) printf("%s:", filename);
+    if (debug)
+        printf("%s:", filename);
     for (blk = 0; blk < dptr->blocks; blk++) {
         if (blk == dptr->blocks - 1)
             sectorSize = diskType == ISIS_PDS ? dptr->lastblksize + 1 : dptr->lastblksize;
 
         blkIdx = blk % (diskType == ISIS_PDS ? 123 : 62);
-        if (debug && blkIdx && blkIdx % 16 == 0) printf("\n%10c", ' ');
+        if (debug && blkIdx && blkIdx % 16 == 0)
+            printf("\n%10c", ' ');
         if (blkIdx == 0) {
-            if (debug) printf("\n  %02d:%02d -> ", links->next.track, links->next.sector);
+            if (debug)
+                printf("\n  %02d:%02d -> ", links->next.track, links->next.sector);
             isisLinkage_t *curLinks = links;
             if ((links = (isisLinkage_t *)getTS(links->next.track, links->next.sector)) == NULL) {
-                rdError("%s block %d bad linkage block t=%d s=%d\n", isisName, blk, curLinks->next.track, curLinks->next.sector);
+                rdError("%s block %d bad linkage block t=%d s=%d\n", isisName, blk,
+                        curLinks->next.track, curLinks->next.sector);
                 rdErrorCnt++;
                 break;
             }
             if (prevSec != links->prev.sector && prevTrk != links->prev.track) {
-                rdError("%s block %d corrupt linkage block t=%d s=%d\n", isisName, blk, curLinks->next.track, curLinks->next.sector);
+                rdError("%s block %d corrupt linkage block t=%d s=%d\n", isisName, blk,
+                        curLinks->next.track, curLinks->next.sector);
                 rdErrorCnt++;
                 break;
             }
             prevTrk = curLinks->next.track;
             prevSec = curLinks->next.sector;
-            if (debug) printf("(%02d:%02d %02d:%02d)", links->prev.track, links->prev.sector, links->next.track, links->next.sector);
-       }
-        if (debug) printf(" %02d:%02d", links->pointers[blkIdx].track, links->pointers[blkIdx].sector);
-        if (links->pointers[blkIdx].sector == 0 || (p = getTS(links->pointers[blkIdx].track, links->pointers[blkIdx].sector)) == NULL) {
-            rdError("%s block %d missing t=%d s=%d\n", filename, blk, links->pointers[blkIdx].track, links->pointers[blkIdx].sector);
+            if (debug)
+                printf("(%02d:%02d %02d:%02d)", links->prev.track, links->prev.sector,
+                       links->next.track, links->next.sector);
+        }
+        if (debug)
+            printf(" %02d:%02d", links->pointers[blkIdx].track, links->pointers[blkIdx].sector);
+        if (links->pointers[blkIdx].sector == 0 ||
+            (p = getTS(links->pointers[blkIdx].track, links->pointers[blkIdx].sector)) == NULL) {
+            rdError("%s block %d missing t=%d s=%d\n", filename, blk, links->pointers[blkIdx].track,
+                    links->pointers[blkIdx].sector);
             rdErrorCnt++;
 
             for (int i = 0; i < sectorSize; i++)
                 putc(0xc7, fout);
-        }
-        else
+        } else
             fwrite(p, 1, sectorSize, fout);
     }
     if (debug && blk != 0) {
-        while (++blkIdx < (diskType == ISIS_PDS ? 123 : 62) && (links->pointers[blkIdx].track || links->pointers[blkIdx].sector))
+        while (++blkIdx < (diskType == ISIS_PDS ? 123 : 62) &&
+               (links->pointers[blkIdx].track || links->pointers[blkIdx].sector))
             printf(" [%02d:%02d]", links->pointers[blkIdx].track, links->pointers[blkIdx].sector);
     }
-    if (debug) putchar('\n');
+    if (debug)
+        putchar('\n');
 
     fclose(fout);
     // update the recipe info
@@ -916,17 +932,19 @@ bool extractFile(dir_t *dptr, int dirSlot)
     strcat(isisDir[dirIdx].name, isisName);
     strcpy(isisDir[dirIdx].fname, filename);
     if (dptr->blocks)
-        isisDir[dirIdx].dirLen = (dptr->blocks - 1) * (diskType == ISIS_PDS ? 256 : 128) + sectorSize;
+        isisDir[dirIdx].dirLen =
+            (dptr->blocks - 1) * (diskType == ISIS_PDS ? 256 : 128) + sectorSize;
     else
         isisDir[dirIdx].dirLen = -dptr->lastblksize;
     int size = isisDir[dirIdx].actLen = getFileKey(filename, isisDir[dirIdx].key);
-    isisDir[dirIdx].attrib = dptr->attributes;
-    isisDir[dirIdx].errors = rdErrorCnt;
-    if (osIdx < 0 && dptr->status == 0 && (strcmp(isisName, "ISIS.BIN") == 0 || strcmp(isisName, "ISIS.PDS") == 0))
+    isisDir[dirIdx].attrib            = dptr->attributes;
+    isisDir[dirIdx].errors            = rdErrorCnt;
+    if (osIdx < 0 && dptr->status == 0 &&
+        (strcmp(isisName, "ISIS.BIN") == 0 || strcmp(isisName, "ISIS.PDS") == 0))
         osIdx = dirIdx;
 
     dirIdx++;
-    if (dptr->status != 0) {         // deleted file
+    if (dptr->status != 0) { // deleted file
         if (rdErrorCnt || size == 0)
             unlink(filename);
         else
@@ -936,18 +954,16 @@ bool extractFile(dir_t *dptr, int dirSlot)
     return rdErrorCnt == 0;
 }
 
-bool isis2_3(dir_t *dptr)
-{
+bool isis2_3(dir_t *dptr) {
     FILE *fp;
     dir_t dentry;
     int dirSlot;
-    bool ok = true;
+    bool ok        = true;
     char *isisName = isDOS ? "DOS.DIR" : "ISIS.DIR";
-
 
     printf("Looks like an ISIS %s disk\n", diskType == ISIS_PDS ? "PDS" : "I / II / III");
 
-    ok &= extractFile(dptr, 0);		// get the ISIS.DIR file, leaves filename in targetPath
+    ok &= extractFile(dptr, 0); // get the ISIS.DIR file, leaves filename in targetPath
     /* although processing of the header file could be done here
        it is simpler to re-read the ISIS.DIR file that has just been saved
     */
@@ -985,20 +1001,6 @@ uint8_t *chkIsisDir(uint8_t *p) {
     return NULL;
 }
 
-
-char const *basename(char const *path) {
-    char *s;
-#ifdef _WIN32
-    if (path[0] && path[1] == ':') // skip leading device
-        path += 2;
-#endif
-    while ((s = strpbrk(path, DIRSEP))) // skip all directory components
-        path = s + 1;
-    return path;
-}
-
-
-
 int main(int argc, char **argv) {
     uint8_t *p;
     FILE *fp;
@@ -1006,42 +1008,32 @@ int main(int argc, char **argv) {
     bool local = false;
     bool ok;
 
-    CHK_SHOW_VERSION(argc, argv);
-    
-    while (argc > 2) {
-        if (stricmp(argv[1], "-l") == 0)
+    while (getopt(argc, argv, "ld") != EOF) {
+        if (optopt == 'l')
             local = true;
-        else if (stricmp(argv[1], "-d") == 0)
+        else if (optopt == 'd')
             debug = true;
-        else
-            break;
-        argv++;
-        argc--;
     }
 
+    if (optind >= argc)
+        usage("Missing file to process");
 
-    if (argc != 2 || (fp = fopen(*++argv, "rb")) == NULL) {
-        fprintf(stderr,
-            "unidsk - extract files from ISIS disks in img or imd format\n\n"
-            "usage: unidsk [-v] | [-V] | [-l] [-d] file\n"
-            "-v/-V   show version information and exit\n"
-            "-l      don't lookup in the repository\n"
-            "-d      debug - shows link info\n");
-        exit(1);
-    }
+    if (optind < argc - 1)
+        warn("Ignoring files after %s", argv[optind]);
+
+    if ((fp = fopen(argv[optind], "rb")) == NULL)
+        fatal("Cannot open %s", argv[optind]);
 
     if (!local)
         openDb();
 
-    strcpy(targetPath, *argv);
+    strcpy(targetPath, argv[optind]);
     char const *fileName = basename(targetPath);
-    char *ext      = strrchr(fileName, '.');
+    char *ext            = strrchr(fileName, '.');
     if (ext && stricmp(ext, ".imd") == 0)
         load_imd(fp);
-    else if (ext && (stricmp(ext, ".img") == 0 || stricmp(ext, ".bin") == 0))
-        load_img(fp);
     else
-        fatal("Expecting .img, .bin or .imd extension\n");
+        load_img(fp);
     fclose(fp);
     isDOS = diskType == ISIS_DOS;
 
@@ -1054,15 +1046,14 @@ int main(int argc, char **argv) {
     // because there are example disks (i.e. I have seen one) where ISIS.DIR is not in
     // the correct place, look through 4 entries to see if it exists
 
-    if ((p = getTS(1, 2)) && (p = chkIsisDir(p))) {                         // ISIS-II
+    if ((p = getTS(1, 2)) && (p = chkIsisDir(p))) { // ISIS-II
         ok = isis2_3((dir_t *)p);
         mkRecipe(basename(*argv), isisDir, comment, diskType, ok);
-    } else if ((p = getTS(0x27, 2)) && (p = chkIsisDir(p))) {               // ISIS-PDS
+    } else if ((p = getTS(0x27, 2)) && (p = chkIsisDir(p))) { // ISIS-PDS
         ok = isis2_3((dir_t *)p);
         mkRecipe(basename(*argv), isisDir, comment, diskType, ok);
-    } else 
+    } else
         isis4();
     if (!local)
         closeDb();
-
 }

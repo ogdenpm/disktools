@@ -26,6 +26,7 @@
 #include <stdbool.h>
 #include <ctype.h>
 #include "unidsk.h"
+#include "utility.h"
 
 
 typedef unsigned char uint8_t;
@@ -42,24 +43,11 @@ typedef struct _loc {           // cut down version from irepo as don't hash on 
 } loc_t;
 
 
-
-
-const char *fileName(const char *loc) {
-    const char *s = strrchr(loc, '/');
-    if (s)
-        loc = s + 1;
-    if ((s = strrchr(loc, '\\')))
-        return s + 1;
-    return loc;
-}
-
-
-
 // return the ISIS compatible prefix of the filename part of the loc path
 // i.e. upto 6.3 alphanumeric name, coverted to uppercase
 char *mkIname(const char *loc) {
     static char iname[11];
-    loc = fileName(loc);
+    loc = basename(loc);
     char *s = iname;
 
     for (int i = 0; i < 6 && isalnum(*loc);)
@@ -81,7 +69,7 @@ int cmpIname(const char *loc, const char *iname) {
     const char *fname = mkIname(loc);
 
     if (stricmp(iname, fname) == 0)
-        return (int)(strlen(fileName(loc)) - strlen(iname) + 1);
+        return (int)(strlen(basename(loc)) - strlen(iname) + 1);
     return 0;
 }
 
@@ -104,7 +92,7 @@ char *findMatch(const KeyPtr key, const char *iname) {
     while (loc) {
         int cmp;
         if (!iname)
-            cmp = (int)strlen(fileName(loc));
+            cmp = (int)strlen(basename(loc));
         else if ((cmp = cmpIname(loc, iname)) == 1)
             return loc;
 

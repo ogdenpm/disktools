@@ -1,3 +1,3 @@
 #define APP_NAME        "unidsk"
-#define APP_PRODUCT     "unidsk"
-#define APP_DESCRIPTION "Extract files from ISIS disk image"
+#define APP_DESCRIPTION "extract files from ISIS disks in imd or binary format"
+
