@@ -8,15 +8,19 @@
  ****************************************************************************/
 
 // static version information
-// overrides are in _appinfo.h in the source directory
+// provides opportunity to set common APP_xxx
 #ifndef _APPINFO_H_
 #define _APPINFO_H_
 #include <_appinfo.h>
+
+// common defaults if not specified
 #ifndef APP_PRODUCT
 #define APP_PRODUCT APP_NAME
 #endif
 #ifndef APP_OWNER
 #define APP_OWNER "Mark Ogden"
 #endif
-#define APP_EMAIL "support@mark-ogden.uk"
+#ifndef APP_EMAIL
+#define APP_EMAIL "mark@mark-ogden.uk"
+#endif
 #endif
