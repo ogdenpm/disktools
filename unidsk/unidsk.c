@@ -61,13 +61,14 @@ TODO
 #else
 #include <errno.h>
 #include <sys/stat.h>
-#include <unistd.h>
+int unlink(const char *pathname);   // unistd.h conflicts with my getopt
+int chdir(const char *path);
 #endif
 #include "unidsk.h"
 #include "utility.h"
-#include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
+
 
 char const help[] = { "Usage: %s [-l] [-d] file\n"
                       "Where\n"
@@ -244,18 +245,21 @@ TRACK *load_track(FILE *fp) {
 
     t       = (TRACK *)calloc(1, sizeof(TRACK));
     t->Mode = m;
-    if ((t->Cyl = getc(fp)) == EOF)
+    if ((c = getc(fp)) == EOF)
         fatal("EOF at Cylinder");
+    t->Cyl = c;
     if ((h = getc(fp)) == EOF)
         fatal("EOF at Head");
     t->Head = h & 0x0F;
     if (t->Head == 1)
         heads = 2;
     t->Hflag = (h & 0xF0);
-    if ((t->Nsec = n = getc(fp)) == EOF)
+    if ((n = getc(fp)) == EOF)
         fatal("EOF at Nsec");
-    if ((t->Size = s = getc(fp)) == EOF)
+    t->Nsec = n;
+    if ((s = getc(fp)) == EOF)
         fatal("EOF at Size");
+    t->Size = s;
     if (t->Cyl >= MAXCYLINDER)
         fatal("Cylinder value %d out of range 0-%d\n", t->Cyl, MAXCYLINDER - 1);
 
@@ -273,7 +277,7 @@ TRACK *load_track(FILE *fp) {
     t->Size = s = xsize[s];
 
     if (n) {
-        if (fread(t->Smap, 1, n, fp) != n)
+        if ((int)fread(t->Smap, 1, n, fp) != n)
             fatal("EOF in Sector Map");
         t->startSec = 255;
         for (i = 0; i < n; i++)
@@ -281,7 +285,7 @@ TRACK *load_track(FILE *fp) {
                 t->startSec = t->Smap[i];
 
         if (h & 0x80) {
-            if (fread(t->Cmap, 1, n, fp) != n)
+            if ((int)fread(t->Cmap, 1, n, fp) != n)
                 fatal("EOF in Cylinder Map");
             if (!issame(t->Cmap, n)) {
                 for (int i = 0; i < n; i++)
@@ -301,7 +305,7 @@ TRACK *load_track(FILE *fp) {
             memset(t->Cmap, t->Cyl, n);
 
         if (h & 0x40) {
-            if (fread(t->Hmap, 1, n, fp) != n)
+            if ((int)fread(t->Hmap, 1, n, fp) != n)
                 fatal("EOF in Head Map");
         } else
             memset(t->Hmap, h, n);
@@ -319,7 +323,7 @@ TRACK *load_track(FILE *fp) {
             fatal("EOF at sector %d/%d flag", i, t->Smap[i]);
 
         if (c & 1) {
-            if (fread(transferBuf, 1, s, fp) != s)
+            if ((int)fread(transferBuf, 1, s, fp) != s)
                 fatal("EOF in sector %d/%d data", i, t->Smap[i]);
         } else if (c) {
             if ((h = getc(fp)) == EOF)
@@ -412,7 +416,7 @@ struct {
     { 653184, ISIS_IV, 80, 2, 15, 128, 8, 512 }    // currently unreliable
     // clang-format on
 };
-#define DISKOPT (sizeof(diskSizes) / sizeof(diskSizes[0]))
+#define DISKOPT (int)(sizeof(diskSizes) / sizeof(diskSizes[0]))
 
 void load_img(FILE *fp) {
     long fileSize;
@@ -446,7 +450,7 @@ void load_img(FILE *fp) {
                 t->Nsec     = spt;
                 t->Size     = sSize;
                 t->startSec = 1;
-                if (fread(t->buf, sSize, spt, fp) != spt) {
+                if ((int)fread(t->buf, sSize, spt, fp) != spt) {
                     fprintf(stderr, "read error\n");
                     exit(1);
                 }

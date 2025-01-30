@@ -167,7 +167,7 @@ const char *getDbLoc(const char *loc) {
     return lp ? lp->loc : NULL;
 }
 
-const KeyPtr getDbLocKey(const char *loc) {
+KeyPtr getDbLocKey(const char *loc) {
     loc_t *lp = lookupLoc(loc);
     return lp ? lp->pKey->key : NULL;
 }

@@ -33,7 +33,7 @@ char *firstLoc(KeyPtr key);
 
 int getFileKey(const char *fname, KeyPtr key);
 const char *getDbLoc(const char *loc);
-const KeyPtr getDbLocKey(const char *loc);
+KeyPtr getDbLocKey(const char *loc);
 bool isDir(const char *fname);
 bool isFile(const char *fname);
 bool isValidKey(const KeyPtr key);
