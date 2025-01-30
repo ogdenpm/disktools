@@ -1,6 +1,6 @@
 SHELL=bash
 .PHONY: clean distclean install rebuild
-DIRS = mkidsk unidsk
+DIRS = mkidsk unidsk bin2imd dmk2imd td02imx
 all:
 	@for f in $(DIRS); do $(MAKE) -C $$f || exit 1; done;
 
