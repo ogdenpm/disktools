@@ -30,7 +30,7 @@
 
 // decoders.c
 void assumeIMD();
-bool flux2Track(char *usrfmt);
+bool flux2Track(char const *usrfmt);
 bool noIMD();
 
 // display.c
@@ -42,7 +42,7 @@ void displayHist(int levels);
 
 // writeImage.c
 void writeImdFile(const char *fname);
-void analyse(char *opt);
+void analyse(char const *opt);
 
 typedef struct {
     int cyl;

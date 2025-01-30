@@ -20,7 +20,6 @@
  ****************************************************************************/
 
 
-#define _CRT_SECURE_NO_WARNINGS
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -44,7 +43,7 @@ unsigned flip32(unsigned n) {
     return result;
 }
 
-void analyse(char *opt) {
+void analyse(char const *opt) {
     char afmt[16] = "\x80";         // prepend a 0x80 to avoid conflict with normal formats
     strncat(afmt, opt, 14);
     setFormat(afmt);

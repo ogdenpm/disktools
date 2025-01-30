@@ -318,7 +318,7 @@ static void hs8GetTrack(int cylinder, int side) {
     finaliseTrack();
 }
 
-static void ssGetTrack(int cylinder, int side, char *usrfmt) {
+static void ssGetTrack(int cylinder, int side, char const *usrfmt) {
 
     unsigned matchType;
     int result;
@@ -443,7 +443,7 @@ static void ssGetTrack(int cylinder, int side, char *usrfmt) {
     finaliseTrack();
 }
 
-bool flux2Track(char *usrfmt) {
+bool flux2Track(char const *usrfmt) {
     char *fmt = NULL;
     int maxSlot = 0;
     int hs;

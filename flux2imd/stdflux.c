@@ -147,7 +147,7 @@ void endFlux() {
     
     // work out the most likely cell width by looking for the largest value of
     // count of pulse width + pulse width * 2
-    int32_t largestCnt = 0;
+    uint32_t largestCnt = 0;
     for (int i = 1; i < PULSECNTS / 2; i++)
         if (sfPulseCnt[i] + sfPulseCnt[i * 2] > largestCnt) {
             largestCnt = sfPulseCnt[i] + sfPulseCnt[i * 2];

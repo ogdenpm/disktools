@@ -24,7 +24,6 @@
 
 // PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
 
-#define _CRT_SECURE_NO_WARNINGS
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -34,6 +33,8 @@
 #include <memory.h>
 #include <string.h>
 #include <ctype.h>
+#include <stdarg.h>
+
 #include "flux.h"
 #include "flux2imd.h"
 #include "trackManager.h"
@@ -41,19 +42,36 @@
 #include "zip.h"
 #include "container.h"
 #include "stdflux.h"
+#include "utility.h"
 
-void showVersion(FILE *fp, bool full);
 
-_declspec(noreturn) void usage();
-void writeImdFile(const char* fname);
+void writeImdFile(const char *fname);
 
 
 
 static int histLevels = 0;
 static int options;
-static char *userfmt;       // user specified format
-static char *aopt;          // user specified analysis format
+static char const *userfmt;       // user specified format
+static char const *aopt;          // user specified analysis format
 
+char const help[] =
+    "usage: %s [-b] [-d [=n]] [-f format] [-g] [-h [=n]] [-p] [-s] [zipfile|rawfile]+\n"
+    "options can be in any order before the first file name\n"
+    //"  -a encoding - undocumented option to help analyse new disk formats\n"
+    "  -b      write bad (idam or data) sectors to the log file\n"
+    "  -d [=n] sets debug flags to n (n is in hex) default is 1 which echos log to console\n"
+    "  -f fmt  forces the specified format, use -f help for more info\n"
+    "  -g      write good (idam and data) sectors to the log file\n"
+    "  -h [=n] displays flux histogram. n is optional number of levels\n"
+    "  -p      ignores parity bit in sector dump ascii display\n"
+    "  -s      force writing of physical sector order in the log file\n"
+    "Note ZDS disks and rawfiles force -g as image files are not created\n"
+#ifdef _DEBUG
+    "\nDebug options - add the hex values:\n"
+    "  01 -> echo    02 -> flux     04 -> detect    08 -> pattern\n"
+    "  10 -> AM      20 -> decode   40 -> no Opt    80 -> tracker\n"
+#endif
+    ;
 
 
 static void decodeFile(const char *name) {
@@ -83,44 +101,14 @@ static void decodeFile(const char *name) {
 
 
 
-static _declspec(noreturn) void usage() {
-    fprintf(stderr,
-        "flux2imd - convert fluxfiles to imd format (c) Mark Ogden 15-Jul-2020\n\n"
-        "usage: flux2imd -v|-V | [-b] [-d[n]] [-f format] [-g] [-h[n]] [-p] [-s] [zipfile|rawfile]+\n"
-        "options can be in any order before the first file name\n"
-//      "  -a encoding - undocumented option to help analyse new disk formats\n"
-        "  -v|-V  show version information and exit. Must be only option\n"
-        "  -b     will write bad (idam or data) sectors to the log file\n"
-        "  -d     sets debug flags to n (n is in hex) default is 1 which echos log to console\n"
-        "  -f     forces the specified format, use -f help for more info\n"
-        "  -g     will write good (idam and data) sectors to the log file\n"
-        "  -h     displays flux histogram. n is optional number of levels\n"
-        "  -p     ignores parity bit in sector dump ascii display\n"
-        "  -s     force writing of physical sector order in the log file\n"
-        "Note ZDS disks and rawfiles force -g as image files are not created\n"
-#ifdef _DEBUG
-        "\nDebug options - add the hex values:\n"
-        "  01 -> echo    02 -> flux     04 -> detect    08 -> pattern\n"
-        "  10 -> AM      20 -> decode   40 -> no Opt    80 -> tracker\n"
-#endif
-
-    );
-    exit(1);
-}
-
 
 int main(int argc, char** argv) {
-    int arg;
-    char optCh;
+    char *endPtr;
 
     createLogFile(NULL);
 
-    if (argc == 2 && _stricmp(argv[1], "-v") == 0) {
-        showVersion(stdout, argv[1][1] == 'V');
-        exit(0);
-    }
-    for (arg = 1; arg < argc && sscanf(argv[arg], "-%c", &optCh) == 1; arg++) {
-        switch (tolower(optCh)) {
+    while (getopt(argc, argv, "a:bd=f:gh=ps") != EOF) {
+        switch (optopt) {
         case 'g':
             options |= gOpt;
             break;
@@ -131,65 +119,47 @@ int main(int argc, char** argv) {
             options |= sOpt;
             break;
         case 'd':
-            if (argv[arg][2]) {
-                if (sscanf(argv[arg] + 2, "%x", &debug) != 1)
+            if (optarg) {
+                debug = (unsigned)strtoul(optarg, &endPtr, 16);
+                if (*endPtr) {
+                    warn("Invalid hex value '%s' for -d option", optarg);
                     debug = D_ECHO;
-            } else if (arg + 1 < argc && isxdigit(argv[arg + 1][0]) && sscanf(argv[arg + 1], "%x%c", &debug, &optCh) == 1)
-                arg++;
-             else
-                 debug = D_ECHO;;
+                }
+            } else
+                debug = D_ECHO;
             break;
         case 'h':
-            if (argv[arg][2]) {
-                if (sscanf(argv[arg] + 2, "%d", &histLevels) != 1)
+            if (optarg) {
+                histLevels = (unsigned)strtoul(optarg, &endPtr, 10);
+                if (*endPtr)
+                    warn("Invalid numeric value '%s' for -h  option", optarg);
+                if (histLevels <= 5)
                     histLevels = 10;
-            } else if (arg + 1 < argc && isxdigit(argv[arg + 1][0]) && sscanf(argv[arg + 1], "%d%c", &histLevels, &optCh) == 1)
-                arg++;
-            else
-                histLevels = 10;
-            if (histLevels <= 5)
+            } else
                 histLevels = 10;
             break;
         case 'p':
             options |= pOpt;
             break;
         case 'f':
-            if (argv[arg][2])
-                userfmt = argv[arg] + 2;
-            else if (arg + 1 < argc) {
-                userfmt = argv[++arg];
-            } else {
-                fprintf(stderr, "missing format after -f\n");
-                usage();
-            }
-            if (_stricmp(userfmt, "help") == 0)
+            userfmt = optarg;
+            if (stricmp(userfmt, "help") == 0)
                 showFormats();
-
             break;
         case 'a':
-            if (argv[arg][2])
-                aopt = argv[arg] + 2;
-            else if (arg + 1 < argc) {
-                aopt = argv[++arg];
-            } else {
-                fprintf(stderr, "missing analysis format after -a\n");
-                usage();
-            }
+            aopt = optarg;
             break;
 
         default:
-            fprintf(stderr, "invalid option -%c\n", optCh);
-            usage();
+            usage("invalid option -%c", optopt);
         }
     }
-    if (aopt && userfmt) {
-        fprintf(stderr, "-a and -f cannot be both specified");
-        usage();
-    }
-    if (arg == argc)
-        usage();
+    if (aopt && userfmt)
+        usage("-a and -f cannot be both specified");
+    if (optind >= argc)
+        usage("No files to process");
 
-    for (; arg < argc; arg++)
-        decodeFile(argv[arg]);
+    while (optind < argc)
+        decodeFile(argv[optind++]);
     return 0;
 }

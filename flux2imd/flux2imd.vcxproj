@@ -58,18 +58,27 @@
   <ImportGroup Label="ExtensionSettings">
   </ImportGroup>
   <ImportGroup Label="Shared">
+    <Import Project="..\shared\shared.vcxitems" Label="Shared" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="..\shared\Cbuild.props" />
+    <Import Project="..\shared\Version.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="..\shared\Cbuild.props" />
+    <Import Project="..\shared\Version.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="..\shared\Cbuild.props" />
+    <Import Project="..\shared\Version.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="..\shared\Cbuild.props" />
+    <Import Project="..\shared\Version.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -98,25 +107,26 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <PreprocessorDefinitions>_MBCS;%(PreprocessorDefinitions);;AUTOVER</PreprocessorDefinitions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
+      <AdditionalDependencies>$(CoreLibraryDependencies);%(AdditionalDependencies);$(OutDir)utility.lib</AdditionalDependencies>
     </Link>
-    <PostBuildEvent>
-      <Command>if exist $(SolutionDir)install.cfg call $(SolutionDir)Scripts\install.cmd $(TargetPath) $(SolutionDir)</Command>
-      <Message>
-      </Message>
-    </PostBuildEvent>
+    <PostBuildEvent />
     <CustomBuildStep>
-      <Command>call $(SolutionDir)\Scripts\version.cmd "$(ProjectDir)Generated\" "$(ProjectDir)Generated\GitVersion.h"</Command>
+      <Command>
+      </Command>
     </CustomBuildStep>
     <CustomBuildStep>
-      <Inputs>.force</Inputs>
-      <Message>Generate Version</Message>
-      <Outputs>$(ProjectDir)Generated\gitVersion.h;$(ProjectDir)Generated\GIT_VERSION_INFO</Outputs>
+      <Inputs>
+      </Inputs>
+      <Message>
+      </Message>
+      <Outputs>
+      </Outputs>
     </CustomBuildStep>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -127,23 +137,24 @@
       <ConformanceMode>true</ConformanceMode>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
-      <PreprocessorDefinitions>_MBCS;%(PreprocessorDefinitions);;AUTOVER</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
+      <AdditionalDependencies>$(CoreLibraryDependencies);%(AdditionalDependencies);$(OutDir)utility.lib</AdditionalDependencies>
     </Link>
-    <PostBuildEvent>
-      <Command>if exist $(SolutionDir)install.cfg call $(SolutionDir)Scripts\install.cmd $(TargetPath) $(SolutionDir)</Command>
-      <Message>
-      </Message>
-    </PostBuildEvent>
+    <PostBuildEvent />
     <CustomBuildStep>
-      <Command>call $(SolutionDir)\Scripts\version.cmd "$(ProjectDir)Generated\" "$(ProjectDir)Generated\version.h"</Command>
+      <Command>
+      </Command>
     </CustomBuildStep>
     <CustomBuildStep>
-      <Inputs>.force</Inputs>
-      <Message>Generate Version</Message>
-      <Outputs>$(ProjectDir)Generated\version.h;$(ProjectDir)Generated\GIT_VERSION_INFO</Outputs>
+      <Inputs>
+      </Inputs>
+      <Message>
+      </Message>
+      <Outputs>
+      </Outputs>
     </CustomBuildStep>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -156,27 +167,28 @@
       <ConformanceMode>true</ConformanceMode>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
-      <PreprocessorDefinitions>_MBCS;%(PreprocessorDefinitions);;AUTOVER</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalDependencies>$(CoreLibraryDependencies);%(AdditionalDependencies);$(OutDir)utility.lib</AdditionalDependencies>
     </Link>
-    <PostBuildEvent>
-      <Command>if exist $(SolutionDir)install.cfg call $(SolutionDir)Scripts\install.cmd $(TargetPath) $(SolutionDir)</Command>
+    <PostBuildEvent />
+    <CustomBuildStep>
+      <Command>
+      </Command>
+    </CustomBuildStep>
+    <CustomBuildStep>
       <Message>
       </Message>
-    </PostBuildEvent>
-    <CustomBuildStep>
-      <Command>call $(SolutionDir)\Scripts\version.cmd "$(ProjectDir)Generated\" "$(ProjectDir)Generated\version.h"</Command>
     </CustomBuildStep>
     <CustomBuildStep>
-      <Message>Generate Version</Message>
-    </CustomBuildStep>
-    <CustomBuildStep>
-      <Outputs>$(ProjectDir)Generated\version.h;$(ProjectDir)Generated\GIT_VERSION_INFO</Outputs>
-      <Inputs>.force</Inputs>
+      <Outputs>
+      </Outputs>
+      <Inputs>
+      </Inputs>
     </CustomBuildStep>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -189,25 +201,26 @@
       <ConformanceMode>true</ConformanceMode>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
-      <PreprocessorDefinitions>_MBCS;%(PreprocessorDefinitions);;AUTOVER</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalDependencies>$(CoreLibraryDependencies);%(AdditionalDependencies);$(OutDir)utility.lib</AdditionalDependencies>
     </Link>
-    <PostBuildEvent>
-      <Command>if exist $(SolutionDir)install.cfg call $(SolutionDir)Scripts\install.cmd $(TargetPath) $(SolutionDir)</Command>
-      <Message>
-      </Message>
-    </PostBuildEvent>
+    <PostBuildEvent />
     <CustomBuildStep>
-      <Command>call $(SolutionDir)\Scripts\version.cmd "$(ProjectDir)Generated\" "$(ProjectDir)Generated\version.h"</Command>
+      <Command>
+      </Command>
     </CustomBuildStep>
     <CustomBuildStep>
-      <Inputs>.force</Inputs>
-      <Message>Generate Version</Message>
-      <Outputs>$(ProjectDir)Generated\version.h;$(ProjectDir)Generated\GIT_VERSION_INFO</Outputs>
+      <Inputs>
+      </Inputs>
+      <Message>
+      </Message>
+      <Outputs>
+      </Outputs>
     </CustomBuildStep>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -232,7 +245,6 @@
     <ClCompile Include="stdflux.c" />
     <ClCompile Include="trackManager.c" />
     <ClCompile Include="util.c" />
-    <ClCompile Include="version.c" />
     <ClCompile Include="writeImage.c" />
     <ClCompile Include="zip.c" />
   </ItemGroup>
@@ -242,6 +254,7 @@
     <ClInclude Include="flux2imd.h" />
     <ClInclude Include="dpll.h" />
     <ClInclude Include="flux.h" />
+    <ClInclude Include="getopt.h" />
     <ClInclude Include="miniz.h" />
     <ClInclude Include="scp.h" />
     <ClInclude Include="sectorManager.h" />
@@ -249,12 +262,19 @@
     <ClInclude Include="trackManager.h" />
     <ClInclude Include="util.h" />
     <ClInclude Include="zip.h" />
+    <ClInclude Include="_appinfo.h" />
+    <ClInclude Include="_version.h" />
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="version.rc" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="version.in" />
+    <ClCompile Update="D:\GitProj\DiskTools\shared\..\mkidsk\_appinfo.c">
+      <FileType>CppCode</FileType>
+    </ClCompile>
+    <ClCompile Update="D:\GitProj\DiskTools\shared\showVersion.c">
+      <FileType>CppCode</FileType>
+    </ClCompile>
+    <ClCompile Update="D:\GitProj\DiskTools\shared\_version.c">
+      <FileType>CppCode</FileType>
+    </ClCompile>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

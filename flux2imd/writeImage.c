@@ -36,7 +36,6 @@ MODIFICATION HISTORY
     18 Aug 2018 -- added copyright info
 
 */
-#define _CRT_SECURE_NO_WARNINGS
 #include <stdio.h>
 #include <time.h>
 #include <stdlib.h>
