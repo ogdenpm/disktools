@@ -17,9 +17,32 @@
 
 */
 #include "td02imx.h"
-#include "getopt.h"
-#include "showVersion.h"
+#include "utility.h"
 #include "td0.h"
+
+
+char const help[] =
+    "Usage: %s [options] file.td0 [outfile|.ext]\n"
+    "If present outfile or .ext are used to specify the name of the converted file\n"
+    "The .ext option is a short hand for using the input file with the .td0 replaced by .ext\n"
+    "If the outfile ends in .imd, the IMD file format is used instead of a binary image\n"
+    "Options are\n"
+    " -c dd       Only cylinders before the number dd are written\n"
+    " -d          Debug - provides more information dump details\n"
+    " -k[aAcdgt]* Keep spurious information\n"
+    "    a        Attempt to place auto generated sectors - use with caution\n"
+    "     A       As 'a' but also tag with CRC error in IMD images\n"
+    "      c      Use data from a bad CRC sectors - implied for IMD\n"
+    "       d     Use data from deleted data sectors - implied for IMD\n"
+    "         g   Keep sector gaps - implied for IMD\n"
+    "          t  Use spurious tracks\n"
+    " -oo         Process all cylinders from side 1 then side 2 both in ascending order "
+    "(Out-Out)\n"
+    " -ob         As -to but side 2 cylinders are processed in descending order (Out-Back)\n"
+    "Track sorting defaults to cylinders in ascending order, alternating head\n"
+    "Skipped and missing data sectors are always replaced with dummy sectors\n"
+    "Duplicates of valid sectors are ignored, any with differing content are noted\n";
+
 
 sizing_t sizing[2][SUSPECT + 1][2]; // [encoding][sSize][head]
 
@@ -27,73 +50,10 @@ track_t disk[MAXCYLINDER][MAXHEAD];
 
 uint8_t nCylinder;
 uint8_t nHead;
-uint8_t headsUsed;
+bool head0Used;
 
 FILE *fpout;
-char *invokeName;
-char *srcFile;
-
-/// <summary>
-/// emit Fatal error message with '\n' appended to stderr and exit
-/// </summary>
-/// <param name="fmt">printf compatible format string</param>
-/// <param name="">optional parameters</param>
-/// <returns>exits with 1</returns>
-_Noreturn void fatal(char const *fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
-    fputs("Fatal error: ", stderr);
-    vfprintf(stderr, fmt, args);
-    va_end(args);
-    putc('\n', stderr);
-    exit(1);
-}
-
-/// <summary>
-/// emit warning message with '\n' appended to stdout
-/// </summary>
-/// <param name="fmt">printf compatible format string</param>
-/// <param name="">optional parameters</param>
-void warn(char const *fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
-    fputs("Warning: ", stdout);
-    vfprintf(stdout, fmt, args);
-    va_end(args);
-    putc('\n', stdout);
-}
-
-#ifdef _MSC_VER
-/// <summary>
-/// Equivalent to POSIX basename for visual C
-/// </summary>
-/// <param name="path">full path to file</param>
-/// <returns>pointer filename only</returns>
-
-char *basename(char *path) {
-    char *s;
-    if (path[0] && path[1] == ':') // strip any device
-        path += 2;
-    while ((s = strpbrk(path, "/\\"))) // allow / or \ directory separators
-        path = s + 1;
-    return path;
-}
-#endif
-
-/// <summary>
-/// generated a new file name by replacing the ext (if present)
-/// </summary>
-/// <param name="path">base filename including path</param>
-/// <param name="ext">new extent including '.' to append</param>
-/// <returns></returns>
-char *makeFilename(char *path, char *ext) {
-    char *s       = strrchr(basename(path), '.');
-    int prefixLen = (int)(s ? s - path : strlen(path));
-    char *newFile = safeMalloc(prefixLen + strlen(ext) + 1);
-    strncpy(newFile, path, prefixLen);
-    strcpy(newFile + prefixLen, ext);
-    return newFile;
-}
+char const *srcFile;
 
 /// <summary>
 /// Check if sectors match.
@@ -184,13 +144,13 @@ uint8_t sectorScore(uint8_t flags) {
 /// <summary>
 /// Analyse the .TD0 sector data
 /// Duplicates are removed
-/// Inter sector spacing is determined
+/// Inter sector id spacing is determined
 /// check for CRC errors on first/last sector id
 /// check for mixed size sectors
 /// check for intra track cylinder/head changes
 /// </summary>
 /// <param name="pTrack">pointer to the track structure to analyse</param>
-void analyseTrack(track_t *pTrack) {
+void analyseTrack(track_t *pTrack, uint16_t options) {
     uint8_t sectorMap[MAXIDAMS]; // list of sectors used. index is  order on track
                                  // value is the index of the corresponding .TD0 sector
     uint8_t secIdUsed[256];      // used to support duplicates, indexed by sector id.
@@ -200,9 +160,13 @@ void analyseTrack(track_t *pTrack) {
     // build sectorMap
     sector_t *pIn = pTrack->sectors;
     // there are some rare occasions where the auto sector isn't tagged so fix it
-    if (!(pIn->flags & SEC_AUTO) && (pIn->sec == 100 + pTrack->nSec)) {
+    // Auto sector id = 100 + nSec. However nSec is sometimes pre incremented to include
+    // the auto sector and other times post incremented!!
+    if (!(pIn->flags & SEC_AUTO) &&
+        (pIn->sec == 100 + pTrack->nSec || (pIn->sec == 100 + pTrack->nSec - 1))) {
         pIn->flags |= SEC_AUTO;
-        warn("Fixed auto sector tag");
+        if (options & VERBOSE)
+            warn("Fixed auto sector tag");
     }
     // first sector may be auto generated if so update track flags
     if (pIn->flags & SEC_AUTO)
@@ -282,11 +246,48 @@ void analyseTrack(track_t *pTrack) {
                 pTrack->trackSize += 128 << ps->sSize;
             }
         }
-        if (pTrack->tFlags & TRK_NONSTD) // Treat non-standard tracks separately for sizing
-            pTrack->sSize = SUSPECT;
-        else if (pTrack->sSize == MIXEDSIZES) // don't fix mixed size tracks
+        if (pTrack->sSize == MIXEDSIZES) // don't fix mixed size tracks
             pTrack->tFlags |= TRK_NONSTD;
     }
+}
+
+uint8_t describeSector(char *buf, sector_t *ps, uint8_t cyl, uint8_t head, uint8_t sSize) {
+    uint8_t valid = 0;
+
+    // check for sector size changes or abnormal sector sizes
+    if (ps->sSize >= 8) // If sector size is non standard emit the associated code
+        buf += sprintf(buf, " [0x%x] ", ps->sSize);
+    else if (sSize != ps->sSize) // print sector size changes
+        buf += sprintf(buf, " [%d]", 128 << (sSize = ps->sSize));
+
+    // check for cylinder or head changes
+    if (ps->cyl != cyl || ps->head != head)
+        buf += sprintf(buf, " {%d/%d}", ps->cyl, ps->head);
+
+    // for used sectors, update the trackSize and the valid sector count
+    if (ps->extraFlag & F_USED) {
+        buf += sprintf(buf, " %2d", ps->sec);
+        if ((ps->flags & ~(SEC_DAM | SEC_DUP | SEC_DOS)) == 0)
+            valid = 1;
+    } else
+        buf += sprintf(buf, " #%d", ps->sec); // mark unused sectors
+
+    // print any suffix code associated with the sector
+    if (ps->extraFlag & F_DUP)          // was a duplicate sector with different content!!
+        *buf++ = 'P';                   // problem sector
+    if (ps->flags) {                    // record the code associated with the flags
+        for (uint8_t i = 0; i < 7; i++) // 8 & 0x80 not used
+            // SEC_DUP   -> 'D'
+            // SEC_CRC   -> 'c'
+            // SEC_DAM   -> 'd'
+            // SEC_DOS   -> 'u'  unused
+            // SEC_NODAT -> 'n'  no data
+            // SEC_AUTO  -> '?'  sector id was auto generated
+            if (ps->flags & (1 << i))
+                *buf++ = "Dcd.un?"[i];
+    }
+    *buf = '\0';
+    return valid;
 }
 
 /// <summary>
@@ -303,14 +304,11 @@ void analyseTrack(track_t *pTrack) {
 /// <param name="pTd0">pointer to the raw .TD0 track structure</param>
 /// <param name="options">user specified options</param>
 void showSectorUsage(track_t *pTrack, td0Track_t *pTd0, uint16_t options) {
-    sector_t *pIn        = pTrack->sectors;
-    uint8_t sSize        = pIn->sSize;
-    uint8_t cyl          = pTd0->cyl;
+    sector_t *pIn;
     uint8_t cylChangeCnt = 0;
-    uint8_t head         = pTd0->head;
-    uint8_t col          = 5; // current output column "%2d/%d " already emitted
-    uint8_t sCol         = 5; // sector restart col
     uint8_t nValid       = 0;
+
+    uint8_t col = printf("%2d/%d ", pTd0->cyl, pTd0->head);
 
     col += printf("%s ", pTrack->encoding ? "FM " : "MFM"); // encoding
     if (pTrack->nUsable == pTrack->nSec) // usable sector count [ / td0 sector count]
@@ -318,61 +316,44 @@ void showSectorUsage(track_t *pTrack, td0Track_t *pTd0, uint16_t options) {
     else
         col += printf("%d/%d", pTrack->nUsable, pTrack->nSec);
 
+    uint8_t map[MAXIDAMS]; // used to determine sectors to show
+    uint8_t count = (options & VERBOSE) ? pTrack->nSec : pTrack->nUsable;
+    if (!(options & VERBOSE)) { // if not verbose only show usable sectors
+        memcpy(map, pTrack->sectorMap, pTrack->nUsable);
+        if ((pTrack->sectors[0].flags & SEC_AUTO)) // put any auto sector in list to show
+            map[count++]  = 0;
+    } else
+        for (int i = 0; i < count; i++) // do all sectors
+            map[i] = i;
+
+    uint8_t sSize = pTrack->sectors[map[0]].sSize;
+
     if (sSize < 8) // Only display initial sector size if valid
         col += printf("%*s[%d]", 15 - col, "", 128 << sSize); // Initial sector size
-    sCol = col;
+    else
+        col += printf("%*s[%02x]", 15 - col, "", sSize);
+    uint8_t sCol = col;                                       // column for continuation line
 
-    // show {cylinder, head} if the first sector is non standard
-    if (pTrack->sectors[0].cyl != pTd0->cyl || pTrack->sectors[0].head != pTd0->head) {
-        cyl  = pTrack->sectors[0].cyl;
-        head = pTrack->sectors[0].head;
-        printf(" {%d/%d}", cyl, head);
-    }
+    char info[64];
+    uint8_t cyl  = pTd0->cyl;
+    uint8_t head = pTd0->head;
 
     // show all of the sectors from the .TD0 file
-    for (uint8_t i = 0; i < pTrack->nSec; i++, pIn++) {
-        char info[64]; // single sector info string used to support multi line formatting
-        char *s = info;
+    for (uint8_t i = 0; i < count; i++) {
+        pIn = &pTrack->sectors[map[i]];
 
-        // check for sector size changes or abnormal sector sizes
-        if (pIn->sSize >= 8) // If sector size is non standard emit the associated code
-            s += sprintf(s, " [0x%x] ", pIn->sSize);
-        else if (sSize != pIn->sSize) // print sector size changes
-            s += sprintf(s, " [%d]", 128 << (sSize = pIn->sSize));
-
-        // check for cylinder or head changes
-        if (pIn->cyl != cyl || pIn->head != head) {
+        nValid += describeSector(info, pIn, cyl, head, sSize);
+        if (cyl != pIn->cyl || head != pIn->head) {
             cyl  = pIn->cyl;
             head = pIn->head;
-            s += sprintf(s, " {%d/%d}", cyl, head);
-            cylChangeCnt++;
+            if (i)  // count changes after the first sector
+                cylChangeCnt++;
         }
+        if (pIn->sSize < 8)
+            sSize = pIn->sSize;
 
-        // for used sectors, update the trackSize and the valid sector count
-        if (pIn->extraFlag & F_USED) {
-            s += sprintf(s, " %2d", pIn->sec);
-            if ((pIn->flags & ~(SEC_DAM | SEC_DUP | SEC_DOS)) == 0)
-                nValid++;
-        } else
-            s += sprintf(s, " #%d", pIn->sec); // mark unused sectors
-
-        // print any suffix code associated with the sector
-        if (pIn->extraFlag & F_DUP)         // was a duplicate sector with different content!!
-            *s++ = 'P';                     // problem sector
-        if (pIn->flags) {                   // record the code associated with the flags
-            for (uint8_t i = 0; i < 7; i++) // 8 & 0x80 not used
-                // SEC_DUP   -> 'D'
-                // SEC_CRC   -> 'c'
-                // SEC_DAM   -> 'd'
-                // SEC_DOS   -> 'u'  unused
-                // SEC_NODAT -> 'n'  no data
-                // SEC_AUTO  -> '?'  sector id was auto generated
-                if (pIn->flags & (1 << i))
-                    *s++ = "Dcd.un?"[i];
-        }
-        *s = '\0';
         // see if the sector string fits on line if not start new line
-        if (col + (s - info) > 100) {
+        if (col + strlen(info) > 100) {
             printf("\n%*s", sCol, "");
             col = sCol;
         }
@@ -401,7 +382,7 @@ void showSectorUsage(track_t *pTrack, td0Track_t *pTd0, uint16_t options) {
         if (!(options & K_TRACK))
             pTrack->nUsable = 0; // will not be used
         else
-            pTrack->sSize = SUSPECT; // lump with with other suspect tracks for sizing purposes
+            pTrack->tFlags |= TRK_NONSTD;
     }
     putchar('\n');
 }
@@ -425,40 +406,31 @@ void loadDisk(uint16_t options) {
             fatal("Track %d/%d beyond supported limits", pTd0->cyl, pTd0->head);
 
         track_t *pTrack = &disk[pTd0->cyl][pTd0->head];
-        if (pTrack->sectors)
-            warn("Track %d/%d - skipping duplicate track", pTd0->cyl, pTd0->head);
-        else if (pTd0->sectors == NULL)
-            warn("Track %d/%d - no sectors", pTd0->cyl, pTd0->head);
-        else {
+        if (pTd0->nSec) {
             pTrack->nSec     = pTd0->nSec;
             pTrack->sectors  = pTd0->sectors;
             pTrack->encoding = encoding;
 
-            analyseTrack(pTrack);
+            analyseTrack(pTrack, options);
 
-            printf("%2d/%d ", pTd0->cyl, pTd0->head);
-            if (pTrack->nSec) {
-                showSectorUsage(pTrack, pTd0, options);
-                if (pTrack->nUsable) { // showSector usage updates nUsable for spurious data
-                    pTd0->sectors = 0; // claim onwership of memory
-
-                    if ((pTrack->tFlags & ~TRK_HASAUTO) ==
-                        0) { // only good tracks are used for geometry guess
-                        sizing_t *si = &sizing[encoding][pTrack->sSize][pTd0->head];
-                        si->count++;
-                        si->first += pTrack->first;
-                        si->last += pTrack->last;
-                        si->spacing += pTrack->spacing;
-                    }
-                    if (pTd0->cyl >= nCylinder)
-                        nCylinder = pTd0->cyl + 1;
-                    if (pTd0->head >= nHead)
-                        nHead = pTd0->head + 1;
-                    headsUsed |= 1 << pTd0->head; // used to catch all of head 0 being invalid
+            showSectorUsage(pTrack, pTd0, options);
+            if (pTrack->nUsable) { // showSector usage updates nUsable for spurious data
+                if ((pTrack->tFlags & ~TRK_HASAUTO) == 0) { // ok to use for geometry guess
+                    sizing_t *si = &sizing[encoding][pTrack->sSize][pTd0->head];
+                    si->count++;
+                    si->first += pTrack->first;
+                    si->last += pTrack->last;
+                    si->spacing += pTrack->spacing;
                 }
-            } else
-                printf("No usable sectors\n");
-        }
+                if (pTd0->cyl >= nCylinder)
+                    nCylinder = pTd0->cyl + 1;
+                if (pTd0->head >= nHead)
+                    nHead = pTd0->head + 1;
+                if (pTd0->head == 0)
+                    head0Used = true;
+            }
+        } else if (options & VERBOSE)
+            printf("%2d/%d - no sectors\n", pTd0->cyl, pTd0->head);
     }
 }
 
@@ -466,14 +438,14 @@ void loadDisk(uint16_t options) {
 /// Processes a track to fix the sector range and inter sector spacing if needed
 /// Will not fix if the read sector range falls outside the range determined by fixSizing()
 /// If option -ka or -KA is specified and there is one misssing IDAM and an auto generated
-/// sector is present, it uses it to replace the missign IDAM
+/// sector is present, it uses it to replace the missing IDAM
 /// </summary>
 /// <param name="cylinder">Cylinder to process</param>
 /// <param name="head">Head to process</param>
 /// <param name="options">options to consider</param>
 void fixRange(uint8_t cylinder, uint8_t head, uint16_t options) {
-
-    track_t *pTrack = &disk[cylinder][head];
+    static char *missingMsg[3] = { "", ", 1 missing sector", ", 2 missing sectors" };
+        track_t *pTrack = &disk[cylinder][head];
     if (pTrack->nSec < 3)
         return;
     sizing_t si     = sizing[pTrack->encoding][pTrack->sSize][head]; // expected layout
@@ -482,9 +454,7 @@ void fixRange(uint8_t cylinder, uint8_t head, uint16_t options) {
     uint8_t last    = (uint8_t)si.last;
     uint8_t spacing = (uint8_t)si.spacing;
     uint8_t nSec    = (last - first) / spacing + 1;
-
-    if (pTrack->first < first || pTrack->last > last)
-        pTrack->sSize = SUSPECT;
+    bool forced     = false;
 
     if ((pTrack->tFlags & TRK_NONSTD) || pTrack->first < first || pTrack->last > last ||
         pTrack->spacing != spacing) {
@@ -492,17 +462,9 @@ void fixRange(uint8_t cylinder, uint8_t head, uint16_t options) {
         last    = pTrack->last;
         spacing = pTrack->spacing;
         nSec    = (last - first) / pTrack->spacing + 1;
-        if ((pTrack->tFlags & TRK_NONSTD) || nSec - pTrack->nUsable > 2) {
-            warn("%d/%d: Non standard track using sector range %d-%d%s", cylinder, head, first,
-                 last, pTrack->nUsable == nSec ? "" : " Possible missing IDAMs");
-
-            if ((pTrack->tFlags & TRK_HASGAP))
-                pTrack->sSize = SUSPECT;
-
-            pTrack->tFlags |= TRK_NONSTD;
-        } else
-            warn("%d/%d: Non standard track using sector range %d-%d", cylinder, head, first, last);
+        forced  = true; // set non-standard once auto track has been fixed
     }
+
     if ((pTrack->tFlags & TRK_HASAUTO) && (options & K_AUTO) && !(pTrack->tFlags & TRK_NONSTD)) {
         if (nSec - pTrack->nUsable != 1)
             warn("%d/%d: Cannot identify sector id for auto sector", cylinder, head);
@@ -522,10 +484,15 @@ void fixRange(uint8_t cylinder, uint8_t head, uint16_t options) {
             }
         }
     }
-    if (options & K_GAP)
+    if (forced) {
+        if ((pTrack->tFlags & TRK_NONSTD) || nSec - pTrack->nUsable > 2)
+            warn("%d/%d: sector range %d-%d%s", cylinder, head, first, last,
+                 pTrack->nUsable == nSec ? "" : " Possible missing sectors");
+        else
+            warn("%d/%d: sector range %d-%d%s", cylinder, head, first, last,
+                 missingMsg[nSec - pTrack->nUsable]);
         pTrack->tFlags |= TRK_NONSTD;
-    else if (!(pTrack->tFlags & TRK_NONSTD) && nSec - pTrack->nUsable != 0)
-        warn("%d/%d: %d missing IDAMs", cylinder, head, nSec - pTrack->nUsable);
+    }
     pTrack->first = first;
     pTrack->last  = last;
 }
@@ -537,7 +504,7 @@ void fixRange(uint8_t cylinder, uint8_t head, uint16_t options) {
 /// </summary>
 void fixSizing() {
     printf("Assumed standard track format(s)\n");
-    for (int sSize = 0; sSize <= SUSPECT; sSize++) {
+    for (int sSize = 0; sSize <= MIXEDSIZES; sSize++) {
         for (int enc = 0; enc <= 1; enc++) {
             for (int head = 0; head < nHead; head++) {
                 sizing_t *ps = &sizing[enc][sSize][head];
@@ -570,7 +537,7 @@ bool sizeDisk() {
     uint8_t head = 0;
     for (track_t *p = &disk[0][0]; p < &disk[nCylinder][nHead]; p++, head = !head) {
         if (p->nUsable)
-            sizing[p->encoding][p->sSize][head].count++;
+            sizing[p->encoding][(p->tFlags & TRK_NONSTD) ? SUSPECT : p->sSize][head].count++;
     }
     for (uint8_t i = 0; i <= SUSPECT; i++) {
         for (uint8_t enc = 0; enc < 2; enc++) { // 0->MFM, 1->FM
@@ -590,21 +557,22 @@ bool sizeDisk() {
                     else if (si[0].count == 0)
                         printf(" [1:%dx%d", si[1].count, nSec1);
                     else
-                        printf(" [(0:%dx%d 1:%dx%d)", si[0].count, nSec0, si[1].count, nSec1);
+                        printf(" [(0:%dx%d, 1:%dx%d)", si[0].count, nSec0, si[1].count, nSec1);
                     partSize = (si[0].count * nSec0 + si[1].count * nSec1) * (128 << i);
                     printf(" %d", 128 << i);
 
                 } else {
                     for (track_t *p = &disk[0][0]; p < &disk[nCylinder][nHead]; p++)
-                        if (p->nUsable && p->encoding == enc && p->sSize == i)
+                        if (p->nUsable && p->encoding == enc &&
+                            (p->sSize == i || (i == SUSPECT && (p->tFlags & TRK_NONSTD))))
                             partSize += p->trackSize;
 
                     if (si[1].count == 0)
-                        printf(" [%s%d", nHead == 2 ? "0:": "", si[0].count);
+                        printf(" [%s%d", nHead == 2 ? "0:" : "", si[0].count);
                     else if (si[0].count == 0)
                         printf(" [1:%d", si[1].count);
                     if (si[0].count && si[1].count)
-                        printf(" 1:%d", si[1].count);
+                        printf("[0:%d, 1:%d", si[0].count, si[1].count);
                     printf(" %s", i == MIXEDSIZES ? "mixed size" : "non standard");
                 }
                 diskSize += partSize;
@@ -622,7 +590,7 @@ bool sizeDisk() {
 /// Also compacts any commend to remove trailing newlines / spaces
 /// </summary>
 /// <param name="pHead">pointer to the header content</param>
-void showHeader(td0Header_t *pHead) {
+void showHeader(td0Header_t *pHead, uint16_t options) {
     static char *densities[] = { "250kbps low", "300kbps low", "high",    "high",
                                  "extended",    "extended",    "unknown", "unknown" };
 
@@ -655,9 +623,9 @@ void showHeader(td0Header_t *pHead) {
         source = "8\"";
         break;
     }
-
-    printf("Type = %d, stepping = %02X, density = %02X\n", pHead->driveType, pHead->stepping,
-           pHead->density);
+    if (options & VERBOSE)
+        printf("Type = %d, stepping = %02X, density = %02X\n", pHead->driveType, pHead->stepping,
+               pHead->density);
     uint8_t density = pHead->density & 6;
     printf("Source was %s %s-density %s\n", source, densities[density],
            (pHead->density & 0x80) ? "FM" : "MFM");
@@ -682,44 +650,6 @@ void showHeader(td0Header_t *pHead) {
     putchar('\n');
 }
 
-/// <summary>
-/// Display command line usage.
-/// Optionally display a message
-/// </summary>
-/// <param name="fmt">Message to display before usage with usual printf options. NULL if there is no
-/// message</param> <param name="">Optional arguments driven by printf formatting options in
-/// fmt</param> <returns>Always exits. If fmt not NULL exits with 1 else exits with 0</returns>
-_Noreturn void usage(char const *fmt, ...) {
-    if (fmt) {
-        va_list args;
-        va_start(args, fmt);
-        vprintf(fmt, args);
-        va_end(args);
-        putchar('\n');
-    }
-    printf(
-        "Usage: %s -v | -V | [options] file.td0 [outfile|.ext]\n"
-        "Where -v shows version info and -V shows extended version info\n"
-        "If present outfile or .ext are used to specify the name of the converted file\n"
-        "The .ext option is a short hand for using the input file with the .td0 replaced by .ext\n"
-        "If the outfile ends in .imd, the IMD file format is used else a binary image is created\n"
-        "Options are\n"
-        " -c dd       Only cylinders before the number dd are written\n"
-        " -k[aAcdgt]* Keep spurious information\n"
-        "    a        Attempt to place auto generated sectors - use with caution\n"
-        "     A       As 'a' but also tag with CRC error in IMD images\n"
-        "      c      Use data from a bad CRC sectors - implied for IMD\n"
-        "       d     Use data from deleted data sectors - implied for IMD\n"
-        "         g   Keep sector gaps - implied for IMD\n"
-        "          t  Use spurious tracks\n"
-        " -to         Process side 1 tracks then side 2 tracks both in ascending order (Out-Out)\n"
-        " -tb         As -to but side 2 tracks are processed in descending order (Out-Back)\n"
-        "Track sorting defaults to cylinders in ascending order, alternating head\n"
-        "Skipped and missing data sectors are always replaced with dummy sectors\n"
-        "Duplicates of valid sectors are ignored, any with differing content are noted\n",
-        invokeName);
-    exit(fmt ? 0 : 1);
-}
 
 /// <summary>
 /// parse the command line and orchestrate the load, analysis and file conversion
@@ -733,17 +663,8 @@ int main(int argc, char *argv[]) {
     char *outFile     = NULL;
     int cylinderLimit = -1;
 
-    invokeName        = basename(argv[0]);
-
-#ifdef _WIN32
-    char *s = strrchr(invokeName, '.');
-    if (s && stricmp(s, ".exe") == 0)
-        *s = 0;
-#endif
-    CHK_SHOW_VERSION(argc, argv);
-
     int c;
-    while ((c = getopt(argc, argv, "k:t:c:")) != EOF) {
+    while ((c = getopt(argc, argv, "k:o:c:d")) != EOF) {
         switch (c) {
         case 'k':
             while (*optarg) {
@@ -756,6 +677,7 @@ int main(int argc, char *argv[]) {
                     break;
                 case 'A':
                     options |= K_AUTOCRC;
+                    // fall through
                 case 'a':
                     options |= K_AUTO;
                     break;
@@ -768,13 +690,16 @@ int main(int argc, char *argv[]) {
         case 'c':
             cylinderLimit = atoi(optarg);
             break;
-        case 't':
+        case 'o':
             if (*optarg == 'o')
                 options = (options & ~S_OB) | S_OO;
             else if (*optarg == 'b')
                 options = (options & ~S_OO) | S_OB;
             else
-                usage("Unknown option -t%s", optarg);
+                usage("Unknown option -o%s", optarg);
+            break;
+        case 'd':
+            options |= VERBOSE;
             break;
         default:
             usage("unknown option -%c", c);
@@ -785,25 +710,27 @@ int main(int argc, char *argv[]) {
 
     td0Header_t *pHead = openTd0(argv[optind]);
     srcFile            = basename(argv[optind]);
-    printf("Processing %s\n", srcFile);
+    printf("Processing %s\n", (options & VERBOSE) ? argv[optind] : srcFile);
 
     if (argc - optind > 1) {
         if (argv[optind + 1][0] == '.' && argv[optind + 1] == basename(argv[optind + 1]))
-            outFile = makeFilename(argv[optind], argv[optind + 1]);
+            outFile = makeFilename(argv[optind], argv[optind + 1], true);
         else
             outFile = argv[optind + 1];
     }
 
-    showHeader(pHead);
+    showHeader(pHead, options);
 
     loadDisk(options); // build the internal track structure from the .TD0 file
-    fixSizing();       // determine likely track formats
+    closeTd0();
+
+    fixSizing(); // determine likely track formats
 
     if (cylinderLimit > 0 && cylinderLimit < nCylinder) {
         printf("Limiting to first %d cylinders\n", cylinderLimit);
         nCylinder = cylinderLimit; // 0 based cylinders
     }
-    if (!(headsUsed & 1))
+    if (!head0Used)
         options |= NOHEAD0;
     // fixup missing IDAMs if possible
     for (int cylinder = 0; cylinder < nCylinder; cylinder++)
@@ -817,6 +744,5 @@ int main(int argc, char *argv[]) {
     } else
         printf("No file produced\n");
 
-    closeTd0();
     return 0;
 }

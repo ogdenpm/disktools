@@ -58,6 +58,7 @@
 #define S_OO        0x40
 #define S_OB        0x80
 #define NOHEAD0     0x200   // special to skip head 0 processing
+#define VERBOSE     0x400
 
 #define MAXSECTOR   64 // Note DOS can only handle up to 64 sectors per track
 #define UNALLOCATED 0x100
@@ -73,12 +74,13 @@ typedef struct {
     uint8_t first;      // lowest sector number
     uint8_t last;       // highest sector number
     uint8_t sSize;      // sector size = 128 << sSize
-    uint8_t encoding;   // 0->MFM, 1->FM]
-    uint8_t spacing;    // sector spacing interval
-    uint8_t tFlags;     // not a standard layout so no padding
+    uint8_t encoding;   // 0->MFM, 1->FM
+    uint8_t spacing;    // sector id spacing interval. Note this is independent of interleave
+    uint8_t tFlags;     // not a standard layout so no padding applied for image files
     uint32_t trackSize; // calculated track size from valid Address Markers
-    sector_t *sectors;  // sector entries nSec is number of sector_t entries
-    uint8_t *sectorMap; // map of usable sectors, indexes into sectors
+    sector_t *sectors;  // sector entries nSec is number of sector_t entries.
+    uint8_t *sectorMap; // map of usable sectors, indexes into sectors. If there is an auto generated
+                        // sector this is appended as a extra sector in case it is used
 } track_t;
 
 // tFlags
@@ -105,7 +107,7 @@ typedef struct {
 
 extern sizing_t sizing[2][SUSPECT + 1][2]; // [encoding][sSize][head]
 
-extern char *srcFile;
+extern char const *srcFile;
 void saveImage(char const *outFile, td0Header_t *pHead, uint16_t options);
 
 bool sameValues(uint8_t *buf, uint16_t len);

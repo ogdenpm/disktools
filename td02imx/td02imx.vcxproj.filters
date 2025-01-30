@@ -21,17 +21,11 @@
     <ClCompile Include="td02imx.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="getopt.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="save.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="getopt.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="td02imx.h">
       <Filter>Header Files</Filter>
     </ClInclude>

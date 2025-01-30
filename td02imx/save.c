@@ -1,5 +1,6 @@
 
 #include "td02imx.h"
+#include "utility.h"
 #include <time.h>
 
 typedef struct {
@@ -39,9 +40,8 @@ void saveIMDHdr(FILE *fp, td0Header_t *pHead) {
                 pHead->yr + 1900, pHead->hr, pHead->min, pHead->sec);
     else {
         time_t nowTime;
-        struct tm *now;
         time(&nowTime);
-        now = localtime(&nowTime);
+        struct tm *now = localtime(&nowTime);
 
         fprintf(fp, "%02d/%02d/%04d %02d:%02d:%02d\r\n", now->tm_mday, now->tm_mon + 1,
                 now->tm_year + 1900, now->tm_hour, now->tm_min, now->tm_sec);
@@ -64,10 +64,7 @@ void saveIMDHdr(FILE *fp, td0Header_t *pHead) {
 /// <param name="len">length of data</param>
 /// <returns>true if all bytes are same</returns>
 bool sameValues(uint8_t *buf, uint16_t len) {
-    for (int i = 1; i < len; i++)
-        if (buf[i] != buf[0])
-            return false;
-    return true;
+    return memcmp(buf, buf + 1, len - 1) == 0;
 }
 
 /// <summary>

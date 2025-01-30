@@ -20,15 +20,15 @@ typedef struct {
 #define HAS_COMMENT 0x80 // stepping top bit indicates comment record follows
     uint8_t dosMode;     // != 0 image contains DOS allocated sectors only
     uint8_t surfaces;    // number of surfaces
-    uint8_t fCrc[2];     // checksum of 1st 10 bytes in record le word
+    uint8_t fCrc[2];     // checksum of 1st 10 bytes in record (le word)
 } td0FileHeader_t;
 
 // all data post the td0 file header is potentially compressed dependent on sig being "td"
 
 #define MAXCOMMENT 584 // determined by partial diassembly of teledisk
 typedef struct {
-    uint8_t cCrc[2]; //  checksum of 8 bytes from &len to end of record le word
-    uint8_t len[2];  // length of string data region following date le word
+    uint8_t cCrc[2]; //  checksum of 8 bytes from &len to end of record (le word)
+    uint8_t len[2];  // length of string data region following date (le word)
     uint8_t yr;      // date and time info. yr = year - 1900
     uint8_t mon;
     uint8_t day;
@@ -51,10 +51,10 @@ typedef struct {
     uint8_t sec;
     uint8_t sSize; // size is 128 << sSize;
     uint8_t flags;
-    uint8_t sCrc; // the low crc of data data if present else of the 5 bytes above
+    uint8_t sCrc; // the low byte of crc of sector data if present else of the 5 bytes above
 } td0SectorHeader_t;
 
-#define MAXPATTERN 0x4000
+#define MAXPATTERN 0x4001   // 16k sector plus leading type 0 byte
 typedef struct {
     uint8_t len[2];
     uint8_t pattern[MAXPATTERN];
@@ -73,11 +73,11 @@ typedef struct {
 #define HAS_COMMENT 0x80   // stepping top bit indicates comment record follows
         uint8_t dosMode;   // != 0 image contains DOS allocated sectors only
         uint8_t surfaces;  // number of surfaces
-        uint8_t fCrc[2];   // checksum of 1st 10 bytes in record le word
+        uint8_t fCrc[2];   // checksum of 1st 10 bytes in record (le word)
     };
     struct {             // td0CommentHeader
-        uint8_t cCrc[2]; //  checksum of 8 bytes from &len to end of record le word
-        uint8_t len[2];  // length of string data region following date le word
+        uint8_t cCrc[2]; //  checksum of 8 bytes from &len to end of record (le word)
+        uint8_t len[2];  // length of string data region following date (le word)
         uint8_t yr;      // date and time info. yr = year - 1900
         uint8_t mon;
         uint8_t day;
@@ -112,15 +112,9 @@ typedef struct {
     sector_t *sectors; // allocated array sized [nSec]
 } td0Track_t;
 
-// user supplied functions
-_Noreturn void fatal(char const *fmt, ...);
-void warn(char const *fmt, ...);
-char *basename(char *path);
-
 // public interface
-uint16_t calcCrc(void *buf, uint16_t len, uint16_t crc);
 td0Header_t *openTd0(char *name);
 td0Track_t *readTrack();
 void closeTd0();
-bool readTd0(void *buf, uint16_t len);
-void *safeMalloc(size_t size);
+
+

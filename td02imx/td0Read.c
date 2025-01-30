@@ -22,13 +22,43 @@
 
 
 */
+/*
+    This code and its associated header td0.h is a largely self contained
+    set of routines to handle processing of a Teledisk td0 file
+    To use it four user provided functions are required
+
+    _Noreturn void fatal(char const *fmt, ...);
+        Arguments are as per printf, which the user supplied function can
+        use. The function should not return
+    void warn(char const *fmt, ...);
+        As per fatal but function returns.
+    char *basename(char *path);
+        For POSIX systems this is a standard function. For Windows
+        an equivalent is needed
+    void *safeMalloc(size_t size);
+        allocates size bytes of memory using malloc, but throws a fatal error on out of memory
+
+    sample implementations are provided in the file missing/utility.c
+
+    Usage of this code follows the basic pattern
+
+    call openTd0(filename)      - this sets up the file and returns a pointer to the header
+                                - structure described in td0.h. Will have called fatal if there is
+                                - an error
+    repeatedly call readTrack() - this returns a pointer to the track structure described in td0.h
+                                - end when the returned pointer is NULL
+                                - Note the track structure pointed to is reused, so any data needed
+                                - should be copied before calling readTrack again, especially the
+                                - pointer to sectors
+    call closeTd0()             - when done
+
+
+*/
 
 #include "td0.h"
-
-#include <ctype.h> // uses isdigit
+#include "utility.h"
 
 // pattern buffer
-#define MAXPATTERN 0x4000
 td0SectorData_t patBuf;
 // the pattern encodings
 #define COPY   0
@@ -39,6 +69,7 @@ static int getTd0Byte(); // forward references to NORMAL read
 static void initNew();   // forward reference to advance compression options
 static void initOld();
 static void readSector(sector_t *pSector);
+static bool readTd0(void *buf, uint16_t len);
 
 static char *td0File;
 static td0Header_t td0Header;
@@ -56,19 +87,6 @@ static uint8_t lastNSec;              // used to protect readTrack release of me
 /// <returns></returns>
 inline int leword(uint8_t *p) {
     return p[0] + p[1] * 256;
-}
-
-/// <summary>
-/// helper to malloc memory and check for out of memory
-/// </summary>
-/// <param name="size">Amount of memory to allocate in bytes.</param>
-/// <returns>pointer to the allocated block</returns>
-void *safeMalloc(size_t size) {
-    void *p = malloc(size);
-    if (!p)
-        fatal("Out of memory");
-    return p;
-
 }
 
 
@@ -109,7 +127,7 @@ static uint16_t crcTable[] = {
 /// <param name="len">The number of bytes to use in the calculation.</param>
 /// <param name="crc">An initial crc value. Normally 0</param>
 /// <returns></returns>
-uint16_t calcCrc(void *buf, uint16_t len, uint16_t crc) {
+static uint16_t calcCrc(void *buf, uint16_t len, uint16_t crc) {
     uint8_t *p = buf;
     for (uint16_t i = 0; i < len; i++)
         crc = crcTable[p[i] ^ (crc >> 8)] ^ (crc << 8);
@@ -162,7 +180,7 @@ td0Header_t *openTd0(char *name) {
 
         // check all but 1st 2 bytes of comment region
         uint16_t crc = calcCrc(td0Header.len, sizeof(td0CommentHeader_t) - 2, 0); // header
-        crc          = calcCrc(td0Header.comment, len, crc);                     // comment text
+        crc          = calcCrc(td0Header.comment, len, crc);                      // comment text
         if (leword(td0Header.cCrc) != crc)
             fatal("CRC error in comment header");
         // convert comment to standard C string
@@ -177,33 +195,15 @@ td0Header_t *openTd0(char *name) {
 /// <summary>
 /// Read a full track of data including all of the sectors
 /// Memory is allocated for the underlying sector information
-/// It is assumed that this memory is used by the consumer and if so it
-/// should transfer the sectors pointer to a local variable and clear the sectors
-/// pointer e.g.
-///     track_t *p;
-///     if ((p = readTrack()) {
-///         // use the information including copy p->sectors
-///         p->sectors = NULL;
-///     }
-///
-/// If it isn't cleared this routine will release the allocated
-/// memory and any under lying data memory allocated in readSector
 /// </summary>
 /// <returns>Pointer to the track structure else NULL at end</returns>
 td0Track_t *readTrack() {
-    // release old info if necessary
-    if (curTrack.sectors) {
-        for (int i = 0; i < lastNSec; i++)
-            free(curTrack.sectors[i].data); // note free(NULL) is harmless
-        free(curTrack.sectors);
-    }
     if (!readTd0(&curTrack.nSec, 1))
         fatal("Corrupt file, failed to read track header");
     if (curTrack.nSec == 0xff)
         return NULL;
     if (!readTd0(&curTrack.cyl, sizeof(td0TrackHeader_t) - 1))
         fatal("Corrupt file, failed to read track header");
-
 
     if (curTrack.tCrc != (calcCrc(&curTrack.nSec, sizeof(td0TrackHeader_t) - 1, 0) & 0xff))
         fatal("CRC error in track record %d", curTrack.cyl);
@@ -228,8 +228,7 @@ static void readSector(sector_t *pSector) {
 
     if ((pSector->sSize & 0xf8) || (pSector->flags & 0x30)) {
         pSector->data = NULL; // no data available
-        if ((calcCrc(&pSector->cyl, sizeof(td0SectorHeader_t) - 1, 0) & 0xff) !=
-            pSector->sCrc)
+        if ((calcCrc(&pSector->cyl, sizeof(td0SectorHeader_t) - 1, 0) & 0xff) != pSector->sCrc)
             warn("%d/%d/%d: Sector header CRC error", pSector->cyl, pSector->head, pSector->sec);
     } else {
         uint16_t sSize = 128 << pSector->sSize;
@@ -319,6 +318,7 @@ static void readSector(sector_t *pSector) {
 void closeTd0() {
     if (fpin)
         fclose(fpin);
+    fpin = NULL;
 }
 
 /// <summary>
@@ -327,7 +327,7 @@ void closeTd0() {
 /// <param name="buf">The location to read to</param>
 /// <param name="len">The number of bytes to read.</param>
 /// <returns>true if successful read else false</returns>
-bool readTd0(void *buf, uint16_t len) {
+static bool readTd0(void *buf, uint16_t len) {
     int c;
     uint8_t *p = buf;
     while (len--) {
@@ -350,7 +350,7 @@ bool readTd0(void *buf, uint16_t len) {
 static void chainTd0() {
     char *s = strchr(td0File, '\0') - 1;
     td0Header_t hdr;
-    if (!isdigit(*s)) {
+    if (*s < '0' || *s > '8') {
         warn("Cannot determine next file from %s\n", basename(td0File));
         fclose(fpin);
         fpin = NULL;
@@ -485,7 +485,7 @@ static void initNew() {
         child[j]  = i;
         parent[i] = parent[i + 1] = j;
     }
-    freq[NEWTABSIZE] = 0xffff; // sentinal to avoid inserting freq value past end
+    freq[NEWTABSIZE] = 0xffff; // sentential to avoid inserting freq value past end
     parent[ROOT]     = 0;      // end marker for walking  tree
 
     drainCnt         = 0; // reset ring buffer
