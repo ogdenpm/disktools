@@ -16,123 +16,114 @@
  * algorithms and code fragments contained herein to be used in the creation
  * of compatible programs on other platforms (eg: Linux).
  */
+#include "_version.h"
+#include "imdVersion.h"
+#include "utility.h"
+
+#include <ctype.h>
+#include <memory.h>
+#include <stdarg.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <memory.h>
-#include "version.h"
-#include <stdarg.h>
-#include <ctype.h>
 #include <string.h>
-#include <conio.h>
-#ifdef AUTOVER
-#include "Generated/gitVersion.h"
-#else
-#include "version.in"
-#endif
 
-#define	TSIZE	32768				// Max size of track
-#define abort   error
+#define TSIZE      32768 // Max size of track
 
- // Status index values
-#define	ST_TOTAL	0				// Total sector count
-#define	ST_COMP		1				// Number Compressed
-#define	ST_DAM		2				// Number Deleted
-#define	ST_BAD		3				// Number Bad
-#define	ST_UNAVAIL	4				// Number unavailable
+// Status index values
+#define ST_TOTAL   0 // Total sector count
+#define ST_COMP    1 // Number Compressed
+#define ST_DAM     2 // Number Deleted
+#define ST_BAD     3 // Number Bad
+#define ST_UNAVAIL 4 // Number unavailable
 
 typedef struct {
-    unsigned Mode,				// Data rate/density
-        Cyl,				// Current cylinder
-        Head,				// Current head
-        Nsec,				// Number of sectors
-        Size;				// Sector size
-    unsigned char *Tbuf; 			// Text buffer (data)
-    unsigned char Hflag;			// Extra bits embedded in Head
-    unsigned char Smap[256];		// Sector numbering map
-    unsigned char Cmap[256];		// Cylinder numbering map
-    unsigned char Hmap[256];		// Head numbering map
+    unsigned Mode,           // Data rate/density
+        Cyl,                 // Current cylinder
+        Head,                // Current head
+        Nsec,                // Number of sectors
+        Size;                // Sector size
+    unsigned char *Tbuf;     // Text buffer (data)
+    unsigned char Hflag;     // Extra bits embedded in Head
+    unsigned char Smap[256]; // Sector numbering map
+    unsigned char Cmap[256]; // Cylinder numbering map
+    unsigned char Hmap[256]; // Head numbering map
     unsigned char Sflag[256];
-} TRACK;	// Sector type flags
+} TRACK; // Sector type flags
 TRACK t1, t2, *AI;
 
-unsigned
-Lmode,				// Last track mode
-Lnsec,				// Last track number sectors
-Lsize,				// Last track sector size
-H0tracks,			// Number of head-0 tracks
-H1tracks,			// Number of head-1 tracks
-STcount[5];			// Statistics counters
+unsigned Lmode, // Last track mode
+    Lnsec,      // Last track number sectors
+    Lsize,      // Last track sector size
+    H0tracks,   // Number of head-0 tracks
+    H1tracks,   // Number of head-1 tracks
+    STcount[5]; // Statistics counters
 
-unsigned char
-*ptr,				// General global pointer
-*Wfile,				// File to write
-*Mfile,				// File to merge
-*CIfile,			// File to inject comments
-*CEfile,			// File to extract comments
-Rcomment,			// Replace comment flag
-Ioutput = 255,		// IMD format output
-Verbose = 255,		// Generate verbose output
-Wflag = 255,		// !warn if no outputput file
-Xmode = 255,		// Ignore mode differences
-Dam = 255,			// Deleted address marks
-Bad = 255,			// Convert bad sectors
-Fill,				// Value to fill missing sectors
-Fflag,				// Fill missing sectors
-Cflag,				// Compressed sector conversion
-Yes,				// Supress overwrite prompt
-Detail,				// Display detail output
-Intl,				// Interleave setting (0=Nochange, 255=BestGuess)
-Tracks[256],		// Track read flags
-Lsmap[256],			// Last sector map
-Index[256],			// Sector index map
-Imap[256],			// Interleave map
-Sskip[256];			// Skip (exclude) map
+char *ptr,         // General global pointer
+    *Ifile,        // file to read
+    *Wfile,        // File to write
+    *Mfile,        // File to merge
+    *CIfile,       // File to inject comments
+    *CEfile;       // File to extract comments
+uint8_t Rcomment,  // Replace comment flag
+    Ioutput = 255, // IMD format output
+    Verbose = 255, // Generate verbose output
+    Wflag   = 255, // !warn if no outputput file
+    Xmode   = 255, // Ignore mode differences
+    Dam     = 255, // Deleted address marks
+    Bad     = 255, // Convert bad sectors
+    Fill,          // Value to fill missing sectors
+    Fflag,         // Fill missing sectors
+    Cflag,         // Compressed sector conversion
+    Yes,           // Supress overwrite prompt
+    Detail,        // Display detail output
+    Intl,          // Interleave setting (0=Nochange, 255=BestGuess)
+    Tracks[256],   // Track read flags
+    Lsmap[256],    // Last sector map
+    Index[256],    // Sector index map
+    Imap[256],     // Interleave map
+    Sskip[256];    // Skip (exclude) map
 
 // Mode (data rate) index to value conversion table
 unsigned Mtext[] = { 500, 300, 250 };
 
-// Encoded sector size to actual size conversion table
-unsigned xsize[] = { 128, 256, 512, 1024, 2048, 4096, 8192 };
-
 // Table for mode translation
 unsigned char Tmode[] = { 0, 1, 2, 3, 4, 5 };
 
-FILE
-*fp,			// Input file
-*fpm,			// Merge file
-*fpw;			// Write (output) file
+FILE *fp, // Input file
+    *fpm, // Merge file
+    *fpw; // Write (output) file
 
-unsigned char help[] = { "Copyright 2005-" CYEAR " Dave Dunfield - All rights reserved.\n"
-"Windows port " GIT_VERSION " -- Mark Ogden " GIT_YEAR "\n\n"
-"Use: IMDU image [[merge-image] [output-image]] [options]\n\n\
-opts:	/B			- output Binary image\n\
-    /C			- Compress \"all-same\" sectors\n\
-    /D			- display track/sector Detail\n\
-    /E			- Expand compressed sectors to full data\n\
-    /M			- ignore Mode difference in merge/compare\n\
-    /NB			- force Non-Bad data\n\
-    /ND			- force Non-Deleted data\n\
-    /Q			- Quiet: supress warnings\n\
-    /Y			- auto-Yes (no overwrite prompt)\n\
-    AC=file[.TXT]		- Append Comment from file	[none]\n\
-    EC=file[.TXT]		- Extract Comment to file	[none]\n\
-    F=xx			- missing sector Fill value	[00]\n\
-    IL=[1-99]		- reInterLeave(blank=BestGuess)	[As read]\n\
-    RC=file[.TXT]		- Replace Comment from file	[none]\n\
-    T2=250/300/500		- 250khz Translate		[250]\n\
-    T3=250/300/500		- 300khz Translate		[300]\n\
-    T5=250/300/500		- 500khz Translate		[500]\n\
-    X=track[,to_track]	- eXclude entire track(s)	[None]\n\
-    X0=track[,to_track]	- eXclude track(s) side 0 only	[None]\n\
-    X1=track[,to_track]	- eXclude track(s) side 1 only	[None]\n" };
+char const help[] = { 
+                "Usage: imdu image [[merge-image] [output-image]] [options]\n\n"
+                "opts:  /B                      - output Binary image\n"
+                "       /C                      - Compress \"all-same\" sectors\n"
+                "       /D                      - display track/sector Detail\n"
+                "       /E                      - Expand compressed sectors to full data\n"
+                "       /M                      - ignore Mode difference in merge/compare\n"
+                "       /NB                     - force Non-Bad data\n"
+                "       /ND                     - force Non-Deleted data\n"
+                "       /Q                      - Quiet: suppress warnings\n"
+                "       /Y                      - auto-Yes (no overwrite prompt)\n"
+                "       AC=file[.TXT]           - Append Comment from file      [none]\n"
+                "       EC=file[.TXT]           - Extract Comment to file       [none]\n"
+                "       F=xx                    - missing sector Fill value     [00]\n"
+                "       IL=[1-99]               - reInterLeave(blank=BestGuess) [As read]\n"
+                "       RC=file[.TXT]           - Replace Comment from file     [none]\n"
+                "       T2=250/300/500          - 250khz Translate              [250]\n"
+                "       T3=250/300/500          - 300khz Translate              [300]\n"
+                "       T5=250/300/500          - 500khz Translate              [500]\n"
+                "       X=track[,to_track]      - eXclude entire track(s)       [None]\n"
+                "       X0=track[,to_track]     - eXclude track(s) side 0 only  [None]\n"
+                "       X1=track[,to_track]     - eXclude track(s) side 1 only  [None]\n" };
 
 int check_sector(unsigned n);
+int _getch(void);       // for windows this is standard, for POSIX see getch.c
 
 /*
  * High-speed test for compressable sector (all bytes same value)
  */
-int issame(unsigned char *buf, int size)
-{
+int issame(unsigned char *buf, int size) {
     for (int i = 1; i < size; i++)
         if (buf[i] != buf[0])
             return 0;
@@ -142,8 +133,7 @@ int issame(unsigned char *buf, int size)
 /*
  * Display new cylinder/head if it has changed
  */
-void xch(void)
-{
+void xch(void) {
     static unsigned C = -1, H;
     if ((t1.Cyl != C) || (t1.Head != H))
         printf("%2u/%u ", C = t1.Cyl, H = t1.Head);
@@ -152,123 +142,95 @@ void xch(void)
 }
 
 /*
- * Display error message and exit
- */
-error(char *fmt, ...)
-{
-    va_list args;
-    va_start(args, fmt);
-
-    vprintf(fmt, args);
-    if (fpm)
-        fclose(fpm);
-    if (fp)
-        fclose(fp);
-    exit(-1);
-}
-
-/*
- * Display warning message
- */
-warn(char *fmt, ...)
-{
-    va_list args;
-    va_start(args, fmt);
-
-    if (Verbose) {
-        vprintf(fmt, args);
-        putc('\n', stdout);
-    }
-}
-
-/*
  * Load a track from an image into memory
  */
-int load_track(TRACK *t, FILE *fp)
-{
-    unsigned c, i, m, h, n, s;
-    unsigned int d;
+int load_track(TRACK *t, FILE *fp) {
+    int c, m, h, n, s;
     AI = t;
     if ((m = getc(fp)) == EOF)
         return 0;
-    t->Mode = m;
-    if ((t->Cyl = getc(fp)) == EOF)
-        error("EOF at Cylinder");
+    if ((c = getc(fp)) == EOF)
+        fatal("EOF at Cylinder");
     if ((h = getc(fp)) == EOF)
-        error("EOF at Head");
-    t->Head = h & 0x0F;
+        fatal("EOF at Head");
+    if ((n = getc(fp)) == EOF)
+        fatal("EOF at Nsec");
+    if ((s = getc(fp)) == EOF)
+        fatal("EOF at Size");
+    t->Mode  = (uint8_t)m;
+    t->Cyl   = (uint8_t)c;
+    t->Head  = h & 0x0F;
     t->Hflag = (h & 0xF0);
-    if ((t->Nsec = n = getc(fp)) == EOF)
-        error("EOF at Nsec");
-    if ((t->Size = s = getc(fp)) == EOF)
-        error("EOF at Size");
+    t->Nsec  = (uint8_t)n;
+    t->Size  = (uint8_t)s;
+
     if (m > 5) {
-        error("Mode value %u out of range 0-5\n", m);
+        fatal("Mode value %u out of range 0-5\n", m);
         t->Mode = 0;
     }
     if ((h & 0x0F) > 1) {
-        error("Head value %u out of range 0-1\n", h);
+        fatal("Head value %u out of range 0-1\n", h);
         t->Head = 0;
     }
     if (s > 6) {
-        error("Size value %u out of range 0-6\n", s);
+        fatal("Size value %u out of range 0-6\n", s);
         t->Size = 0;
     }
 
-    s = xsize[s];
+    unsigned sLen = 128U << s;
 
     if (n) {
-        if (fread(t->Smap, 1, n, fp) != n)
-            error("EOF in Sector Map");
+        if ((int)fread(t->Smap, 1, n, fp) != n)
+            fatal("EOF in Sector Map");
 
         if (h & 0x80) {
-            if (fread(t->Cmap, 1, n, fp) != n)
-                error("EOF in Cylinder Map");
-        }
-        else
+            if ((int)fread(t->Cmap, 1, n, fp) != n)
+                fatal("EOF in Cylinder Map");
+        } else
             memset(t->Cmap, t->Cyl, n);
 
         if (h & 0x40) {
-            if (fread(t->Hmap, 1, n, fp) != n)
-                error("EOF in Head Map");
-        }
-        else
+            if ((int)fread(t->Hmap, 1, n, fp) != n)
+                fatal("EOF in Head Map");
+        } else
             memset(t->Hmap, h, n);
     }
 
-    if ((n*s) > TSIZE)
-        error("Data block two large");
+    if ((n * s) > TSIZE)
+        fatal("Data block two large");
 
     // Decode sector data blocks
-    d = 0;
-    for (i = 0; i < n; ++i) {
+    unsigned int d = 0;
+    for (int i = 0; i < n; ++i) {
         switch (c = getc(fp)) {
-        case EOF: error("EOF at sector %u/%u flag", i, t->Smap[i]);
-        case 0:		// Missing data
-            memset(t->Tbuf + d, Fill, s);
+        case EOF:
+            fatal("EOF at sector %u/%u flag", i, t->Smap[i]);
+        case 0: // Missing data
+            memset(t->Tbuf + d, Fill, sLen);
             m = 255;
             break;
         default:
             m = 0;
-            if (--c & 0x01) {		// Compressed
+            if (--c & 0x01) { // Compressed
                 m |= 1;
                 if ((h = getc(fp)) == EOF)
-                    error("EOF in sector %u/%u comress data", i, t->Smap[i]);
-                memset(t->Tbuf + d, h, s);
+                    fatal("EOF in sector %u/%u compress data", i, t->Smap[i]);
+                memset(t->Tbuf + d, h, sLen);
+            } else { // Normal
+                if (fread(t->Tbuf + d, 1, sLen, fp) != sLen)
+                    fatal("EOF in sector %u/%u data", i, t->Smap[i]);
             }
-            else {				// Normal
-                if (fread(t->Tbuf + d, 1, s, fp) != s)
-                    error("EOF in sector %u/%u data", i, t->Smap[i]);
-            }
-            if (c & 0x02) {		// Deleted data
-                if (!Dam) m |= 2;
+            if (c & 0x02) { // Deleted data
+                if (!Dam)
+                    m |= 2;
             }
             if (c & 0x04) {
-                if (Bad) m |= 4;
+                if (Bad)
+                    m |= 4;
             }
         }
         t->Sflag[i] = m + 1;
-        d += s;
+        d += sLen;
     }
     return 255;
 }
@@ -277,8 +239,7 @@ int load_track(TRACK *t, FILE *fp)
  * Reorder the sectors to the requested interleave.
  * If necessary, calculate optimal interleave.
  */
-void interleave(TRACK *t)
-{
+void interleave(TRACK *t) {
     unsigned i, j, k, n;
     unsigned char D, E, F, G, Slist[256], Sbuf[256];
     unsigned char map[256];
@@ -295,15 +256,15 @@ void interleave(TRACK *t)
         for (j = i + 1; j < n; ++j) {
             E = Slist[j];
             if (E < D) {
-                G = map[j];
+                G        = map[j];
                 Slist[j] = D;
                 Slist[i] = D = E;
-                map[j] = F;
+                map[j]       = F;
                 map[i] = F = G;
             }
         }
     }
-    if (Intl == 255) {		// Best guess - calculate interleave
+    if (Intl == 255) { // Best guess - calculate interleave
         // Scan sector map to determine interleave occurances
         memset(Sbuf, 0, n);
         for (i = j = k = 0; i < n; ++i) {
@@ -325,8 +286,7 @@ void interleave(TRACK *t)
                 D = Sbuf[i];
             }
         }
-    }
-    else
+    } else
         k = Intl;
 
     // Regenerate the Sector Numbering Map using
@@ -337,15 +297,14 @@ void interleave(TRACK *t)
             j = (j + 1) % n;
         Imap[j] = map[i];
         Sbuf[j] = 255;
-        j = (j + k) % n;
+        j       = (j + k) % n;
     }
 }
 
 /*
  * Update individual map value with interleave
  */
-void inter_update(unsigned char map[], unsigned n)
-{
+void inter_update(unsigned char map[], unsigned n) {
     unsigned i;
     unsigned char temp[256];
     memcpy(temp, map, n);
@@ -356,20 +315,19 @@ void inter_update(unsigned char map[], unsigned n)
 /*
  * Write track from memory to output file
  */
-void write_track(TRACK *t, FILE *fp)
-{
+void write_track(TRACK *t, FILE *fp) {
     unsigned i, j, n, s;
     unsigned char f;
 
     // Don't write excluded tracks
-    if (f = Sskip[t->Cyl]) {
+    if ((f = Sskip[t->Cyl])) {
         if ((t->Head ? 2 : 1) & f)
             return;
     }
 
     // Build index table to access sector data
     n = t->Nsec;
-    s = xsize[t->Size];
+    s = 128 << t->Size;
     for (i = j = 0; i < n; ++i) {
         Index[i] = j >> 7;
         j += s;
@@ -411,19 +369,18 @@ void write_track(TRACK *t, FILE *fp)
     // Output sector data
     for (i = 0; i < n; ++i) {
         j = Index[i] << 7;
-        if (f = t->Sflag[i])		// Data available
+        if ((f = t->Sflag[i])) // Data available
             --f;
         else {
-            if (!Fflag) {		// No sector data
+            if (!Fflag) { // No sector data
                 putc(0, fp);
                 continue;
             }
         }
-        if (f & 0x01) {			// Compressed
+        if (f & 0x01) { // Compressed
             if (Cflag & 0xF0)
                 f &= ~1;
-        }
-        else if (Cflag & 0x0F) {	// Not compressed
+        } else if (Cflag & 0x0F) { // Not compressed
             if (issame(t->Tbuf + j, s))
                 f |= 1;
         }
@@ -438,64 +395,45 @@ void write_track(TRACK *t, FILE *fp)
 /*
  * Update statistics counters
  */
-void update_stats(TRACK *t)
-{
+void update_stats(TRACK *t) {
     unsigned i, b;
     if (t->Head)
         ++H1tracks;
     else
         ++H0tracks;
     for (i = 0; i < t->Nsec; ++i) {
-        ++STcount[ST_TOTAL];				// Total sectors
-        if (b = t->Sflag[i]) {
+        ++STcount[ST_TOTAL]; // Total sectors
+        if ((b = t->Sflag[i])) {
             --b;
-            if (b & 1) ++STcount[ST_COMP];	// Compressed
-            if (b & 2) ++STcount[ST_DAM];	// Deleted
-            if (b & 4) ++STcount[ST_BAD];
-        }	// Bad
+            if (b & 1)
+                ++STcount[ST_COMP]; // Compressed
+            if (b & 2)
+                ++STcount[ST_DAM]; // Deleted
+            if (b & 4)
+                ++STcount[ST_BAD];
+        } // Bad
         else
             ++STcount[ST_UNAVAIL];
-    }		// Unavail
-}
-
-/*
- * Parse a filename and append extension if none supplied
- */
-void filename(unsigned char *name, unsigned char *ext)
-{
-    unsigned char d, *p;
-    p = Lsmap;
-rd:	d = 255;
-    for (;;) switch (*p++ = *name++) {
-    case 0:
-        if (d)
-            strcpy(p - 1, ext);
-        return;
-    case ':':
-    case '\\':	goto rd;
-    case '.':	d = 0;
-    }
+    } // Unavail
 }
 
 /*
  * Test for additional command option value (comma separated)
  */
-int tnext(void)
-{
+int tnext(void) {
     if (*ptr == ',') {
         ++ptr;
         return 255;
     }
     if (*ptr)
-        error("Syntax error");
+        fatal("Syntax error");
     return 0;
 }
 
 /*
  * Obtain a numeric value from command input
  */
-unsigned number(unsigned base, unsigned low, unsigned high)
-{
+unsigned number(unsigned base, unsigned low, unsigned high) {
     unsigned c, v;
     unsigned char f;
     v = f = 0;
@@ -506,21 +444,23 @@ unsigned number(unsigned base, unsigned low, unsigned high)
             c -= ('A' - 10);
         else if ((c >= 'a') && (c <= 'f'))
             c -= ('a' - 10);
-        else switch (c) {
-        case 0:
-        case ',':
-            if (f) {
-                if ((v < low) || (v > high))
-                    error(((base == 16) ?
-                        "Value (%x) out of range: %x-%x\n" :
-                        "Value (%u) out of range: %u-%u\n"),
-                        v, low, high);
-                return v;
+        else
+            switch (c) {
+            case 0:
+            case ',':
+                if (f) {
+                    if ((v < low) || (v > high))
+                        fatal(((base == 16) ? "Value (%x) out of range: %x-%x\n"
+                                            : "Value (%u) out of range: %u-%u\n"),
+                              v, low, high);
+                    return v;
+                }
+                // FALLTHROUGH
+            default:
+                fatal("Bad number");
             }
-        default: error("Bad number");
-        }
         if (c >= base)
-            error("Bad numeric value");
+            fatal("Bad numeric value");
         f = 255;
         v = (v * base) + c;
         ++ptr;
@@ -530,18 +470,18 @@ unsigned number(unsigned base, unsigned low, unsigned high)
 /*
  * Validate track data * insert from merge
  */
-void check_track(void)
-{
-    unsigned i, x, m, c, h, h1, n, s;
+void check_track(void) {
+    unsigned i, m, c, h, h1, n, s;
+    int x;
     m = t1.Mode;
     c = t1.Cyl;
     h = t1.Head;
     n = t1.Nsec;
-    s = xsize[t1.Size];
+    s = 128 << t1.Size;
 
     if (t2.Cyl >= c) {
         if ((t2.Cyl > c) || (t2.Head > h)) {
-            //printf("Rewind\n");
+            // printf("Rewind\n");
             rewind(fpm);
             while ((x = getc(fpm)) != 0x1A) {
                 if (x == EOF) {
@@ -558,7 +498,7 @@ void check_track(void)
 
     while ((t2.Cyl != c) || (t2.Head != h)) {
         h1 = 1 << t2.Head;
-        //printf("%u %u/%u %02x\n", c, t2.Cyl, t2.Head, Tracks[t2.Cyl]);
+        // printf("%u %u/%u %02x\n", c, t2.Cyl, t2.Head, Tracks[t2.Cyl]);
         if (!(Tracks[t2.Cyl] & h1)) {
             if ((t2.Cyl < c) || ((t2.Cyl == c) && (t2.Head < h))) {
                 warn("Adding track %u/%u from mergefile", t2.Cyl, t2.Head);
@@ -590,15 +530,15 @@ void check_track(void)
     // Scan track and insert any missing sectors
     for (i = 0; i < t2.Nsec; ++i) {
         c = t2.Smap[i];
-        for (x = 0; x < t1.Nsec; ++x) {
+        for (unsigned x = 0; x < t1.Nsec; ++x) {
             if (t1.Smap[x] == c)
                 goto secfound;
         }
         // Sector to add
         warn("Adding sector %u/%u", n, c);
-        t1.Smap[n] = c;
-        t1.Cmap[n] = t2.Cmap[i];
-        t1.Hmap[n] = t2.Hmap[i];
+        t1.Smap[n]  = c;
+        t1.Cmap[n]  = t2.Cmap[i];
+        t1.Hmap[n]  = t2.Hmap[i];
         t1.Sflag[n] = t2.Sflag[i];
         memcpy(t1.Tbuf + n * s, t2.Tbuf + i * s, s);
         t1.Nsec = ++n;
@@ -609,8 +549,7 @@ void check_track(void)
 /*
  * Check an individual sector from input/merge files
  */
-int check_sector(unsigned i)
-{
+int check_sector(unsigned i) {
     unsigned s, j, si, f, f1, f2;
 
     s = t1.Smap[i];
@@ -621,8 +560,8 @@ int check_sector(unsigned i)
     warn("Sector %u not found in merge image", s);
     return 0;
 
-secok:	// Sector was found
-    si = xsize[t1.Size];
+secok: // Sector was found
+    si = 128 << t1.Size;
     f2 = t2.Sflag[j];
     if (!(f1 = t1.Sflag[i])) {
         if (f2) {
@@ -636,7 +575,7 @@ secok:	// Sector was found
     }
 
     // We have sector data
-    if (!f2)					// No merge sector data
+    if (!f2) // No merge sector data
         return 0;
     --f1;
     --f2;
@@ -651,11 +590,44 @@ secok:	// Sector was found
     return 0;
 }
 
+
 /*
  * Main program
  */
-void main(int argc, char *argv[])
-{
+
+// modified handling of options to support 2 char values portably
+#define OPT(a, b) (((a) << 8) | (b))
+enum {
+    OPTAC = OPT('A', 'C'),
+    OPTdB = OPT('-', 'B'),
+    OPTsB = OPT('/', 'B'),
+    OPTdC = OPT('-', 'C'),
+    OPTsC = OPT('/', 'C'),
+    OPTdD = OPT('-', 'D'),
+    OPTsD = OPT('/', 'D'),
+    OPTdE = OPT('-', 'E'),
+    OPTsE = OPT('/', 'E'),
+    OPTdM = OPT('-', 'M'),
+    OPTsM = OPT('/', 'M'),
+    OPTdN = OPT('-', 'N'),
+    OPTsN = OPT('/', 'N'),
+    OPTdQ = OPT('-', 'Q'),
+    OPTsQ = OPT('/', 'Q'),
+    OPTdY = OPT('-', 'Y'),
+    OPTsY = OPT('/', 'Y'),
+    OPTEC = OPT('E', 'C'),
+    OPTFe = OPT('F', '='),
+    OPTIL = OPT('I', 'L'),
+    OPTRC = OPT('R', 'C'),
+    OPTT2 = OPT('T', '2'),
+    OPTT3 = OPT('T', '3'),
+    OPTT5 = OPT('T', '5'),
+    OPTX0 = OPT('X', '0'),
+    OPTX1 = OPT('X', '1'),
+    OPTXe = OPT('X', '='),
+};
+
+int main(int argc, char *argv[]) {
     int c;
     unsigned i, s, t;
     unsigned char f;
@@ -663,35 +635,63 @@ void main(int argc, char *argv[])
 
     fputs("IMageDisk Utility " VERSION " / " __DATE__ "\n", stdout);
 
+    chkStdOptions(argc, argv);
+
     // Process command line arguments
     for (i = 1; i < (unsigned)argc; ++i) {
-        ptr = argv[i];
-        switch (s = (toupper(*ptr++) << 8) | toupper(*ptr++)) {
-        case '-B':
-        case '/B': Ioutput = Wflag = 0; 		continue;
-        case '-D':
-        case '/D': Detail = 255;				continue;
-        case '-Q':
-        case '/Q': Verbose = 0;				continue;
-        case '-Y':
-        case '/Y': Yes = 255;					continue;
-        case '-C':
-        case '/C': Cflag = 0x0F; Wflag = 0;	continue;
-        case '-E':
-        case '/E': Cflag = 0xF0; Wflag = 0;	continue;
-        case '-M':
-        case '/M': Xmode = 0;					continue;
-        case '-N':
-        case '/N':
+        ptr      = argv[i];
+        char ch1 = toupper(*ptr++); // avoid sequence point risk
+        char ch2 = toupper(*ptr++);
+        switch (s = OPT(ch1, ch2)) {
+        case OPTdB:
+        case OPTsB:
+            Ioutput = Wflag = 0;
+            continue;
+        case OPTdD:
+        case OPTsD:
+            Detail = 255;
+            continue;
+        case OPTdQ:
+        case OPTsQ:
+            Verbose = 0;
+            continue;
+        case OPTdY:
+        case OPTsY:
+            Yes = 255;
+            continue;
+        case OPTdC:
+        case OPTsC:
+            Cflag = 0x0F;
+            Wflag = 0;
+            continue;
+        case OPTdE:
+        case OPTsE:
+            Cflag = 0xF0;
+            Wflag = 0;
+            continue;
+        case OPTdM:
+        case OPTsM:
+            Xmode = 0;
+            continue;
+        case OPTdN:
+        case OPTsN:
             switch (toupper(*ptr)) {
-            case 'D': Dam = Wflag = 0;			continue;
-            case 'B': Bad = Wflag = 0; 		    continue;
+            case 'D':
+                Dam = Wflag = 0;
+                continue;
+            case 'B':
+                Bad = Wflag = 0;
+                continue;
             }
-            goto xhelp;
-        case 'F=': Fill = number(16, Wflag = 0, 255);
-            Fflag = 255;				continue;
-        case 'X=':	f = 3;
-        doexc:
+            usage("/N must be followed by D or B");
+        case OPTFe:
+            Fill  = number(16, Wflag = 0, 255);
+            Fflag = 255;
+            continue;
+        case OPTX0:
+        case OPTX1:
+        case OPTXe:
+            f = ch2 == '0' ? 1 : ch2 == '1' ? 2 : 3;
             c = s = number(10, Wflag = 0, 255);
             if (tnext())
                 c = number(10, 0, 255);
@@ -699,73 +699,97 @@ void main(int argc, char *argv[])
                 Sskip[s++] |= f;
             continue;
         }
-        if (*ptr++ == '=') switch (s) {
-        case 'RC': Rcomment = 255;
-        case 'AC': CIfile = ptr;				continue;
-        case 'EC': CEfile = ptr;				continue;
-        case 'X0': f = 1;						goto doexc;
-        case 'X1': f = 2;						goto doexc;
-        case 'IL': Intl = *ptr ? number(10, 1, 99) : 255;
-            Wflag = 0;					continue;
-        case 'T5':	s = 0;						goto dotran;
-        case 'T3': s = 1;						goto dotran;
-        case 'T2': s = 3;
-        dotran: switch (number(10, Wflag = 0, 65535)) {
-        default: goto xhelp;
-        case 500: c = 0;		break;
-        case 300: c = 1;		break;
-        case 250: c = 2;
-        }
-                Tmode[s] = c;
+        if (*ptr++ == '=')
+            switch (s) {
+            case OPTRC:
+                Rcomment = 255;
+                // FALLTHROUGH
+            case OPTAC:
+                CIfile = makeFilename(ptr, ".txt", false);
+                continue;
+            case OPTEC:
+                CEfile = makeFilename(ptr, ".txt", false);
+                continue;
+            case OPTIL:
+                Intl  = *ptr ? number(10, 1, 99) : 255;
+                Wflag = 0;
+                continue;
+            case OPTT5:
+            case OPTT3:
+            case OPTT2:
+                s = ch2 == '5' ? 0 : ch2 == '3' ? 1 : 3;
+                switch (number(10, Wflag = 0, 65535)) {
+                default:
+                    usage("/T must be followed by 2, 3 or 5");
+                case 500:
+                    c = 0;
+                    break;
+                case 300:
+                    c = 1;
+                    break;
+                case 250:
+                    c = 2;
+                }
+                Tmode[s]     = c;
                 Tmode[s + 3] = c + 3;
                 continue;
-        }
-        if (!fp) {											// 1st = Input
-            filename(ptr - 3, ".IMD");
-			if ((fp = fopen(Lsmap, "rb")) == NULL)
-				error("can't open %s\n", Lsmap);
+            }
+        if (!fp) { // 1st = Input
+            char *iFile = makeFilename(ptr - 3, ".imd", false);
+            if ((fp = fopen(iFile, "rb")) == NULL)
+                fatal("can't open %s\n", iFile);
             continue;
         }
-        if (!Mfile) { Mfile = ptr - 3;				continue; }	// 2nd = Merge
-        if (!Wfile) { Wfile = ptr - 3; 			continue; }	// 3rd = Output
-    xhelp: abort(help);
+        if (!Mfile) {
+            Mfile = makeFilename(ptr - 3, ".imd", false);
+            continue;
+        } // 2nd = Merge
+        if (!Wfile) {
+            Wfile = ptr - 3;
+            continue;
+        } // 3rd = Output
+        usage("Too many file arguments");
     }
 
-    if (!fp) goto xhelp;				// No input file - issue help/exit
+    if (!fp)
+        usage("No image file"); // No input file - issue help/exit
 
     // Allocate 2 32k blocks for track data
-    if (!(t1.Tbuf = (unsigned char *)malloc(0x8000)) || !(t2.Tbuf = (unsigned char *)malloc(0x8000)))
-        abort("Out of memory");
+    if (!(t1.Tbuf = (unsigned char *)malloc(0x8000)) ||
+        !(t2.Tbuf = (unsigned char *)malloc(0x8000)))
+        fatal("Out of memory");
     // Read and display input file comment, saving it to segment
     t = 0;
     while ((c = getc(fp)) != 0x1A) {
         if (c == EOF)
-            abort("EOF in comment");
-        putc(c, stdout);
+            fatal("EOF in comment");
+        if (c != '\r') // avoid \r\n becoming \r\r\n
+            putc(c, stdout);
         t1.Tbuf[t++] = c;
     }
 
     // If extracting comment, retrieve from segment and write to file
     if (CEfile) {
-        filename(CEfile, ".TXT");
-		if ((fpw = fopen(Lsmap, "wt")) == NULL)
-			error("can't create %s\n", Lsmap);
+        if ((fpw = fopen(CEfile, "wb")) == NULL)
+            fatal("can't create %s\n", CEfile);
         for (i = 0; i < t; ++i)
             putc(t1.Tbuf[i], fpw);
         fclose(fpw);
     }
 
-    if (Rcomment)	// Replacing - reset segment top
+    if (Rcomment) // Replacing - reset segment top
         t = 0;
 
     // If inserting comment - append to segment
     if (CIfile) {
         Wflag = 0;
-        filename(CIfile, ".TXT");
-		if ((fpw = fopen(Lsmap, "rb")) == NULL)
-			error("can't open %s\n", Lsmap);
-        while ((c = getc(fpw)) != EOF)
+        if ((fpw = fopen(CIfile, "rb")) == NULL)
+            fatal("can't open %s\n", CIfile);
+        while ((c = getc(fpw)) != EOF) {
+            if (c == '\n' && (t != 0 || t1.Tbuf[t - 1] != '\r')) // handle linux
+                t1.Tbuf[t++] = '\r';
             t1.Tbuf[t++] = c;
+        }
         fclose(fpw);
     }
     fpw = 0;
@@ -774,41 +798,44 @@ void main(int argc, char *argv[])
     // other options indicate we are convertng data
     if (Mfile) {
         if (Wfile || Wflag) {
-            filename(Mfile, ".IMD");
-			if ((fpm = fopen(Lsmap, "rb")) == NULL)
-				error("can't open %s\n", Lsmap);
-        }
-        else
+            if ((fpm = fopen(Mfile, "rb")) == NULL)
+                fatal("can't open %s\n", Mfile);
+        } else
             Wfile = Mfile;
     }
 
-    if (Wfile) {						// We are writing output
-        if (!(Ioutput | Intl)) {		// Binary output with no IL=
+    if (Wfile) {                 // We are writing output
+        if (!(Ioutput | Intl)) { // Binary output with no IL=
             Intl = 1;
             if (Verbose)
                 printf("Assuming 1:1 for Binary output\n");
         }
-        filename(Wfile, Ioutput ? ".IMD" : ".BIN");
+        Wfile = makeFilename(Wfile, Ioutput ? ".imd" : ".bin", false);
         // Test for file already existing and prompt for overwrite
-        if (!Yes) if (fpw = fopen(Lsmap, "rb")) {
-            printf("%s already exists - proceed(Y/N)?", Lsmap);
-        xxx: switch (_getch()) {
-        default: goto xxx;
-        case 0x1B:
-        case 0x03:
-        case 'n':
-        case 'N': printf("N\n"); return;
-        case 'y':
-        case 'Y': printf("Y\n");
-        }
-             fclose(fpw);
-        }
-		if ((fpw = fopen(Lsmap, "wb")) == NULL)
-			error("can't create %s\n", Lsmap);
-    }
-    else {		// No output file specified
-        if (!Wflag)		// Error if we are converting
-            abort("No output file.");
+        if (!Yes)
+            if ((fpw = fopen(Wfile, "rb"))) {
+                printf("%s already exists - proceed(Y/N)?", Wfile);
+            xxx:
+                switch (_getch()) {
+                default:
+                    goto xxx;
+                case 0x1B:
+                case 0x03:
+                case 'n':
+                case 'N':
+                    printf("N\n");
+                    return 1;
+                case 'y':
+                case 'Y':
+                    printf("Y\n");
+                }
+                fclose(fpw);
+            }
+        if ((fpw = fopen(Wfile, "wb")) == NULL)
+            fatal("can't create %s\n", Wfile);
+    } else {        // No output file specified
+        if (!Wflag) // Error if we are converting
+            fatal("Missing output file");
         if (Verbose && fpm)
             printf("No output file - compare only.\n");
     }
@@ -830,7 +857,7 @@ void main(int argc, char *argv[])
         rewind(fp);
         while ((c = getc(fp)) != 0x1A) {
             if (c == EOF)
-                abort("EOF in comment");
+                fatal("EOF in comment");
         }
     }
 
@@ -841,7 +868,7 @@ void main(int argc, char *argv[])
             check_track();
         update_stats(&t1);
 
-        s = xsize[t1.Size];
+        s = 128 << t1.Size;
         if ((t1.Mode != Lmode) || (t1.Nsec != Lnsec) || (t1.Size != Lsize))
             f = 255;
         if (f) {
@@ -851,10 +878,9 @@ void main(int argc, char *argv[])
                 f = 0;
                 continue;
             }
-            printf("%u kbps %cD  %ux%u\n",
-                Mtext[(Lmode = t1.Mode) % 3],
-                (Lmode > 2) ? 'D' : 'S',
-                Lnsec = t1.Nsec, xsize[Lsize = t1.Size]);
+            Lmode = t1.Mode; // avoid sequence point issues
+            printf("%u kbps %cD  %ux%u\n", Mtext[Lmode % 3], (Lmode > 2) ? 'D' : 'S',
+                   Lnsec = t1.Nsec, 128 << (Lsize = t1.Size));
         }
         if (f || memcmp(t1.Smap, Lsmap, sizeof(Lsmap))) {
             f = 255;
@@ -869,7 +895,7 @@ void main(int argc, char *argv[])
                 putc('\n', stdout);
             }
         }
-        if (Detail) {		// Display detail records
+        if (Detail) { // Display detail records
             if (t1.Hflag & 0x80) {
                 printf(" CL: ");
                 for (i = 0; i < t1.Nsec; ++i) {
@@ -898,9 +924,10 @@ void main(int argc, char *argv[])
                 }
                 --f;
                 c = (f & 4) ? 'B' : 'D';
-                if (f & 0x20) c += ('a' - 'A');
+                if (f & 0x20)
+                    c += ('a' - 'A');
                 if (f & 1)
-                    printf("%c%02x", c, t1.Tbuf[i*s]);
+                    printf("%c%02x", c, t1.Tbuf[i * s]);
                 else
                     printf("%c  ", c);
             }
@@ -917,7 +944,7 @@ void main(int argc, char *argv[])
         while ((c = getc(fpm)) != 0x1A) {
             if (c == EOF) {
                 warn("EOF in merge comment");
-                return;
+                return 1;
             }
         }
         while (load_track(&t2, fpm)) {
@@ -931,10 +958,10 @@ void main(int argc, char *argv[])
     }
 
     // Display summary
-    printf("%u tracks(%u/%u), %u sectors",
-        H0tracks + H1tracks, H0tracks, H1tracks, STcount[ST_TOTAL]);
+    printf("%u tracks(%u/%u), %u sectors", H0tracks + H1tracks, H0tracks, H1tracks,
+           STcount[ST_TOTAL]);
     for (f = i = 0; i < 4; ++i) {
-        if (s = STcount[i + 1]) {
+        if ((s = STcount[i + 1])) {
             printf("%s%u %s", f ? ", " : " (", s, st_names[i]);
             f = 255;
         }
@@ -950,4 +977,5 @@ void main(int argc, char *argv[])
         fclose(fpm);
     if (fp)
         fclose(fp);
+    return 0;
 }
