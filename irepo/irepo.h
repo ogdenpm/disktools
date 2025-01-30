@@ -43,7 +43,6 @@ typedef struct {
 
 
 char *findMatch(const KeyPtr key, const char *iname);
-const char *fileName(const char *loc);
 bool isAlt(const char *loc, const char *iname);
 char *mkIname(const char *loc);
 
@@ -52,6 +51,6 @@ bool parseRecipe(char *line, recipe_t *recipe);
 bool printRecipe(FILE *fp, recipe_t *recipe, bool showAlt);
 bool updateRecipe(recipe_t *r);
 
-#endif#
+#endif
 
 
