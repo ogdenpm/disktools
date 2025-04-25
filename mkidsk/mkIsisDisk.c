@@ -161,6 +161,8 @@ struct {
 } osLookup[]    = { {"NONE", NONE}, // 0 always NONE
                     {"UNKNOWN", UNKNOWN}, // 1 always UNKNOWN
                     {"ISIS I 1.1", I11},
+                    {"ISIS I 1.1 16K", I11_16K},
+                    {"ISIS I 1.1", I12},
                     {"ISIS II 2.2", II22},
                     {"ISIS II 3.4", II34},
                     {"ISIS II 4.0", II40},
@@ -191,7 +193,9 @@ struct {
 osMap_t osMap[] = {
     {"non", NULL, 0},
     {"UNKNOWN", "", 0}, // will pick up from user files
-    {"ISIS I 1.1", "Intel80/isis_i/1.1/", USESWP},
+    {"ISIS I 1.1", "Intel80/isis_i/1.1/", USESWP},  // I11
+    {"ISIS I 1.1 16K", "Intel80/isis_i/1.1/", USESWP},  // I11_16K
+    {"ISIS I 1.2", "Intel80/isis_i/1.2/", USESWP},
     {"ISIS II 2.2", "Intel80/isis_ii/2.2/", USESWP},
     {"ISIS II 3.4", "Intel80/isis_ii/3.4/", 0},
     {"ISIS II 4.0", "Intel80/isis_ii/4.0/", 0},
