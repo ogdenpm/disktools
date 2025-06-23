@@ -229,14 +229,14 @@ void readBlk(uint8_t *addPt, uint32_t loc, uint32_t len) {
        any data beyond the hole.
     */
     if (shortTrack0 && loc < T0SIZE && loc + len > T0HOLE) {
-        warn("Reading from loc %d for %d bytes includes missing track 0 sector 16\n", loc, len);
+        warn("Reading %d bytes starting at location %d includes missing track 0 sector 16\n", len, loc);
         uint32_t preHoleSize = loc < T0HOLE ? T0HOLE - loc : 0;
         len -= preHoleSize;
         uint32_t holeSize = len > 128 ? 128 : len;
         len -= holeSize;
 
         readBlk(addPt, loc, preHoleSize); // read before the hole (uses the code in else block)
-        memset(addPt + preHoleSize, 0, holeSize);
+        memset(addPt + preHoleSize, '?', holeSize);
         readBlk(addPt + preHoleSize + holeSize, T0SIZE,
                 len); // read after the hole (as per pre hole)
     } else {
@@ -510,9 +510,11 @@ bool nonBlank(uint8_t *p, unsigned len) {
     return false;
 }
 
+uint8_t isoLabel[128];
+uint8_t irmxLabel[128];
+
 void irmxConfig(FILE *fp) {
-    uint8_t isoLabel[128];
-    uint8_t irmxLabel[128];
+
 
     fseek(fp, 0, SEEK_END);
 
@@ -531,6 +533,7 @@ void irmxConfig(FILE *fp) {
     shortTrack0 = volSize == fileSize + 128; // floppy disk may have track 0 with 15, 128 byte
                                              // sectors leading to a short block on track 0
 
+    
     if (debug) {
         printf("ISO: ");
         if (memcmp(isoLabel, "VOL", 3) != 0)
@@ -587,13 +590,17 @@ void irmxConfig(FILE *fp) {
     dump reserved sections
 */
 void dumpReserved(FILE *fp) {
-    uint8_t tmp[VOLHEADER_SIZE];
-    if (fseek(fp, 0L, SEEK_SET) == 0 && fread(tmp, 1, VOLHEADER_SIZE, fp) == VOLHEADER_SIZE) {
-        appendComponent("__boot__");
-        saveFile(targetPath, tmp, VOLHEADER_SIZE);
-        logMsg("-     %-9s %8d    ----- ----%22s __boot__\n", "system", VOLHEADER_SIZE, "");
-    } else
-        fprintf(stderr, "can't read volume header\n");
+    uint8_t tmp[3328-1024];
+
+    appendComponent("__boot.0__");
+    logMsg("%-9s %8d    ----- ----%22s __boot.0__\n", "system", 384, "");
+    readBlk(tmp, 0L, 384);
+    saveFile(targetPath, tmp, 384);
+    appendComponent("__boot.1__");
+    logMsg("%-9s %8d    ----- ----%22s __boot.1__\n", "system", 3328-1024, "");
+    readBlk(tmp, 1024L, 3328-1024);
+    saveFile(targetPath, tmp, 3328-1024);
+
 }
 
 /*
@@ -681,12 +688,20 @@ void main(int argc, char **argv) {
     appendComponent("__log__");
     openLog(targetPath);
 
+    logMsg("ISO Volume Label saved as __isolabel__\n");
+    logMsg("iRMX Volume Label saved as __irmxlabel__\n\n");
+    appendComponent("__isolabel__");
+    saveFile(targetPath, isoLabel, 128);
+    appendComponent("__irmxlabel__");
+    saveFile(targetPath, irmxLabel, 128);
+
     fnode_t aNode;
     if (!readFnode(rootFnode, &aNode))
         fatal("Cannot read root node %d\n", rootFnode);
 
     irmxDirectory(&aNode, "");
-    logMsg("Unattached files\n");
+    logMsg("\nUnattached files\n");
+    debug = false;  // suppress  debug info i.e. fnode number as not appropriate
     for (uint32_t i = 0; i < maxFnode; i++)
         if ((rawFnode[i * fnodeSize] & 9) == 1 && readFnode(i, &aNode)) {
             if (i < 6)
