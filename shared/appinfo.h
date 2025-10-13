@@ -21,6 +21,6 @@
 #define APP_OWNER "Mark Ogden"
 #endif
 #ifndef APP_EMAIL
-#define APP_EMAIL "mark@mark-ogden.uk"
+#define APP_EMAIL "support@mark-ogden.uk"
 #endif
 #endif
