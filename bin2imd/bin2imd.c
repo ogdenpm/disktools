@@ -514,7 +514,7 @@ int main(int argc, char *argv[]) {
 
     // If option file, open it and read first set of parameters
     // Apply them if they apply to track-0
-    if (*Ffile) {
+    if (Ffile) {
         if ((fpf = fopen(Ffile, "rt")) == NULL)
             fatal("can't open %s", Ffile);
         read_format();
