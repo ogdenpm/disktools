@@ -176,7 +176,7 @@ inline bool invalidCh(int c) {
     the buffer grows with each bigger file, otherwise it is reused
     it also has a minimum size MINCOPYBUF (currently 64k)
 */
-uint8_t *getCopyBuf(size_t size) {
+uint8_t *getCopyBuf(uint32_t size) {
     if (size > sizeCopyBuf) {
         if (size < MINCOPYBUF) // make sure minimum size
             size = MINCOPYBUF;
