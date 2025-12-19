@@ -68,7 +68,8 @@ FILE *fpi, // Binary file in
     *fpo,  // IMD file out
     *fpf;  // Detail record fp
 
-/*
+uint8_t FfileBuf[200];
+    /*
  * Obtain a number from the command line
  */
 unsigned char get_num(unsigned *value, unsigned l, unsigned h) {
@@ -394,7 +395,7 @@ unsigned char skip(void) {
  */
 void read_format(void) {
 again:
-    if (!fgets(ptr = Ffile, sizeof(Ffile) - 1, fpf)) {
+    if (!fgets(ptr = FfileBuf, sizeof(FfileBuf) - 1, fpf)) {
         Fmtnext = -1;
         return;
     }
