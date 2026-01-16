@@ -338,7 +338,7 @@ void logFnode(fnode_t *fnode) {
         logMsg("%-9s", nodeTypes[fnode->type]);
     else
         logMsg("?%-8d", fnode->type);
-    logMsg(" %8d %c%c", fnode->totalSize, fnode->flags & 0x20 ? 'm' : ' ',
+    logMsg(" %8d %c%c", fnode->totalSize, fnode->flags & 0x40 ? 'X' :fnode->flags & 0x20 ? 'm' : ' ',
              fnode->flags & 2 ? 'l' : ' ');
 
     for (int i = 0; i < 3; i++)
@@ -381,21 +381,15 @@ void setFileTime(char const *path, fnode_t *node) {
     hiresTime.QuadPart = unixDay0 + (uint64_t)(node->modTime + IRMXDATEOFFSET) * 10000000ULL;
     FILETIME mfiletm   = { hiresTime.LowPart, hiresTime.HighPart };
 
-    // CreateFile needs wchar path name so convert
-    int wsize      = MultiByteToWideChar(CP_ACP, 0, path, -1, NULL, 0);
-    wchar_t *wPath = safeMalloc(wsize * sizeof(wchar_t));
-    MultiByteToWideChar(CP_ACP, 0, path, -1, wPath, wsize);
-
     // open the  file to allow update of the attributes
     HANDLE hFile =
-        CreateFile(wPath, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+        CreateFile(path, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                    OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
-    free(wPath);
-    if (hFile == INVALID_HANDLE_VALUE) { // quietly ignore if we could not open
-        return;
+
+    if (hFile != INVALID_HANDLE_VALUE) { // only process if we could open file
+        SetFileTime(hFile, &cfiletm, &afiletm, &mfiletm); // set time, quietly ignore errors
+        CloseHandle(hFile);
     }
-    SetFileTime(hFile, &cfiletm, &afiletm, &mfiletm); // set time, quietly ignore errors
-    CloseHandle(hFile);
 }
 #else
 // simple version for none windows systems
@@ -640,7 +634,7 @@ void appendComponent(char const *component) {
     strcpy(irmxPath + appendPos, component);
     strcpy(rootPath + appendPos, component);
     for (char *s = rootPath + appendPos; s = strchr(s, '?'); s++)
-        *s = '!';
+        *s = '~';
 }
 
 void enterDir(char const *component) {
