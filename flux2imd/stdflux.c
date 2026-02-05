@@ -43,7 +43,7 @@ uint16_t actIndexCnt;
 
 static uint32_t tsToPos(int32_t ts);
 
-void beginFlux(uint32_t sampleCnt, int indexCnt, double sclk, double rpm, int16_t hsCnt) {  // indexCnt is the count of index holes
+void beginFlux(uint32_t sampleCnt, int indexCnt, double sclk, uint16_t rpm, int16_t hsCnt) {  // indexCnt is the count of index holes
     free(sfTs);
     free(sfIndex);
     sfTs = NULL;

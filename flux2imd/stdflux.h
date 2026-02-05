@@ -23,7 +23,7 @@ typedef bool (*OnIndex)(int16_t itype);
 
 
 
-void beginFlux(uint32_t sampleCnt, int indexCnt, double sclk, double rpm, int16_t hsCnt);  // indexCnt should include index holes + 1 for EODATA. SODATA allocated internally
+void beginFlux(uint32_t sampleCnt, int indexCnt, double sclk, uint16_t rpm, int16_t hsCnt);  // indexCnt should include index holes + 1 for EODATA. SODATA allocated internally
 void setActualRPM(double rpm);
 void addDelta(uint32_t delta);
 void addIndex(int16_t itype, uint32_t delta);

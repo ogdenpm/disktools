@@ -329,6 +329,7 @@ static void ssGetTrack(int cylinder, int side, char const *usrfmt) {
 
     unsigned idamPos = 0;
     unsigned dataPos = 0;
+    unsigned indexPos = 0;
     bool savedData   = false;
 
     initTrack(cylinder, side);
@@ -355,6 +356,7 @@ static void ssGetTrack(int cylinder, int side, char const *usrfmt) {
                 switch (matchType) {
                 case M2FM_INDEXAM:
                 case INDEXAM: // to note start of track
+                    indexPos = getByteCnt(fromTs);
                     DBGLOG(D_DECODER, "@%d index\n", indexPos);
                     break;
                 case TI_IDAM:

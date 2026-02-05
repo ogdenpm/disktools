@@ -52,7 +52,7 @@ bool scpOpen(const char *fname) {
     }
     if (scpHeader[IFF_FLAGS] & (1 << FB_EXTENDED))
         fseek(scpFp, 0x80, SEEK_SET);
-    for (int i = 0; i <= scpHeader[IFF_END]; i++)
+    for (int i = scpHeader[IFF_START]; i <= scpHeader[IFF_END]; i++)
         trkOffset[i] = scp32(scpFp);
     if (feof(scpFp)) {
         fclose(scpFp);
@@ -95,21 +95,26 @@ bool scpLoadTrk(uint16_t trk) {
     uint8_t trkHdr[4];
     sprintf(ct, "%d,%d", trk / 2, trk % 2);
     setLogPrefix(scpFname, ct);
-    if (fseek(scpFp, trkOffset[trk], SEEK_SET) ||
-        fread(trkHdr, 1, 4, scpFp) != 4 ||
-        memcmp(trkHdr, "TRK", 3) != 0 ||
-        trkHdr[3] != trk) {
+    if (fseek(scpFp, trkOffset[trk], SEEK_SET) || fread(trkHdr, 1, 4, scpFp) != 4 ||
+        memcmp(trkHdr, "TRK", 3) != 0 || trkHdr[3] != trk) {
         logFull(D_WARNING, "track info missing\n");
         return false;
     }
     uint32_t fluxTotal = 0;
     for (int i = 0; i < scpHeader[IFF_NUMREVS]; i++) {
-        trkData[i].rpm = 60.0 / (scp32(scpFp) * 25e-9);
+        trkData[i].rpm                  = 60.0 / (scp32(scpFp) * 25e-9);
         fluxTotal += trkData[i].fluxCnt = scp32(scpFp);
-        trkData[i].base = scp32(scpFp);
+        trkData[i].base                 = scp32(scpFp);
+    }
+    // SCP file format does not always record the rpm correctly
+    // only an issue when not index aligned - warn if flag is not set and the recorded rpm is > 327
+    uint16_t rpm = trkData[0].rpm > 327.0 ? 360 : 300;
+    if ((scpHeader[IFF_FLAGS] & (1 << FB_INDEX)) == 0 &&  ((scpHeader[IFF_FLAGS] >> FB_RPM) & 1) != (trkData[0].rpm > 320.0 ? 1 : 0)) {
+        logFull(D_WARNING, "RPM flag does not match recorded RPM - assuming %u rpm\n",
+                rpm);
     }
     double sclk = 1 / (25e-9 * (scpHeader[IFF_RESOLUTION] + 1));
-    beginFlux(fluxTotal, scpHeader[IFF_NUMREVS] + 1, sclk, (scpHeader[IFF_FLAGS] & (1 << FB_RPM)) ? 360.0 : 300.0, 0);
+    beginFlux(fluxTotal, scpHeader[IFF_NUMREVS] + 1, sclk, rpm, 0);
     setCylHead(trk / 2, trk % 2);
     int32_t delta = 0;
     int32_t sample;
@@ -148,7 +153,7 @@ bool scpLoad() {
         setLogPrefix(scpFname, NULL);
         if (trkOffset[curTrack])
             loaded = scpLoadTrk(curTrack);
-        curTrack += scpHeader[IFF_HEADS] == 0 ? 1 : 2;
+        curTrack++;
     }
     return loaded;
 }

@@ -111,7 +111,7 @@ static void finishFluxPass1(uint32_t streamPos, uint32_t sampleCnt) {
 
     double rpm = calcRPM(1);     // get an initial RPM
 
-    beginFlux(sampleCnt, fluxIndexCnt, sck, rpm < 327.0 ? 300.0 : 360.00, hc);
+    beginFlux(sampleCnt, fluxIndexCnt, sck, rpm < 327.0 ? 300 : 360, hc);
     setActualRPM(rpm);
 
     if (hc > 0) {
