@@ -98,6 +98,10 @@ void setActualRPM(double rpm) {
 void addDelta(uint32_t delta) {
 #ifdef _DEBUG
     actSampleCnt++;
+    if (actSampleCnt < 1000)
+        printf("%u, ", delta);
+    if (actSampleCnt < 1001 && actSampleCnt % 10 == 0)
+        putchar('\n');
 #endif
     sfBaseDelta += delta;
     if (sfTsPos < sfTsLen) {

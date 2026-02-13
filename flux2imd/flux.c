@@ -75,7 +75,7 @@ bool pass2KryoFlux(const uint8_t *image, uint32_t size);
 static void addFluxIndex(uint32_t streamPos, uint32_t sampleCnt, uint32_t indexCnt) {
     if (fluxIndexCnt >= MAXROTATE * (MAXHARDSECTOR + 1))
         logFull(D_ERROR, "addFluxIndex: too many indexes\n");
-    printf("%d %d %d\n", streamPos, sampleCnt, indexCnt);
+    //printf("%d %d %d\n", streamPos, sampleCnt, indexCnt);
     fluxIndex[fluxIndexCnt].streamPos = streamPos;
     if (streamPos == 0) {
         logFull(D_WARNING, "Ignoring index before start of data.\n");
@@ -180,7 +180,7 @@ static uint32_t oob(const uint8_t *fluxBuf, uint32_t fluxPos, uint32_t size, uin
                 }
                 if (matchType == OOB_STREAMEND && num2 != 0)
                     logFull(D_ERROR, "Steam End Block Error Code = %lu\n", num2);
-                printf("Stream: %d %d\n", num1, num2);
+                //printf("Stream: %d %d\n", num1, num2);
             }
             break;
         case OOB_INDEX:
@@ -227,6 +227,7 @@ static uint32_t oob(const uint8_t *fluxBuf, uint32_t fluxPos, uint32_t size, uin
     2) build the standard flux format
 */
 bool loadKryoFlux(const uint8_t *image, uint32_t size) {
+    // printf("Load\n");
     if (pass1KryoFlux(image, size) && pass2KryoFlux(image, size))
         return true;
 
